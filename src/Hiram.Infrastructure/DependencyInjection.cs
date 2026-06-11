@@ -13,6 +13,7 @@ public static class DependencyInjection
     {
         services.AddDbContext<HiramDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<INotificationStore, NotificationStore>();
+        services.AddScoped<INotificationReader, NotificationReader>();
         services.AddSingleton<IClock, SystemClock>();
 
         return services;
