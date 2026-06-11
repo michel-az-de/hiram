@@ -22,7 +22,7 @@ Hiram accepts a notification request, persists it together with an outbox row in
 
 ## Status
 
-Pre-F0. The walking skeleton is being built. Roadmap, phase plans and architecture decisions live in this repository:
+F0 complete. The walking skeleton runs end to end: a `POST /v1/notifications` is persisted with its outbox row in one PostgreSQL transaction, relayed to RabbitMQ, consumed, and reflected as `published`, with a single OpenTelemetry trace spanning the API, the publish and the consume. Roadmap, phase plans and architecture decisions live in this repository:
 
 | Document | Purpose |
 |---|---|
@@ -34,7 +34,51 @@ Pre-F0. The walking skeleton is being built. Roadmap, phase plans and architectu
 
 ## Quick start
 
-Arrives with phase F0. Until then: `plans/F0-walking-skeleton.md`.
+The dev infrastructure runs in Docker, the hosts run on .NET 10. Run everything from the repository root.
+
+1. Start Postgres, RabbitMQ, Redis and the Aspire Dashboard:
+
+   ```bash
+   docker compose -f docker-compose.dev.yml up -d
+   ```
+
+2. Set the dev API key (kept in user-secrets, never committed):
+
+   ```bash
+   dotnet user-secrets set "Auth:DevApiKey" "dev-key-local" --project src/Hiram.Api
+   ```
+
+3. Start the API. It applies database migrations on startup and listens on `http://localhost:3357`:
+
+   ```bash
+   dotnet run --project src/Hiram.Api
+   ```
+
+4. In another shell start the Dispatcher (outbox relay plus email consumer). Start it after the API so the schema already exists:
+
+   ```bash
+   dotnet run --project src/Hiram.Dispatcher
+   ```
+
+5. Submit a notification and read it back:
+
+   ```bash
+   curl -i -X POST http://localhost:3357/v1/notifications \
+     -H "X-Api-Key: dev-key-local" -H "Content-Type: application/json" \
+     -d '{"channel":"email","recipient":"felipe@example.com","subject":"hello","body":"first slice"}'
+
+   curl -s http://localhost:3357/v1/notifications/<id> -H "X-Api-Key: dev-key-local"
+   ```
+
+   The POST returns `202` with the id and status `accepted`. Within about a second the Dispatcher logs `Would send email for notification <id>` and the GET reports `published`.
+
+Where to look:
+
+- API reference (Scalar): `http://localhost:3357/scalar`
+- Distributed trace (Aspire Dashboard): `http://localhost:18888`, open the request trace to see the API, publish and consume spans under one trace id
+- RabbitMQ management: `http://localhost:15672` (user `hiram`, password `hiram`)
+
+Run the tests with `dotnet test`. The integration suite uses Testcontainers and needs a running Docker engine.
 
 ## License
 
