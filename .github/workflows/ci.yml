@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props', 'global.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore Hiram.sln
+
+      # Release turns warnings into errors, so this step doubles as the warning gate.
+      - name: Build
+        run: dotnet build Hiram.sln --configuration Release --no-restore
+
+      # Testcontainers talks to the Docker engine preinstalled on the runner.
+      - name: Test
+        run: dotnet test Hiram.sln --configuration Release --no-build --verbosity normal
