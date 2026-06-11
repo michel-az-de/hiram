@@ -1,0 +1,60 @@
+name: hiram
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: hiram-postgres
+    environment:
+      POSTGRES_USER: hiram
+      POSTGRES_PASSWORD: hiram
+      POSTGRES_DB: hiram
+    # Host 5433 to avoid clashing with another Postgres already bound to 5432 on this machine.
+    ports:
+      - "5433:5432"
+    volumes:
+      - hiram-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hiram -d hiram"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: hiram-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Redis comes up now to keep the dev environment stable across phases, but it is
+  # only consumed from F1 onward (quota fast-path, idempotency, rate limit, template cache).
+  redis:
+    image: redis:7-alpine
+    container_name: hiram-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:latest
+    container_name: hiram-aspire
+    # Anonymous access so local apps can export OTLP and the UI opens without a login token.
+    environment:
+      DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+    # 18888 is the dashboard UI. Host 4317 maps to the container OTLP gRPC port (18889)
+    # so the hosts can export to the conventional http://localhost:4317.
+    ports:
+      - "18888:18888"
+      - "4317:18889"
+
+volumes:
+  hiram-pgdata:
