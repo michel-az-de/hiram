@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using Hiram.Application.Abstractions;
 using Hiram.Infrastructure.Persistence;
+using Hiram.Infrastructure.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
@@ -47,13 +49,28 @@ public sealed class OutboxRelay
 
         foreach (var message in batch)
         {
-            var properties = new BasicProperties { Persistent = true, ContentType = "application/json" };
+            using var activity = HiramDiagnostics.Messaging.StartActivity(
+                "publish email", ActivityKind.Producer, ParseContext(message.TraceParent));
+
+            var headers = new Dictionary<string, object?>();
+            var traceParent = activity?.Id ?? message.TraceParent;
+            if (traceParent is not null)
+                headers["traceparent"] = traceParent;
+
+            var properties = new BasicProperties
+            {
+                Persistent = true,
+                ContentType = "application/json",
+                Headers = headers
+            };
             var body = System.Text.Encoding.UTF8.GetBytes(message.Payload);
 
             // Awaiting the publish waits for the broker to confirm the message before we mark the row
             // processed. A crash before the commit leaves the row pending and it is republished: at-least-once.
             await channel.BasicPublishAsync(HiramTopology.Exchange, message.Type, mandatory: false, properties, body, cancellationToken);
+
             message.MarkProcessed(_clock.UtcNow);
+            HiramDiagnostics.OutboxDispatched.Add(1);
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -62,4 +79,9 @@ public sealed class OutboxRelay
         _logger.LogInformation("Relayed {Count} outbox message(s) to RabbitMQ", batch.Count);
         return batch.Count;
     }
+
+    private static ActivityContext ParseContext(string? traceParent) =>
+        !string.IsNullOrEmpty(traceParent) && ActivityContext.TryParse(traceParent, null, out var context)
+            ? context
+            : default;
 }

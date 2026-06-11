@@ -1,4 +1,7 @@
+using System.Diagnostics;
+using System.Text;
 using Hiram.Infrastructure.Messaging;
+using Hiram.Infrastructure.Telemetry;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
@@ -48,6 +51,9 @@ public sealed class EmailConsumerWorker : BackgroundService
 
     private async Task OnReceivedAsync(object sender, BasicDeliverEventArgs args)
     {
+        using var activity = HiramDiagnostics.Messaging.StartActivity(
+            "consume email", ActivityKind.Consumer, ExtractContext(args.BasicProperties.Headers));
+
         try
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
@@ -62,5 +68,18 @@ public sealed class EmailConsumerWorker : BackgroundService
             _logger.LogError(ex, "Failed to process email message {DeliveryTag}", args.DeliveryTag);
             await _channel!.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: false, args.CancellationToken);
         }
+    }
+
+    private static ActivityContext ExtractContext(IDictionary<string, object?>? headers)
+    {
+        if (headers is not null
+            && headers.TryGetValue("traceparent", out var raw)
+            && raw is byte[] bytes
+            && ActivityContext.TryParse(Encoding.UTF8.GetString(bytes), null, out var context))
+        {
+            return context;
+        }
+
+        return default;
     }
 }

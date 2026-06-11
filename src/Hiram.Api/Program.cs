@@ -3,13 +3,19 @@ using Hiram.Api.Notifications;
 using Hiram.Application.Notifications;
 using Hiram.Infrastructure;
 using Hiram.Infrastructure.Persistence;
+using Hiram.Infrastructure.Telemetry;
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("Hiram")
     ?? throw new InvalidOperationException("Connection string 'Hiram' is not configured.");
+
+builder.AddHiramTelemetry("hiram-api", tracing => tracing
+    .AddAspNetCoreInstrumentation()
+    .AddHttpClientInstrumentation());
 
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();

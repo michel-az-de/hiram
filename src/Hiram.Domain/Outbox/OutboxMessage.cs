@@ -9,6 +9,10 @@ public sealed class OutboxMessage
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset? ProcessedAtUtc { get; private set; }
 
+    // W3C trace context captured when the row was written, so the asynchronous relay can publish
+    // under the same trace as the request that produced it.
+    public string? TraceParent { get; private set; }
+
     // Parameterless ctor exists so EF Core can materialize rows without re-running creation invariants.
     private OutboxMessage()
     {
@@ -16,7 +20,7 @@ public sealed class OutboxMessage
         Payload = null!;
     }
 
-    public OutboxMessage(Guid id, Guid tenantId, string type, string payload, DateTimeOffset createdAtUtc)
+    public OutboxMessage(Guid id, Guid tenantId, string type, string payload, DateTimeOffset createdAtUtc, string? traceParent = null)
     {
         if (id == Guid.Empty)
             throw new ArgumentException("Outbox message id is required.", nameof(id));
@@ -33,6 +37,7 @@ public sealed class OutboxMessage
         Payload = payload;
         CreatedAtUtc = createdAtUtc;
         ProcessedAtUtc = null;
+        TraceParent = traceParent;
     }
 
     public bool IsProcessed => ProcessedAtUtc is not null;

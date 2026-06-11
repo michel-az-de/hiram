@@ -1,6 +1,7 @@
 using Hiram.Application.Notifications;
 using Hiram.Contracts;
 using Hiram.Domain.Notifications;
+using Hiram.Infrastructure.Telemetry;
 
 namespace Hiram.Api.Notifications;
 
@@ -27,6 +28,7 @@ internal static class NotificationEndpoints
         var command = new SubmitNotificationCommand(DevTenant.Id, channel, request.Recipient, request.Subject, request.Body);
 
         var result = await submit.SubmitAsync(command, cancellationToken);
+        HiramDiagnostics.NotificationsAccepted.Add(1);
 
         var body = new NotificationAccepted(result.NotificationId, ToWire(result.Status));
         return Results.Accepted($"/v1/notifications/{result.NotificationId}", body);

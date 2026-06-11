@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Hiram.Application.Abstractions;
 using Hiram.Domain.Notifications;
@@ -43,7 +44,8 @@ public sealed class SubmitNotificationHandler : ISubmitNotification
             command.TenantId,
             RoutingKeyFor(command.Channel),
             JsonSerializer.Serialize(payload),
-            now);
+            now,
+            Activity.Current?.Id);
 
         await _store.SaveAsync(request, outbox, cancellationToken);
 

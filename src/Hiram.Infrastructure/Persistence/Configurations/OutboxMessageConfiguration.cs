@@ -17,6 +17,7 @@ internal sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outb
         builder.Property(x => x.Payload).HasColumnName("payload").HasColumnType("jsonb").IsRequired();
         builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
         builder.Property(x => x.ProcessedAtUtc).HasColumnName("processed_at_utc");
+        builder.Property(x => x.TraceParent).HasColumnName("trace_parent").HasMaxLength(64);
 
         // Partial index over the relay hot path: only unprocessed rows, oldest first.
         builder.HasIndex(x => x.CreatedAtUtc)
