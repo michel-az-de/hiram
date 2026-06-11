@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="currentColor" role="img" aria-label="Hiram">
+  <title>Hiram</title>
+  <rect x="20" y="16" width="12" height="64" rx="2"/>
+  <rect x="64" y="16" width="12" height="64" rx="2"/>
+  <rect x="32" y="36" width="32" height="11" rx="2"/>
+  <circle cx="48" cy="57" r="4.2"/>
+  <circle cx="40" cy="69" r="4.2"/>
+  <circle cx="56" cy="69" r="4.2"/>
+</svg>

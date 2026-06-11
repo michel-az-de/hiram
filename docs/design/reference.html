@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hiram · Design System</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root{
+  --lodge-50:#EEF3FA;--lodge-100:#D8E3F3;--lodge-200:#B3C8E7;--lodge-300:#87A7D6;--lodge-400:#5D86C2;--lodge-500:#3E68A8;--lodge-600:#2C4F8A;--lodge-700:#1B3A6B;--lodge-800:#142C52;--lodge-900:#0E1F3B;--lodge-950:#0A1428;
+  --orient-100:#F5EAC4;--orient-200:#EBD88E;--orient-300:#DFC25B;--orient-400:#D4B13C;--orient-500:#C9A227;--orient-600:#A98621;--orient-700:#86691B;
+  --ashlar-50:#F8F7F4;--ashlar-100:#F0EEE8;--ashlar-200:#E2DFD6;--ashlar-300:#CCC8BC;--ashlar-400:#ABA79A;--ashlar-500:#8A867A;--ashlar-600:#6B675D;--ashlar-800:#3A3833;--ashlar-900:#262522;
+  --acacia-300:#A4C496;--acacia-500:#6C9B5D;--acacia-700:#426637;
+  --danger-300:#DE9183;--danger-500:#B3402F;--danger-600:#963426;
+  --warning-300:#E0AC62;--warning-500:#B45309;
+  --f-display:'Space Grotesk',system-ui,sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,monospace;
+  --cut:16px;--r-sm:6px;--r-md:10px;--r-lg:14px;
+  --ease:cubic-bezier(.2,0,0,1);
+}
+[data-theme="dark"]{
+  --bg:var(--lodge-950);--surface:#0F1B30;--raised:#142440;
+  --text:#E8ECF4;--muted:#94A3BD;
+  --border:rgba(179,200,231,.14);--border-strong:rgba(179,200,231,.26);
+  --action-bg:var(--orient-500);--action-text:var(--lodge-950);--action-hover:var(--orient-400);
+  --link:var(--orient-300);--ring:var(--orient-400);
+  --st-delivered:var(--acacia-300);--st-queued:var(--lodge-300);--st-failed:var(--danger-300);--st-suppressed:var(--ashlar-400);
+  --shadow:none;
+}
+[data-theme="light"]{
+  --bg:var(--ashlar-50);--surface:#FFFFFF;--raised:var(--ashlar-100);
+  --text:#1C2433;--muted:var(--ashlar-600);
+  --border:var(--ashlar-200);--border-strong:var(--ashlar-300);
+  --action-bg:var(--lodge-700);--action-text:#FFFFFF;--action-hover:var(--lodge-600);
+  --link:var(--lodge-600);--ring:var(--orient-600);
+  --st-delivered:var(--acacia-700);--st-queued:var(--lodge-600);--st-failed:var(--danger-600);--st-suppressed:var(--ashlar-600);
+  --shadow:0 4px 12px rgba(20,30,50,.07);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--f-body);font-size:16px;line-height:1.6;transition:background .2s var(--ease),color .2s var(--ease)}
+a{color:var(--link)}
+:focus-visible{outline:2px solid var(--ring);outline-offset:2px;border-radius:4px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+.lapidar{font-family:var(--f-display);font-weight:600;letter-spacing:.32em;text-transform:uppercase;font-size:12px}
+.eyebrow{color:var(--muted)}
+h2{font-family:var(--f-display);font-weight:600;font-size:32px;line-height:1.15;margin:8px 0 12px}
+h3{font-family:var(--f-display);font-weight:600;font-size:20px;margin:0 0 8px}
+section{padding:64px 0;border-top:1px solid var(--border)}
+.lead{color:var(--muted);max-width:640px}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:20px 0}
+.brand{display:flex;align-items:center;gap:14px;color:var(--text)}
+.brand svg{width:34px;height:34px}
+.toggle{background:var(--surface);color:var(--text);border:1px solid var(--border-strong);border-radius:var(--r-sm);padding:9px 16px;font-family:var(--f-body);font-size:14px;font-weight:500;cursor:pointer;transition:border-color .15s var(--ease)}
+.toggle:hover{border-color:var(--ring)}
+
+.hero{position:relative;padding:96px 0 88px;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0;background-image:conic-gradient(currentColor 25%,transparent 25% 50%,currentColor 50% 75%,transparent 75%);background-size:48px 48px;opacity:.04;pointer-events:none}
+.hero .wrap{position:relative}
+.hero .badge-mark{width:72px;height:72px;margin-bottom:32px}
+.hero h1{font-family:var(--f-display);font-weight:600;font-size:clamp(40px,7vw,56px);letter-spacing:.3em;text-transform:uppercase;line-height:1.05}
+.hero h1 span{color:var(--orient-500)}
+.tagline{font-family:var(--f-display);font-weight:500;font-size:24px;margin:20px 0 6px}
+.btn-row{display:flex;gap:12px;margin-top:36px;flex-wrap:wrap}
+
+.btn{display:inline-flex;align-items:center;height:40px;padding:0 20px;border-radius:var(--r-sm);font-family:var(--f-body);font-size:14px;font-weight:500;border:1px solid transparent;cursor:pointer;transition:background .15s var(--ease),border-color .15s var(--ease)}
+.btn-primary{background:var(--action-bg);color:var(--action-text)}
+.btn-primary:hover{background:var(--action-hover)}
+.btn-secondary{background:transparent;color:var(--text);border-color:var(--border-strong)}
+.btn-secondary:hover{border-color:var(--ring)}
+.btn-ghost{background:transparent;color:var(--muted)}
+.btn-ghost:hover{color:var(--text)}
+.btn-danger{background:var(--danger-500);color:#fff}
+.btn-danger:hover{background:var(--danger-600)}
+
+.grid{display:grid;gap:16px}
+.cols-2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.cols-4{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+
+.family{margin-bottom:28px}
+.family-name{display:flex;align-items:baseline;gap:12px;margin-bottom:10px}
+.family-name small{color:var(--muted);font-size:13px}
+.swatches{display:grid;grid-template-columns:repeat(auto-fit,minmax(76px,1fr));gap:8px}
+.sw{border-radius:var(--r-sm);border:1px solid var(--border);padding:38px 8px 8px;font-family:var(--f-mono);font-size:11px;line-height:1.4}
+
+.spec{display:grid;gap:18px}
+.spec-row{display:grid;grid-template-columns:150px 1fr;gap:20px;align-items:baseline;border-bottom:1px solid var(--border);padding-bottom:14px}
+.spec-label{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:24px;box-shadow:var(--shadow)}
+.card-ashlar{background:var(--raised);border:1px solid var(--border-strong);border-radius:0;clip-path:polygon(0 0,calc(100% - var(--cut)) 0,100% var(--cut),100% 100%,0 100%);padding:28px}
+.card-ashlar .lapidar{color:var(--orient-500)}
+
+.field label{display:block;margin-bottom:8px}
+.field input{width:100%;background:var(--surface);border:1px solid var(--border-strong);color:var(--text);border-radius:var(--r-sm);height:40px;padding:0 12px;font-family:var(--f-body);font-size:14px}
+.field input:focus{outline:2px solid var(--ring);outline-offset:1px;border-color:transparent}
+.hint{font-size:13px;color:var(--muted);margin-top:6px}
+
+.status{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:4px 12px;font-size:13px;font-weight:500}
+.status i{width:6px;height:6px;border-radius:50%;background:currentColor}
+.st-delivered{color:var(--st-delivered);background:color-mix(in srgb,var(--st-delivered) 14%,transparent)}
+.st-queued{color:var(--st-queued);background:color-mix(in srgb,var(--st-queued) 14%,transparent)}
+.st-failed{color:var(--st-failed);background:color-mix(in srgb,var(--st-failed) 14%,transparent)}
+.st-suppressed{color:var(--st-suppressed);background:color-mix(in srgb,var(--st-suppressed) 14%,transparent)}
+
+.code{background:var(--lodge-950);border:1px solid rgba(179,200,231,.18);border-radius:var(--r-md);padding:20px;font-family:var(--f-mono);font-size:13px;line-height:1.7;color:#D7E0EF;overflow-x:auto}
+.code .c1{color:var(--orient-300)}
+.code .c2{color:var(--lodge-300)}
+.code .c3{color:#7E8DA6}
+
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-family:var(--f-display);font-weight:600;font-size:12px;letter-spacing:.32em;text-transform:uppercase;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--border-strong)}
+td{padding:12px;border-bottom:1px solid var(--border)}
+td.mono{font-family:var(--f-mono);font-size:13px}
+
+.principles .card p{color:var(--muted);font-size:14px;margin-top:6px}
+
+footer{position:relative;border-top:1px solid var(--border);padding:48px 0;overflow:hidden}
+footer::before{content:"";position:absolute;inset:0;background-image:conic-gradient(currentColor 25%,transparent 25% 50%,currentColor 50% 75%,transparent 75%);background-size:48px 48px;opacity:.04;pointer-events:none}
+footer .wrap{position:relative;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+footer .mark{width:26px;height:26px;color:var(--orient-500)}
+.al{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+@media (max-width:640px){.spec-row{grid-template-columns:1fr;gap:6px}}
+</style>
+</head>
+<body>
+
+<header class="wrap topbar">
+  <div class="brand">
+    <svg viewBox="0 0 96 96" fill="currentColor" aria-hidden="true"><rect x="20" y="16" width="12" height="64" rx="2"/><rect x="64" y="16" width="12" height="64" rx="2"/><rect x="32" y="36" width="32" height="11" rx="2"/><circle cx="48" cy="57" r="4.2"/><circle cx="40" cy="69" r="4.2"/><circle cx="56" cy="69" r="4.2"/></svg>
+    <span class="lapidar">Hiram&#8756;</span>
+  </div>
+  <button class="toggle" id="themeToggle" type="button">Tema: abóbada</button>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <svg class="badge-mark" viewBox="0 0 96 96" aria-hidden="true"><path d="M12 0 H74 L96 22 V84 Q96 96 84 96 H12 Q0 96 0 84 V12 Q0 0 12 0 Z" fill="#0A1428"/><g fill="#C9A227" transform="translate(13.5 13.5) scale(0.72)"><rect x="20" y="16" width="12" height="64" rx="2"/><rect x="64" y="16" width="12" height="64" rx="2"/><rect x="32" y="36" width="32" height="11" rx="2"/><circle cx="48" cy="57" r="4.2"/><circle cx="40" cy="69" r="4.2"/><circle cx="56" cy="69" r="4.2"/></g></svg>
+    <h1>Hiram<span>&#8756;</span></h1>
+    <p class="tagline">A palavra não se perde.</p>
+    <p class="lead">Notificações multi-tenant com entrega garantida. Email, push, SMS e WhatsApp atrás de uma API, com outbox, créditos e autonomia de IA configurável.</p>
+    <div class="btn-row">
+      <button class="btn btn-primary" type="button">Começar pelo Handshake</button>
+      <button class="btn btn-secondary" type="button">Ver o Trestleboard</button>
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <span class="lapidar eyebrow">Cor</span>
+    <h2>A pedra e o céu</h2>
+    <p class="lead">O tema escuro é a abóbada: azul-noite com luzes em ouro. O claro é a pedra polida. O ouro é cerimonial: um CTA, o foco, um destaque por tela, nunca três.</p>
+    <div style="margin-top:32px">
+      <div class="family">
+        <div class="family-name"><h3>lodge</h3><small>estrutura e ação</small></div>
+        <div class="swatches">
+          <div class="sw" style="background:#D8E3F3;color:#142C52">100</div>
+          <div class="sw" style="background:#87A7D6;color:#0A1428">300</div>
+          <div class="sw" style="background:#3E68A8;color:#EEF3FA">500</div>
+          <div class="sw" style="background:#1B3A6B;color:#EEF3FA">700</div>
+          <div class="sw" style="background:#0E1F3B;color:#B3C8E7">900</div>
+          <div class="sw" style="background:#0A1428;color:#B3C8E7;border-color:rgba(179,200,231,.3)">950</div>
+        </div>
+      </div>
+      <div class="family">
+        <div class="family-name"><h3>orient</h3><small>acento cerimonial</small></div>
+        <div class="swatches">
+          <div class="sw" style="background:#F5EAC4;color:#644E15">100</div>
+          <div class="sw" style="background:#DFC25B;color:#44350F">300</div>
+          <div class="sw" style="background:#C9A227;color:#2B2109">500</div>
+          <div class="sw" style="background:#A98621;color:#FBF6E7">600</div>
+          <div class="sw" style="background:#86691B;color:#FBF6E7">700</div>
+        </div>
+      </div>
+      <div class="family">
+        <div class="family-name"><h3>ashlar</h3><small>pedra e neutros</small></div>
+        <div class="swatches">
+          <div class="sw" style="background:#F8F7F4;color:#524F47;border-color:#E2DFD6">50</div>
+          <div class="sw" style="background:#E2DFD6;color:#3A3833">200</div>
+          <div class="sw" style="background:#ABA79A;color:#171614">400</div>
+          <div class="sw" style="background:#6B675D;color:#F8F7F4">600</div>
+          <div class="sw" style="background:#262522;color:#E2DFD6">900</div>
+        </div>
+      </div>
+      <div class="family">
+        <div class="family-name"><h3>semânticas</h3><small>acacia, danger, warning</small></div>
+        <div class="swatches">
+          <div class="sw" style="background:#6C9B5D;color:#EFF5EC">acacia 500</div>
+          <div class="sw" style="background:#426637;color:#EFF5EC">acacia 700</div>
+          <div class="sw" style="background:#B3402F;color:#FAEDEA">danger 500</div>
+          <div class="sw" style="background:#B45309;color:#FBF1E4">warning 500</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <span class="lapidar eyebrow">Tipografia</span>
+    <h2>Desenhada com as ferramentas</h2>
+    <p class="lead">Space Grotesk para display, geometria pura. IBM Plex Sans no corpo, sobriedade institucional. Plex Mono como cidadão de primeira classe, porque o produto fala com devs.</p>
+    <div class="spec" style="margin-top:32px">
+      <div class="spec-row"><span class="spec-label">lapidar · 12/600 +.32em</span><span class="lapidar">Entrega garantida por outbox</span></div>
+      <div class="spec-row"><span class="spec-label">display · 40/600</span><span style="font-family:var(--f-display);font-weight:600;font-size:40px;line-height:1.15">Cada palavra chega ao seu destino</span></div>
+      <div class="spec-row"><span class="spec-label">título · 24/600</span><span style="font-family:var(--f-display);font-weight:600;font-size:24px">Webhooks assinados por tenant</span></div>
+      <div class="spec-row"><span class="spec-label">corpo · 16/400</span><span>A requisição e o registro de outbox nascem na mesma transação. Se o banco confirmou, a notificação existe e será entregue.</span></div>
+      <div class="spec-row"><span class="spec-label">mono · 13/400</span><span style="font-family:var(--f-mono);font-size:13px">POST /v1/notifications · X-Hiram-Signature: t=1718064000,v1=5f1a&#8230;</span></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <span class="lapidar eyebrow">Componentes</span>
+    <h2>Quietos por padrão</h2>
+    <div class="grid cols-2" style="margin-top:32px">
+      <div class="card">
+        <h3>Botões</h3>
+        <div class="btn-row" style="margin-top:16px">
+          <button class="btn btn-primary" type="button">Enviar notificação</button>
+          <button class="btn btn-secondary" type="button">Duplicar template</button>
+          <button class="btn btn-ghost" type="button">Cancelar</button>
+          <button class="btn btn-danger" type="button">Revogar chave</button>
+        </div>
+        <p class="hint" style="margin-top:16px">O ouro marca a ação primária no tema escuro. No claro, a ação é lodge-700 e o ouro fica para o foco.</p>
+      </div>
+      <div class="card">
+        <h3>Campo</h3>
+        <div class="field" style="margin-top:16px">
+          <label class="lapidar eyebrow" for="ep">Endpoint do webhook</label>
+          <input id="ep" type="url" placeholder="https://api.seusistema.com.br/hiram">
+          <p class="hint">Cada entrega leva o header X-Hiram-Signature para verificação HMAC.</p>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Status de entrega</h3>
+        <div class="btn-row" style="margin-top:16px">
+          <span class="status st-delivered"><i></i>delivered</span>
+          <span class="status st-queued"><i></i>queued</span>
+          <span class="status st-failed"><i></i>failed</span>
+          <span class="status st-suppressed"><i></i>suppressed</span>
+        </div>
+        <p class="hint" style="margin-top:16px">Acácia confirma a entrega. Informação nunca apenas por cor: o rótulo acompanha sempre.</p>
+      </div>
+      <div class="card-ashlar">
+        <span class="lapidar">Card ashlar</span>
+        <h3 style="margin-top:10px">Plano Mestre</h3>
+        <p style="color:var(--muted);font-size:14px">O canto lapidado é a assinatura formal do sistema. Um por vista, somente em momentos de marca: planos, chaves, anúncios.</p>
+        <div style="margin-top:16px;font-family:var(--f-mono);font-size:13px">hk_live_7f3a&#8230;9c21 · criada em 10 jun 2026</div>
+      </div>
+    </div>
+
+    <div class="grid cols-2" style="margin-top:16px">
+      <div>
+        <h3 style="margin-bottom:12px">Code block</h3>
+        <div class="code"><span class="c3">$</span> curl -X POST <span class="c2">https://api.hiram.dev/v1/notifications</span> \
+  -H <span class="c1">"X-Api-Key: hk_live_7f3a&#8230;"</span> \
+  -d <span class="c1">'{"channel":"email","recipient":"ops@tenant.com.br",
+       "subject":"Pedido confirmado","body":"&#8230;"}'</span>
+
+<span class="c3">HTTP/1.1</span> <span class="c2">202 Accepted</span>
+{ <span class="c1">"id"</span>: "ntf_01HZX&#8230;", <span class="c1">"status"</span>: "accepted" }</div>
+      </div>
+      <div>
+        <h3 style="margin-bottom:12px">Tabela</h3>
+        <table>
+          <thead><tr><th>Notificação</th><th>Canal</th><th>Status</th><th>p99</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">ntf_01HZX4</td><td>email</td><td><span class="status st-delivered"><i></i>delivered</span></td><td class="mono">412 ms</td></tr>
+            <tr><td class="mono">ntf_01HZX7</td><td>push</td><td><span class="status st-queued"><i></i>queued</span></td><td class="mono">&#8212;</td></tr>
+            <tr><td class="mono">ntf_01HZX9</td><td>email</td><td><span class="status st-failed"><i></i>failed</span></td><td class="mono">2.1 s</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="principles">
+  <div class="wrap">
+    <span class="lapidar eyebrow">Princípios</span>
+    <h2>Regras da casa</h2>
+    <div class="grid cols-4" style="margin-top:32px">
+      <div class="card"><h3>Dupla leitura</h3><p>Todo sinal funciona para quem não sabe e ilumina para quem sabe. Nada exige explicação.</p></div>
+      <div class="card"><h3>API profana</h3><p>Endpoints, erros e logs em vocabulário técnico claro. A assinatura mora na marca, nunca na semântica.</p></div>
+      <div class="card"><h3>Ouro cerimonial</h3><p>Uma ação primária, um foco, um destaque. Se o ouro aparece três vezes, uma está errada.</p></div>
+      <div class="card"><h3>Ousadia com orçamento</h3><p>Um canto lapidado por vista. Mosaico só em hero e footer. O resto permanece quieto.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 96 96" fill="currentColor" aria-hidden="true"><rect x="20" y="16" width="12" height="64" rx="2"/><rect x="64" y="16" width="12" height="64" rx="2"/><rect x="32" y="36" width="32" height="11" rx="2"/><circle cx="48" cy="57" r="4.2"/><circle cx="40" cy="69" r="4.2"/><circle cx="56" cy="69" r="4.2"/></svg>
+      <span class="lapidar" style="font-size:11px">A palavra não se perde</span>
+    </div>
+    <span class="al">&#169; 2026 &#183; A&#8756;L&#8756; 6026</span>
+  </div>
+</footer>
+
+<script>
+const btn = document.getElementById('themeToggle');
+btn.addEventListener('click', () => {
+  const root = document.documentElement;
+  const dark = root.getAttribute('data-theme') === 'dark';
+  root.setAttribute('data-theme', dark ? 'light' : 'dark');
+  btn.textContent = dark ? 'Tema: pedra' : 'Tema: abóbada';
+});
+</script>
+</body>
+</html>

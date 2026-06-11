@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <defs>
+    <pattern id="mosaic" width="48" height="48" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="24" height="24" fill="#B3C8E7"/>
+      <rect x="24" y="24" width="24" height="24" fill="#B3C8E7"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="640" fill="#0A1428"/>
+  <rect width="1280" height="640" fill="url(#mosaic)" opacity="0.012"/>
+  <g transform="translate(512.4 122) scale(2.2)" fill="none" stroke="#C9A227" stroke-width="3.5" stroke-linecap="square">
+    <rect x="36" y="14" width="76" height="52"/>
+    <path d="M39 17.5 L74 46 L109 17.5"/>
+    <path d="M10 31 H30"/>
+    <path d="M4 40 H26"/>
+    <path d="M12 49 H30"/>
+  </g>
+  <text x="615" y="425" text-anchor="middle" font-family="Space Grotesk SemiBold, Space Grotesk" font-weight="600" font-size="66" letter-spacing="21" fill="#E8ECF4">HIRAM</text>
+  <g fill="#E8ECF4">
+    <circle cx="795" cy="390" r="5.5"/>
+    <circle cx="784" cy="412" r="5.5"/>
+    <circle cx="806" cy="412" r="5.5"/>
+  </g>
+  <text x="640" y="490" text-anchor="middle" font-family="Space Grotesk" font-weight="400" font-size="27" letter-spacing="2.5" fill="#94A3BD">The word is never lost.</text>
+</svg>
