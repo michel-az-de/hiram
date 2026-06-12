@@ -65,7 +65,7 @@ public class WalkingSkeletonTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PostedNotification_FlowsThroughOutboxToPublished_InASingleTrace()
+    public async Task PostedNotification_FlowsThroughOutboxToSent_InASingleTrace()
     {
         var activities = new ConcurrentBag<Activity>();
         using var listener = new ActivityListener
@@ -91,13 +91,13 @@ public class WalkingSkeletonTests : IAsyncLifetime
         for (var attempt = 0; attempt < 40; attempt++)
         {
             view = await client.GetFromJsonAsync<NotificationResponse>($"/v1/notifications/{accepted!.Id}");
-            if (view?.Status == "published")
+            if (view?.Status == "sent")
                 break;
             await Task.Delay(500);
         }
 
         Assert.NotNull(view);
-        Assert.Equal("published", view!.Status);
+        Assert.Equal("sent", view!.Status);
 
         var publish = SingleActivity(activities, "publish email");
         var consume = SingleActivity(activities, "consume email");

@@ -1,5 +1,6 @@
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Outbox;
+using Hiram.Domain.Tenants;
 using Microsoft.EntityFrameworkCore;
 
 namespace Hiram.Infrastructure.Persistence;
@@ -14,6 +15,9 @@ public sealed class HiramDbContext : DbContext
 
     public DbSet<NotificationRequest> NotificationRequests => Set<NotificationRequest>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<Tenant> Tenants => Set<Tenant>();
+    public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
+    public DbSet<TenantProviderConfig> TenantProviderConfigs => Set<TenantProviderConfig>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

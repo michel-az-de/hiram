@@ -11,6 +11,9 @@ public sealed class NotificationRequest
     public NotificationStatus Status { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
+    // Client supplied key that scopes idempotency to the tenant. Null when the client did not send one.
+    public string? IdempotencyKey { get; private set; }
+
     // Parameterless ctor exists so EF Core can materialize rows without re-running creation invariants.
     private NotificationRequest()
     {
@@ -26,7 +29,8 @@ public sealed class NotificationRequest
         string recipient,
         string subject,
         string body,
-        DateTimeOffset createdAtUtc)
+        DateTimeOffset createdAtUtc,
+        string? idempotencyKey = null)
     {
         if (id == Guid.Empty)
             throw new ArgumentException("Notification id is required.", nameof(id));
@@ -48,14 +52,15 @@ public sealed class NotificationRequest
         Subject = subject;
         Body = body;
         CreatedAtUtc = createdAtUtc;
+        IdempotencyKey = idempotencyKey;
         Status = NotificationStatus.Accepted;
     }
 
-    public void MarkPublished()
+    public void MarkSent()
     {
-        if (Status == NotificationStatus.Published)
+        if (Status == NotificationStatus.Sent)
             return;
 
-        Status = NotificationStatus.Published;
+        Status = NotificationStatus.Sent;
     }
 }

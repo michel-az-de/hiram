@@ -88,23 +88,39 @@ public class NotificationRequestTests
     }
 
     [Fact]
-    public void MarkPublished_TransitionsFromAcceptedToPublished()
+    public void MarkSent_TransitionsFromAcceptedToSent()
     {
         var request = CreateValid();
 
-        request.MarkPublished();
+        request.MarkSent();
 
-        Assert.Equal(NotificationStatus.Published, request.Status);
+        Assert.Equal(NotificationStatus.Sent, request.Status);
     }
 
     [Fact]
-    public void MarkPublished_IsIdempotent()
+    public void MarkSent_IsIdempotent()
     {
         var request = CreateValid();
 
-        request.MarkPublished();
-        request.MarkPublished();
+        request.MarkSent();
+        request.MarkSent();
 
-        Assert.Equal(NotificationStatus.Published, request.Status);
+        Assert.Equal(NotificationStatus.Sent, request.Status);
+    }
+
+    [Fact]
+    public void Constructor_KeepsIdempotencyKey_WhenProvided()
+    {
+        var request = new NotificationRequest(
+            Guid.NewGuid(), Guid.NewGuid(), NotificationChannel.Email, "to@example.com", "s", "b",
+            DateTimeOffset.UnixEpoch, idempotencyKey: "evt-0001");
+
+        Assert.Equal("evt-0001", request.IdempotencyKey);
+    }
+
+    [Fact]
+    public void Constructor_LeavesIdempotencyKeyNull_WhenOmitted()
+    {
+        Assert.Null(CreateValid().IdempotencyKey);
     }
 }

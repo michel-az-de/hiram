@@ -36,7 +36,7 @@ public sealed class EmailNotificationProcessor
             return;
         }
 
-        notification.MarkPublished();
+        notification.MarkSent();
         await _context.SaveChangesAsync(cancellationToken);
     }
 }

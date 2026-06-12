@@ -19,5 +19,13 @@ internal sealed class NotificationRequestConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.Body).HasColumnName("body").IsRequired();
         builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
+        builder.Property(x => x.IdempotencyKey).HasColumnName("idempotency_key").HasMaxLength(255);
+
+        // One accepted notification per (tenant, idempotency key). Rows without a key are unconstrained,
+        // so the unique index is partial. This is the durable backstop behind the Redis fast path.
+        builder.HasIndex(x => new { x.TenantId, x.IdempotencyKey })
+            .HasDatabaseName("ux_notification_requests_idempotency")
+            .IsUnique()
+            .HasFilter("idempotency_key IS NOT NULL");
     }
 }
