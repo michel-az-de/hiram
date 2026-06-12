@@ -1,0 +1,57 @@
+using Hiram.Domain.Notifications;
+using Hiram.Domain.Tenants;
+using Hiram.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Testcontainers.PostgreSql;
+
+namespace Hiram.IntegrationTests.Persistence;
+
+public class TenantProviderConfigStoreTests : IAsyncLifetime
+{
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17").Build();
+
+    public async Task InitializeAsync()
+    {
+        await _postgres.StartAsync();
+        await using var context = NewContext();
+        await context.Database.MigrateAsync();
+    }
+
+    public Task DisposeAsync() => _postgres.DisposeAsync().AsTask();
+
+    private HiramDbContext NewContext() =>
+        new(new DbContextOptionsBuilder<HiramDbContext>().UseNpgsql(_postgres.GetConnectionString()).Options);
+
+    [Fact]
+    public async Task FindAsync_ReturnsConfig_ForTenantAndChannel()
+    {
+        var tenantId = Guid.NewGuid();
+        await using (var seed = NewContext())
+        {
+            seed.TenantProviderConfigs.Add(new TenantProviderConfig(
+                tenantId, NotificationChannel.Email, "resend", "{\"from\":\"hi@easystok.com\"}", "protected:secret", DateTimeOffset.UtcNow));
+            await seed.SaveChangesAsync();
+        }
+
+        await using var context = NewContext();
+        var store = new TenantProviderConfigStore(context);
+
+        var config = await store.FindAsync(tenantId, NotificationChannel.Email, CancellationToken.None);
+
+        Assert.NotNull(config);
+        Assert.Equal("resend", config!.Provider);
+        Assert.Equal("protected:secret", config.SecretProtected);
+        Assert.Equal("{\"from\":\"hi@easystok.com\"}", config.Settings);
+    }
+
+    [Fact]
+    public async Task FindAsync_ReturnsNull_WhenTenantHasNoConfig()
+    {
+        await using var context = NewContext();
+        var store = new TenantProviderConfigStore(context);
+
+        var config = await store.FindAsync(Guid.NewGuid(), NotificationChannel.Email, CancellationToken.None);
+
+        Assert.Null(config);
+    }
+}
