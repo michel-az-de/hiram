@@ -49,6 +49,19 @@ services:
       timeout: 3s
       retries: 10
 
+  # Mailpit is the local SMTP sink: the dev SMTP provider delivers here and the messages show up in the UI.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: hiram-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   aspire-dashboard:
     image: mcr.microsoft.com/dotnet/aspire-dashboard:latest
     container_name: hiram-aspire

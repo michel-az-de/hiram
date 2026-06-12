@@ -1,7 +1,9 @@
 using Hiram.Application.Abstractions;
+using Hiram.Application.Delivery;
 using Hiram.Application.Notifications;
 using Hiram.Application.Tenancy;
 using Hiram.Infrastructure.Caching;
+using Hiram.Infrastructure.Delivery;
 using Hiram.Infrastructure.Persistence;
 using Hiram.Infrastructure.Time;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +22,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantStore, TenantStore>();
         services.AddScoped<IApiKeyStore, ApiKeyStore>();
         services.AddSingleton<IClock, SystemClock>();
+        services.AddSingleton<IEmailProvider, SmtpEmailProvider>();
 
         return services;
     }
