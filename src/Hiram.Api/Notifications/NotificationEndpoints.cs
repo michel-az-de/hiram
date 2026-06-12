@@ -1,3 +1,4 @@
+using Hiram.Api.Authentication;
 using Hiram.Application.Notifications;
 using Hiram.Contracts;
 using Hiram.Domain.Notifications;
@@ -18,6 +19,7 @@ internal static class NotificationEndpoints
     private static async Task<IResult> SubmitAsync(
         SubmitNotificationRequest request,
         ISubmitNotification submit,
+        TenantContext tenant,
         CancellationToken cancellationToken)
     {
         var errors = Validate(request);
@@ -25,7 +27,7 @@ internal static class NotificationEndpoints
             return Results.ValidationProblem(errors);
 
         var channel = ParseChannel(request.Channel)!.Value;
-        var command = new SubmitNotificationCommand(DevTenant.Id, channel, request.Recipient, request.Subject, request.Body);
+        var command = new SubmitNotificationCommand(tenant.TenantId, channel, request.Recipient, request.Subject, request.Body);
 
         var result = await submit.SubmitAsync(command, cancellationToken);
         HiramDiagnostics.NotificationsAccepted.Add(1);

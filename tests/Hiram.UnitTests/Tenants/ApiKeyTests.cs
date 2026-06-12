@@ -76,4 +76,28 @@ public class ApiKeyTests
         Assert.Throws<ArgumentException>(() =>
             new ApiKey(Guid.NewGuid(), Guid.NewGuid(), "n", new string('a', 64), keyPrefix, DateTimeOffset.UnixEpoch));
     }
+
+    [Fact]
+    public void Revoke_MarksKeyRevoked()
+    {
+        var key = CreateValid();
+        var when = DateTimeOffset.UnixEpoch.AddDays(1);
+
+        key.Revoke(when);
+
+        Assert.True(key.IsRevoked);
+        Assert.Equal(when, key.RevokedAtUtc);
+    }
+
+    [Fact]
+    public void Revoke_KeepsFirstRevocation_WhenCalledAgain()
+    {
+        var key = CreateValid();
+        var first = DateTimeOffset.UnixEpoch.AddDays(1);
+
+        key.Revoke(first);
+        key.Revoke(first.AddDays(5));
+
+        Assert.Equal(first, key.RevokedAtUtc);
+    }
 }

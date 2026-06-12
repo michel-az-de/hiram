@@ -44,4 +44,14 @@ public sealed class ApiKey
         KeyPrefix = keyPrefix;
         CreatedAtUtc = createdAtUtc;
     }
+
+    public bool IsRevoked => RevokedAtUtc is not null;
+
+    public void Revoke(DateTimeOffset whenUtc)
+    {
+        if (IsRevoked)
+            return;
+
+        RevokedAtUtc = whenUtc;
+    }
 }

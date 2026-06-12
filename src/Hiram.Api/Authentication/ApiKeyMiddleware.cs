@@ -1,49 +1,57 @@
+using Hiram.Application.Abstractions;
+using Hiram.Application.Tenancy;
+
 namespace Hiram.Api.Authentication;
 
 public sealed class ApiKeyMiddleware
 {
     private const string HeaderName = "X-Api-Key";
     private const string ProtectedPrefix = "/v1";
+    private const string AdminPrefix = "/v1/admin";
 
     private readonly RequestDelegate _next;
-    private readonly IConfiguration _configuration;
     private readonly IProblemDetailsService _problemDetails;
-    private readonly ILogger<ApiKeyMiddleware> _logger;
 
-    public ApiKeyMiddleware(
-        RequestDelegate next,
-        IConfiguration configuration,
-        IProblemDetailsService problemDetails,
-        ILogger<ApiKeyMiddleware> logger)
+    public ApiKeyMiddleware(RequestDelegate next, IProblemDetailsService problemDetails)
     {
         _next = next;
-        _configuration = configuration;
         _problemDetails = problemDetails;
-        _logger = logger;
     }
 
-    public async Task InvokeAsync(HttpContext context)
+    public async Task InvokeAsync(
+        HttpContext context,
+        IApiKeyStore apiKeys,
+        IApiKeyUsageThrottle throttle,
+        TenantContext tenant,
+        IClock clock)
     {
-        if (!context.Request.Path.StartsWithSegments(ProtectedPrefix))
+        var path = context.Request.Path;
+
+        // Admin endpoints carry their own X-Admin-Key gate; everything outside /v1 is public (docs, health).
+        if (!path.StartsWithSegments(ProtectedPrefix) || path.StartsWithSegments(AdminPrefix))
         {
             await _next(context);
             return;
         }
 
-        var configuredKey = _configuration["Auth:DevApiKey"];
-        if (string.IsNullOrEmpty(configuredKey))
-        {
-            _logger.LogError("Auth:DevApiKey is not configured; rejecting request to {Path}", context.Request.Path);
-            await WriteUnauthorized(context, "API key authentication is not configured.");
-            return;
-        }
-
-        if (!context.Request.Headers.TryGetValue(HeaderName, out var provided)
-            || !FixedTimeEquals(provided.ToString(), configuredKey))
+        if (!context.Request.Headers.TryGetValue(HeaderName, out var presented) || string.IsNullOrWhiteSpace(presented))
         {
             await WriteUnauthorized(context, "A valid X-Api-Key header is required.");
             return;
         }
+
+        var hash = ApiKeyHasher.Hash(presented.ToString());
+        var apiKey = await apiKeys.FindByHashAsync(hash, context.RequestAborted);
+        if (apiKey is null || apiKey.IsRevoked)
+        {
+            await WriteUnauthorized(context, "The provided API key is invalid or has been revoked.");
+            return;
+        }
+
+        tenant.Resolve(apiKey.TenantId);
+
+        if (await throttle.ShouldRecordUsageAsync(apiKey.Id, context.RequestAborted))
+            await apiKeys.RecordUsageAsync(apiKey.Id, clock.UtcNow, context.RequestAborted);
 
         await _next(context);
     }
@@ -61,18 +69,5 @@ public sealed class ApiKeyMiddleware
                 Detail = detail
             }
         });
-    }
-
-    private static bool FixedTimeEquals(string provided, string expected)
-    {
-        // Compare without an early exit on first mismatch so a wrong key cannot be inferred by timing.
-        if (provided.Length != expected.Length)
-            return false;
-
-        var difference = 0;
-        for (var i = 0; i < provided.Length; i++)
-            difference |= provided[i] ^ expected[i];
-
-        return difference == 0;
     }
 }

@@ -1,3 +1,4 @@
+using Hiram.Api.Admin;
 using Hiram.Api.Authentication;
 using Hiram.Api.Notifications;
 using Hiram.Application.Notifications;
@@ -12,6 +13,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("Hiram")
     ?? throw new InvalidOperationException("Connection string 'Hiram' is not configured.");
+var redisConnectionString = builder.Configuration.GetConnectionString("Redis")
+    ?? throw new InvalidOperationException("Connection string 'Redis' is not configured.");
 
 builder.AddHiramTelemetry("hiram-api", tracing => tracing
     .AddAspNetCoreInstrumentation()
@@ -20,7 +23,9 @@ builder.AddHiramTelemetry("hiram-api", tracing => tracing
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddHiramInfrastructure(connectionString);
+builder.Services.AddHiramRedis(redisConnectionString);
 builder.Services.AddScoped<ISubmitNotification, SubmitNotificationHandler>();
+builder.Services.AddScoped<TenantContext>();
 
 var app = builder.Build();
 
@@ -35,6 +40,7 @@ app.UseMiddleware<ApiKeyMiddleware>();
 
 app.MapOpenApi();
 app.MapScalarApiReference();
+app.MapAdminEndpoints();
 app.MapNotificationEndpoints();
 
 app.Run();

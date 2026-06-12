@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Net;
 using System.Net.Http.Json;
 using Hiram.Contracts;
 using Hiram.Dispatcher;
@@ -11,29 +10,33 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
+using Testcontainers.Redis;
 
 namespace Hiram.IntegrationTests.EndToEnd;
 
+[Collection("ApiHost")]
 public class WalkingSkeletonTests : IAsyncLifetime
 {
-    private const string ApiKey = "e2e-test-key";
+    private const string AdminKey = "admin-e2e-key";
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17").Build();
     private readonly RabbitMqContainer _rabbit = new RabbitMqBuilder("rabbitmq:4-management")
         .WithUsername("hiram")
         .WithPassword("hiram")
         .Build();
+    private readonly RedisContainer _redis = new RedisBuilder("redis:7-alpine").Build();
 
     private WebApplicationFactory<Program>? _factory;
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_postgres.StartAsync(), _rabbit.StartAsync());
+        await Task.WhenAll(_postgres.StartAsync(), _rabbit.StartAsync(), _redis.StartAsync());
 
         var rabbitConnection = _rabbit.GetConnectionString();
         Environment.SetEnvironmentVariable("ConnectionStrings__Hiram", _postgres.GetConnectionString());
         Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", rabbitConnection);
-        Environment.SetEnvironmentVariable("Auth__DevApiKey", ApiKey);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", _redis.GetConnectionString());
+        Environment.SetEnvironmentVariable("Hiram__AdminKey", AdminKey);
         // The manual ActivityListener below keeps spans alive for the assertion; the OTLP exporter has
         // nothing to talk to in tests, so disable the SDK to avoid export noise and shutdown delays.
         Environment.SetEnvironmentVariable("OTEL_SDK_DISABLED", "true");
@@ -57,11 +60,13 @@ public class WalkingSkeletonTests : IAsyncLifetime
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Hiram", null);
         Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", null);
-        Environment.SetEnvironmentVariable("Auth__DevApiKey", null);
+        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", null);
+        Environment.SetEnvironmentVariable("Hiram__AdminKey", null);
         Environment.SetEnvironmentVariable("OTEL_SDK_DISABLED", null);
 
         await _postgres.DisposeAsync();
         await _rabbit.DisposeAsync();
+        await _redis.DisposeAsync();
     }
 
     [Fact]
@@ -76,14 +81,16 @@ public class WalkingSkeletonTests : IAsyncLifetime
         };
         ActivitySource.AddActivityListener(listener);
 
+        var apiKey = await IssueApiKey();
+
         var client = _factory!.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Api-Key", ApiKey);
+        client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
 
         var response = await client.PostAsJsonAsync(
             "/v1/notifications",
             new SubmitNotificationRequest("email", "felipe@example.com", "hello", "first slice"));
 
-        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.Accepted, response.StatusCode);
         var accepted = await response.Content.ReadFromJsonAsync<NotificationAccepted>();
         Assert.NotNull(accepted);
 
@@ -109,10 +116,29 @@ public class WalkingSkeletonTests : IAsyncLifetime
             a.Source.Name == "Microsoft.AspNetCore" && a.TraceId == publish.TraceId);
     }
 
+    private async Task<string> IssueApiKey()
+    {
+        var admin = _factory!.CreateClient();
+        admin.DefaultRequestHeaders.Add("X-Admin-Key", AdminKey);
+
+        var tenantResponse = await admin.PostAsJsonAsync("/v1/admin/tenants", new { name = "easystok", deliveryMode = "live" });
+        tenantResponse.EnsureSuccessStatusCode();
+        var tenant = await tenantResponse.Content.ReadFromJsonAsync<TenantCreatedDto>();
+
+        var keyResponse = await admin.PostAsJsonAsync("/v1/admin/api-keys", new { tenantId = tenant!.Id, name = "server" });
+        keyResponse.EnsureSuccessStatusCode();
+        var key = await keyResponse.Content.ReadFromJsonAsync<ApiKeyCreatedDto>();
+        return key!.Key;
+    }
+
     private static Activity SingleActivity(ConcurrentBag<Activity> activities, string displayName)
     {
         var activity = activities.FirstOrDefault(a => a.DisplayName == displayName);
         Assert.True(activity is not null, $"Expected an activity named '{displayName}' but none was recorded.");
         return activity!;
     }
+
+    private sealed record TenantCreatedDto(Guid Id, string Name, string DeliveryMode);
+
+    private sealed record ApiKeyCreatedDto(Guid Id, Guid TenantId, string Name, string Key, string Prefix);
 }
