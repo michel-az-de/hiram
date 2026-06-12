@@ -3,6 +3,7 @@ using Hiram.Application.Notifications;
 using Hiram.Contracts;
 using Hiram.Domain.Notifications;
 using Hiram.Infrastructure.Telemetry;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Hiram.Api.Notifications;
 
@@ -18,19 +19,31 @@ internal static class NotificationEndpoints
 
     private static async Task<IResult> SubmitAsync(
         SubmitNotificationRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         ISubmitNotification submit,
         TenantContext tenant,
+        HttpResponse response,
         CancellationToken cancellationToken)
     {
         var errors = Validate(request);
         if (errors.Count > 0)
             return Results.ValidationProblem(errors);
 
+        idempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey.Trim();
+        if (idempotencyKey is { Length: > 255 })
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["idempotencyKey"] = ["Idempotency-Key must be at most 255 characters."]
+            });
+
         var channel = ParseChannel(request.Channel)!.Value;
-        var command = new SubmitNotificationCommand(tenant.TenantId, channel, request.Recipient, request.Subject, request.Body);
+        var command = new SubmitNotificationCommand(tenant.TenantId, channel, request.Recipient, request.Subject, request.Body, idempotencyKey);
 
         var result = await submit.SubmitAsync(command, cancellationToken);
         HiramDiagnostics.NotificationsAccepted.Add(1);
+
+        if (result.Replayed)
+            response.Headers["Idempotency-Replayed"] = "true";
 
         var body = new NotificationAccepted(result.NotificationId, ToWire(result.Status));
         return Results.Accepted($"/v1/notifications/{result.NotificationId}", body);

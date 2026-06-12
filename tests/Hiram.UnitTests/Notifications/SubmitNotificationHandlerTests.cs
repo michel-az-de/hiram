@@ -16,14 +16,57 @@ public class SubmitNotificationHandlerTests
         public NotificationRequest? SavedRequest { get; private set; }
         public OutboxMessage? SavedOutbox { get; private set; }
         public int SaveCalls { get; private set; }
+        public Exception? ThrowOnSave { get; set; }
 
         public Task SaveAsync(NotificationRequest request, OutboxMessage outbox, CancellationToken cancellationToken)
         {
+            SaveCalls++;
+            if (ThrowOnSave is not null)
+                throw ThrowOnSave;
+
             SavedRequest = request;
             SavedOutbox = outbox;
-            SaveCalls++;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FakeIdempotencyKeys : IIdempotencyKeys
+    {
+        public Guid? ClaimResult { get; set; }
+        public int ClaimCalls { get; private set; }
+        public int StoreCalls { get; private set; }
+        public int ReleaseCalls { get; private set; }
+        public Guid? LastStoredId { get; private set; }
+
+        public Task<Guid?> TryClaimAsync(Guid tenantId, string key, Guid notificationId, CancellationToken cancellationToken)
+        {
+            ClaimCalls++;
+            return Task.FromResult(ClaimResult);
+        }
+
+        public Task StoreAsync(Guid tenantId, string key, Guid notificationId, CancellationToken cancellationToken)
+        {
+            StoreCalls++;
+            LastStoredId = notificationId;
+            return Task.CompletedTask;
+        }
+
+        public Task ReleaseAsync(Guid tenantId, string key, CancellationToken cancellationToken)
+        {
+            ReleaseCalls++;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeReader : INotificationReader
+    {
+        public Guid? ExistingId { get; set; }
+
+        public Task<NotificationRequest?> FindAsync(Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult<NotificationRequest?>(null);
+
+        public Task<Guid?> FindIdByIdempotencyKeyAsync(Guid tenantId, string idempotencyKey, CancellationToken cancellationToken) =>
+            Task.FromResult(ExistingId);
     }
 
     private sealed class FixedClock(DateTimeOffset now) : IClock
@@ -31,71 +74,147 @@ public class SubmitNotificationHandlerTests
         public DateTimeOffset UtcNow { get; } = now;
     }
 
-    private static (SubmitNotificationHandler Handler, CapturingStore Store) Build()
+    private sealed record Harness(
+        SubmitNotificationHandler Handler,
+        CapturingStore Store,
+        FakeIdempotencyKeys Idempotency,
+        FakeReader Reader);
+
+    private static Harness Build()
     {
         var store = new CapturingStore();
-        var handler = new SubmitNotificationHandler(store, new FixedClock(FixedNow));
-        return (handler, store);
+        var idempotency = new FakeIdempotencyKeys();
+        var reader = new FakeReader();
+        var handler = new SubmitNotificationHandler(store, reader, idempotency, new FixedClock(FixedNow));
+        return new Harness(handler, store, idempotency, reader);
     }
 
-    private static SubmitNotificationCommand ValidCommand() =>
-        new(DevTenant, NotificationChannel.Email, "felipe@example.com", "hello", "first slice");
+    private static SubmitNotificationCommand ValidCommand(string? idempotencyKey = null) =>
+        new(DevTenant, NotificationChannel.Email, "felipe@example.com", "hello", "first slice", idempotencyKey);
 
     [Fact]
     public async Task Submit_ReturnsAcceptedNotificationId()
     {
-        var (handler, _) = Build();
+        var harness = Build();
 
-        var result = await handler.SubmitAsync(ValidCommand(), CancellationToken.None);
+        var result = await harness.Handler.SubmitAsync(ValidCommand(), CancellationToken.None);
 
         Assert.NotEqual(Guid.Empty, result.NotificationId);
         Assert.Equal(NotificationStatus.Accepted, result.Status);
+        Assert.False(result.Replayed);
     }
 
     [Fact]
     public async Task Submit_PersistsRequestAndOutboxInOneSaveSharingTenantAndTimestamp()
     {
-        var (handler, store) = Build();
+        var harness = Build();
 
-        var result = await handler.SubmitAsync(ValidCommand(), CancellationToken.None);
+        var result = await harness.Handler.SubmitAsync(ValidCommand(), CancellationToken.None);
 
-        Assert.Equal(1, store.SaveCalls);
-        Assert.NotNull(store.SavedRequest);
-        Assert.NotNull(store.SavedOutbox);
+        Assert.Equal(1, harness.Store.SaveCalls);
+        Assert.NotNull(harness.Store.SavedRequest);
+        Assert.NotNull(harness.Store.SavedOutbox);
 
-        Assert.Equal(result.NotificationId, store.SavedRequest!.Id);
-        Assert.Equal(NotificationStatus.Accepted, store.SavedRequest.Status);
-        Assert.Equal(DevTenant, store.SavedRequest.TenantId);
-        Assert.Equal(NotificationChannel.Email, store.SavedRequest.Channel);
-        Assert.Equal("felipe@example.com", store.SavedRequest.Recipient);
-        Assert.Equal(FixedNow, store.SavedRequest.CreatedAtUtc);
+        Assert.Equal(result.NotificationId, harness.Store.SavedRequest!.Id);
+        Assert.Equal(NotificationStatus.Accepted, harness.Store.SavedRequest.Status);
+        Assert.Equal(DevTenant, harness.Store.SavedRequest.TenantId);
+        Assert.Equal(NotificationChannel.Email, harness.Store.SavedRequest.Channel);
+        Assert.Equal("felipe@example.com", harness.Store.SavedRequest.Recipient);
+        Assert.Equal(FixedNow, harness.Store.SavedRequest.CreatedAtUtc);
 
-        Assert.Equal(DevTenant, store.SavedOutbox!.TenantId);
-        Assert.Equal(FixedNow, store.SavedOutbox.CreatedAtUtc);
-        Assert.Null(store.SavedOutbox.ProcessedAtUtc);
+        Assert.Equal(DevTenant, harness.Store.SavedOutbox!.TenantId);
+        Assert.Equal(FixedNow, harness.Store.SavedOutbox.CreatedAtUtc);
+        Assert.Null(harness.Store.SavedOutbox.ProcessedAtUtc);
     }
 
     [Fact]
     public async Task Submit_SetsOutboxTypeToChannelRoutingKey()
     {
-        var (handler, store) = Build();
+        var harness = Build();
 
-        await handler.SubmitAsync(ValidCommand(), CancellationToken.None);
+        await harness.Handler.SubmitAsync(ValidCommand(), CancellationToken.None);
 
-        Assert.Equal("email", store.SavedOutbox!.Type);
+        Assert.Equal("email", harness.Store.SavedOutbox!.Type);
     }
 
     [Fact]
     public async Task Submit_WritesNotificationIdIntoOutboxPayload()
     {
-        var (handler, store) = Build();
+        var harness = Build();
 
-        var result = await handler.SubmitAsync(ValidCommand(), CancellationToken.None);
+        var result = await harness.Handler.SubmitAsync(ValidCommand(), CancellationToken.None);
 
-        var payload = JsonSerializer.Deserialize<OutboxNotificationPayload>(store.SavedOutbox!.Payload);
+        var payload = JsonSerializer.Deserialize<OutboxNotificationPayload>(harness.Store.SavedOutbox!.Payload);
         Assert.NotNull(payload);
         Assert.Equal(result.NotificationId, payload!.NotificationId);
         Assert.Equal("felipe@example.com", payload.Recipient);
         Assert.Equal("hello", payload.Subject);
+    }
+
+    [Fact]
+    public async Task Submit_WithoutIdempotencyKey_NeverConsultsTheFastPath()
+    {
+        var harness = Build();
+
+        await harness.Handler.SubmitAsync(ValidCommand(), CancellationToken.None);
+
+        Assert.Equal(0, harness.Idempotency.ClaimCalls);
+    }
+
+    [Fact]
+    public async Task Submit_WithNewIdempotencyKey_AcceptsAndStoresTheKeyOnTheRequest()
+    {
+        var harness = Build();
+        harness.Idempotency.ClaimResult = null;
+
+        var result = await harness.Handler.SubmitAsync(ValidCommand("evt-1"), CancellationToken.None);
+
+        Assert.False(result.Replayed);
+        Assert.Equal(1, harness.Store.SaveCalls);
+        Assert.Equal("evt-1", harness.Store.SavedRequest!.IdempotencyKey);
+    }
+
+    [Fact]
+    public async Task Submit_WithKnownIdempotencyKey_ReplaysOriginalWithoutSaving()
+    {
+        var harness = Build();
+        var original = Guid.NewGuid();
+        harness.Idempotency.ClaimResult = original;
+
+        var result = await harness.Handler.SubmitAsync(ValidCommand("evt-1"), CancellationToken.None);
+
+        Assert.True(result.Replayed);
+        Assert.Equal(original, result.NotificationId);
+        Assert.Equal(0, harness.Store.SaveCalls);
+    }
+
+    [Fact]
+    public async Task Submit_WhenDatabaseRejectsDuplicate_ReplaysOriginalAndRepairsTheCache()
+    {
+        var harness = Build();
+        var original = Guid.NewGuid();
+        harness.Idempotency.ClaimResult = null;
+        harness.Store.ThrowOnSave = new DuplicateIdempotencyKeyException();
+        harness.Reader.ExistingId = original;
+
+        var result = await harness.Handler.SubmitAsync(ValidCommand("evt-1"), CancellationToken.None);
+
+        Assert.True(result.Replayed);
+        Assert.Equal(original, result.NotificationId);
+        Assert.Equal(1, harness.Idempotency.StoreCalls);
+        Assert.Equal(original, harness.Idempotency.LastStoredId);
+    }
+
+    [Fact]
+    public async Task Submit_WhenSaveFailsForAnotherReason_ReleasesTheClaimAndRethrows()
+    {
+        var harness = Build();
+        harness.Idempotency.ClaimResult = null;
+        harness.Store.ThrowOnSave = new InvalidOperationException("boom");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            harness.Handler.SubmitAsync(ValidCommand("evt-1"), CancellationToken.None));
+
+        Assert.Equal(1, harness.Idempotency.ReleaseCalls);
     }
 }

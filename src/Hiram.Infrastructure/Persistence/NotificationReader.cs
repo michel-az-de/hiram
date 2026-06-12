@@ -17,4 +17,11 @@ public sealed class NotificationReader : INotificationReader
         _context.NotificationRequests
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    public Task<Guid?> FindIdByIdempotencyKeyAsync(Guid tenantId, string idempotencyKey, CancellationToken cancellationToken) =>
+        _context.NotificationRequests
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.IdempotencyKey == idempotencyKey)
+            .Select(x => (Guid?)x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 }

@@ -33,6 +33,7 @@ public static class DependencyInjection
 
         services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(options));
         services.AddSingleton<IApiKeyUsageThrottle, RedisApiKeyUsageThrottle>();
+        services.AddSingleton<IIdempotencyKeys, RedisIdempotencyKeys>();
 
         return services;
     }

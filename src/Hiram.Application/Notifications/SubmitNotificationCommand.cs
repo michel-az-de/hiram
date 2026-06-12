@@ -7,4 +7,5 @@ public sealed record SubmitNotificationCommand(
     NotificationChannel Channel,
     string Recipient,
     string Subject,
-    string Body);
+    string Body,
+    string? IdempotencyKey = null);
