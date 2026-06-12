@@ -36,8 +36,8 @@ O código será escrito por IA mas não pode ter cara de IA. Regras duras:
 - WIP=1. Um passo do plano por vez, do início ao commit, antes de abrir o próximo.
 - Commits pequenos e por pathspec: `git add src/Hiram.Domain/Notifications/`. Proibido `git add .` e `git add -A`.
 - Conventional commits escritos como humano escreveria: `feat: persist notification with outbox row in one transaction`. Proibido qualquer rodapé de IA, co-authored-by de bot ou emoji.
-- Branch curta por passo quando o passo for arriscado, direto no master quando for aditivo e coberto por teste. Em dúvida, branch.
-- Nunca force push no master. Nunca rebase de branch compartilhada.
+- Branch curta por passo quando o passo for arriscado, direto no main quando for aditivo e coberto por teste. Em dúvida, branch.
+- Nunca force push no main. Nunca rebase de branch compartilhada.
 
 ## Testes
 

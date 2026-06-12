@@ -121,7 +121,7 @@ Um artigo por fase, sempre derivado de problema real com código de produção. 
 ## 10. Riscos e mitigações
 
 - **Escopo crescer.** Mitigação: fases com DoD fechado, WIP=1, este documento é a fonte da verdade.
-- **Agentes paralelos quebrarem o master.** Lição do EasyStok pós-recuperação de 14 dias. Mitigação: branch curta por passo, commits por pathspec, nunca `git add .`, CI obrigatório antes de merge.
+- **Agentes paralelos quebrarem o main.** Lição do EasyStok pós-recuperação de 14 dias. Mitigação: branch curta por passo, commits por pathspec, nunca `git add .`, CI obrigatório antes de merge.
 - **Custo de IA.** Mitigação: budget de tokens por tenant, cache de respostas, Intelligence escala a zero.
 - **Lock-in de provider de envio.** Mitigação: abstração de provider com duas implementações desde a F1.
 - **VPS pequeno sufocar a telemetria.** Mitigação: retenção curta, sampling de traces, alertas de disco.
