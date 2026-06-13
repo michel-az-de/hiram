@@ -23,6 +23,8 @@ public static class DependencyInjection
         services.AddScoped<IApiKeyStore, ApiKeyStore>();
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<IEmailProvider, SmtpEmailProvider>();
+        services.AddHttpClient<IEmailProvider, ResendEmailProvider>(client =>
+            client.BaseAddress = new Uri("https://api.resend.com/"));
 
         return services;
     }
