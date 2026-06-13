@@ -85,14 +85,16 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         return new EmailNotificationProcessor(context, resolver, FastPipeline(), new TestClock(), NullLogger<EmailNotificationProcessor>.Instance);
     }
 
-    private async Task<Guid> SeedNotification(Guid tenantId)
+    private async Task<(Guid TenantId, Guid NotificationId)> Seed(DeliveryMode deliveryMode)
     {
-        var id = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var notificationId = Guid.NewGuid();
         await using var context = NewContext();
+        context.Tenants.Add(new Tenant(tenantId, "test-tenant", deliveryMode, DateTimeOffset.UtcNow));
         context.NotificationRequests.Add(
-            new NotificationRequest(id, tenantId, NotificationChannel.Email, "ops@example.com", "hello", "f1", DateTimeOffset.UtcNow));
+            new NotificationRequest(notificationId, tenantId, NotificationChannel.Email, "ops@example.com", "hello", "f1", DateTimeOffset.UtcNow));
         await context.SaveChangesAsync();
-        return id;
+        return (tenantId, notificationId);
     }
 
     private static byte[] PayloadFor(Guid notificationId, Guid tenantId) =>
@@ -117,8 +119,7 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
     [Fact]
     public async Task Process_RecoversOnSecondAttempt_WhenFirstIsTransient()
     {
-        var tenantId = Guid.NewGuid();
-        var notificationId = await SeedNotification(tenantId);
+        var (tenantId, notificationId) = await Seed(DeliveryMode.Live);
         var provider = new ScriptedProvider("fake", [new SendOutcome.TransientFailure("temporary"), new SendOutcome.Sent()]);
 
         await using (var context = NewContext())
@@ -135,8 +136,7 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
     [Fact]
     public async Task Process_FailsWithoutRetry_WhenPermanent()
     {
-        var tenantId = Guid.NewGuid();
-        var notificationId = await SeedNotification(tenantId);
+        var (tenantId, notificationId) = await Seed(DeliveryMode.Live);
         var provider = new ScriptedProvider("fake", [new SendOutcome.PermanentFailure("rejected")]);
 
         await using (var context = NewContext())
@@ -154,8 +154,7 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
     [Fact]
     public async Task Process_FailsAfterThreeAttempts_WhenAlwaysTransient()
     {
-        var tenantId = Guid.NewGuid();
-        var notificationId = await SeedNotification(tenantId);
+        var (tenantId, notificationId) = await Seed(DeliveryMode.Live);
         var provider = new ScriptedProvider("fake", Enumerable.Repeat<SendOutcome>(new SendOutcome.TransientFailure("temporary"), 5));
 
         await using (var context = NewContext())
@@ -169,5 +168,26 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         Assert.Equal(new[] { 1, 2, 3 }, attempts.Select(a => a.AttemptNumber).ToArray());
         Assert.All(attempts, a => Assert.Equal("fake", a.Provider));
         Assert.All(attempts, a => Assert.True(a.Duration >= TimeSpan.Zero));
+    }
+
+    [Fact]
+    public async Task Process_RecordsShadowAttempt_WithoutCallingProvider_WhenTenantIsShadow()
+    {
+        var (tenantId, notificationId) = await Seed(DeliveryMode.Shadow);
+        // Scripted to a hard failure: if the provider were ever called, the assertions below would catch it.
+        var provider = new ScriptedProvider("fake", [new SendOutcome.PermanentFailure("must not be called")]);
+
+        await using (var context = NewContext())
+            await BuildProcessor(context, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None);
+
+        Assert.Equal(0, provider.Calls);
+        Assert.Equal(NotificationStatus.Sent, await StatusOf(notificationId));
+
+        var attempts = await AttemptsFor(notificationId);
+        Assert.Single(attempts);
+        Assert.Equal(DeliveryOutcome.ShadowWouldSend, attempts[0].Outcome);
+        Assert.True(attempts[0].Shadowed);
+        Assert.Equal("fake", attempts[0].Provider);
+        Assert.False(string.IsNullOrEmpty(attempts[0].PayloadHash));
     }
 }

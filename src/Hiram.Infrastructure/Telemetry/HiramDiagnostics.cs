@@ -14,4 +14,5 @@ public static class HiramDiagnostics
 
     public static readonly Counter<long> NotificationsAccepted = Meter.CreateCounter<long>("hiram.notifications.accepted");
     public static readonly Counter<long> OutboxDispatched = Meter.CreateCounter<long>("hiram.outbox.dispatched");
+    public static readonly Counter<long> NotificationsShadowed = Meter.CreateCounter<long>("hiram.notifications.shadowed");
 }

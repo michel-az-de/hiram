@@ -12,6 +12,12 @@ public sealed class DeliveryAttempt
     public TimeSpan Duration { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
+    // True when the tenant runs in shadow mode and the provider was resolved but never called.
+    public bool Shadowed { get; private set; }
+
+    // Hash of the message that would have been sent, kept for shadow parity audits without storing the body.
+    public string? PayloadHash { get; private set; }
+
     // Parameterless ctor exists so EF Core can materialize rows without re-running creation invariants.
     private DeliveryAttempt()
     {
@@ -27,7 +33,9 @@ public sealed class DeliveryAttempt
         DeliveryOutcome outcome,
         string? error,
         TimeSpan duration,
-        DateTimeOffset createdAtUtc)
+        DateTimeOffset createdAtUtc,
+        bool shadowed = false,
+        string? payloadHash = null)
     {
         if (id == Guid.Empty)
             throw new ArgumentException("Delivery attempt id is required.", nameof(id));
@@ -53,5 +61,7 @@ public sealed class DeliveryAttempt
         Error = error;
         Duration = duration;
         CreatedAtUtc = createdAtUtc;
+        Shadowed = shadowed;
+        PayloadHash = payloadHash;
     }
 }

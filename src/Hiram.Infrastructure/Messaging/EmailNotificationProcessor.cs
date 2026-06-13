@@ -1,10 +1,14 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Hiram.Application.Abstractions;
 using Hiram.Application.Delivery;
 using Hiram.Application.Notifications;
 using Hiram.Domain.Notifications;
+using Hiram.Domain.Tenants;
 using Hiram.Infrastructure.Persistence;
+using Hiram.Infrastructure.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Polly;
@@ -63,6 +67,17 @@ public sealed class EmailNotificationProcessor
 
         var resolved = await _resolver.ResolveAsync(notification.TenantId, cancellationToken);
         var message = new EmailMessage(notification.Recipient, notification.Subject, notification.Body);
+
+        if (await IsShadowAsync(notification.TenantId, cancellationToken))
+        {
+            // Shadow mode processes everything up to the edge of the send, then records what would have
+            // gone out without touching the provider, so a tenant can compare against its legacy system.
+            await RecordShadowAttemptAsync(notification, resolved.Provider.Name, message, cancellationToken);
+            notification.MarkSent();
+            await _context.SaveChangesAsync(cancellationToken);
+            HiramDiagnostics.NotificationsShadowed.Add(1);
+            return;
+        }
 
         var attemptNumber = 0;
         var outcome = await _pipeline.ExecuteAsync(
@@ -143,4 +158,43 @@ public sealed class EmailNotificationProcessor
         SendOutcome.PermanentFailure permanent => (DeliveryOutcome.PermanentFailure, permanent.Reason),
         _ => throw new ArgumentOutOfRangeException(nameof(outcome))
     };
+
+    private async Task<bool> IsShadowAsync(Guid tenantId, CancellationToken cancellationToken)
+    {
+        var deliveryMode = await _context.Tenants
+            .Where(t => t.Id == tenantId)
+            .Select(t => (DeliveryMode?)t.DeliveryMode)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return deliveryMode == DeliveryMode.Shadow;
+    }
+
+    private async Task RecordShadowAttemptAsync(
+        NotificationRequest notification,
+        string provider,
+        EmailMessage message,
+        CancellationToken cancellationToken)
+    {
+        var attempt = new DeliveryAttempt(
+            Guid.NewGuid(),
+            notification.TenantId,
+            notification.Id,
+            attemptNumber: 1,
+            provider,
+            DeliveryOutcome.ShadowWouldSend,
+            error: null,
+            duration: TimeSpan.Zero,
+            _clock.UtcNow,
+            shadowed: true,
+            payloadHash: HashPayload(message));
+
+        _context.DeliveryAttempts.Add(attempt);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static string HashPayload(EmailMessage message)
+    {
+        var canonical = $"{message.Recipient}\n{message.Subject}\n{message.Body}";
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
+    }
 }
