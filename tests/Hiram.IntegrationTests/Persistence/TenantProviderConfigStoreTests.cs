@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Tenants;
 using Hiram.Infrastructure.Persistence;
@@ -41,7 +42,9 @@ public class TenantProviderConfigStoreTests : IAsyncLifetime
         Assert.NotNull(config);
         Assert.Equal("resend", config!.Provider);
         Assert.Equal("protected:secret", config.SecretProtected);
-        Assert.Equal("{\"from\":\"hi@easystok.com\"}", config.Settings);
+        // Compare the settings by content: Postgres reformats jsonb on the round trip, so the raw string differs.
+        var settings = JsonSerializer.Deserialize<Dictionary<string, string>>(config.Settings)!;
+        Assert.Equal("hi@easystok.com", settings["from"]);
     }
 
     [Fact]
