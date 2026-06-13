@@ -62,11 +62,17 @@ public class SubmitNotificationHandlerTests
     {
         public Guid? ExistingId { get; set; }
 
-        public Task<NotificationRequest?> FindAsync(Guid id, CancellationToken cancellationToken) =>
+        public Task<NotificationRequest?> FindAsync(Guid tenantId, Guid id, CancellationToken cancellationToken) =>
             Task.FromResult<NotificationRequest?>(null);
 
         public Task<Guid?> FindIdByIdempotencyKeyAsync(Guid tenantId, string idempotencyKey, CancellationToken cancellationToken) =>
             Task.FromResult(ExistingId);
+
+        public Task<IReadOnlyList<NotificationRequest>> QueryAsync(NotificationQuery query, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<NotificationRequest>>([]);
+
+        public Task<IReadOnlyList<DeliveryAttempt>> AttemptsAsync(Guid tenantId, Guid notificationId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<DeliveryAttempt>>([]);
     }
 
     private sealed class FixedClock(DateTimeOffset now) : IClock
