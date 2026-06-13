@@ -56,11 +56,21 @@ public sealed class NotificationRequest
         Status = NotificationStatus.Accepted;
     }
 
+    public void MarkSending()
+    {
+        Status = NotificationStatus.Sending;
+    }
+
     public void MarkSent()
     {
         if (Status == NotificationStatus.Sent)
             return;
 
         Status = NotificationStatus.Sent;
+    }
+
+    public void MarkFailed()
+    {
+        Status = NotificationStatus.Failed;
     }
 }

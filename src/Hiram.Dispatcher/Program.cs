@@ -13,6 +13,7 @@ var rabbitMq = builder.Configuration.GetConnectionString("RabbitMq")
 builder.AddHiramTelemetry("hiram-dispatcher");
 
 builder.Services.AddHiramInfrastructure(postgres);
+builder.Services.AddHiramEmailDelivery(builder.Configuration);
 builder.Services.AddHiramMessaging(rabbitMq);
 builder.Services.AddHostedService<OutboxRelayWorker>();
 builder.Services.AddHostedService<EmailConsumerWorker>();
