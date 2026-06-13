@@ -14,7 +14,7 @@
 | 6 | Shadow mode (registra `shadow_would_send` sem chamar provider) | Feito | Passo 8. Caminho shadow no consumer, attempt com `shadowed` e hash do payload, métrica `hiram.notifications.shadowed`. Testes: cenário shadow em `EmailDeliveryPipelineTests` e `EmailDeliveryEndToEndTests`. |
 | 7 | Consulta de auditoria (listagem paginada com filtros, detalhe com tentativas) | Feito | Passo 9. `GET /v1/notifications` (cursor, filtros, escopo por tenant) e `GET /v1/notifications/{id}` com attempts. Testes: `NotificationQueryTests`. |
 | 8 | Scalar com Handshake, exemplos reais e catálogo de erros ProblemDetails | Feito (com ressalva) | Passo 10. `HiramApiDocs`. Teste: `ApiDocsTests`. Ressalva no catálogo 409/422, ver Desvios e pendências. |
-| 9 | Testes verdes, incluindo ponta a ponta com Mailpit, e CI verde | Parcial | Testes locais (build + unit) verdes; e2e `EmailDeliveryEndToEndTests` cobre Mailpit. CI precisa de confirmação visual, ver nota de CI. |
+| 9 | Testes verdes, incluindo ponta a ponta com Mailpit, e CI verde | Feito | Build Release sem warnings, 66 unit verdes, suíte de integração verde no CI (run `dce79d7`, conclusão success), com `EmailDeliveryEndToEndTests` cobrindo o fluxo live até o Mailpit. |
 
 ## Definição de pronto da F1
 
@@ -22,7 +22,7 @@
 - [ ] Email real entregue em produção com domínio verificado. Operacional, fora do dev. Em dev, entrega no Mailpit (evidência: `SmtpDeliveryTests`, `EmailDeliveryEndToEndTests`). O corte de produção depende de DNS (SPF/DKIM/DMARC) verificado no provider.
 - [ ] EasyStok integrado em shadow e 3 dias de paridade. Integração mora no repositório do EasyStok e é ato operacional pós-F1; o lado Hiram (shadow mode + listagem de auditoria) está pronto.
 - [ ] Nenhuma biblioteca além de MailKit e Polly. Desvio reportado abaixo.
-- [ ] CI verde, zero warnings, histórico um passo por commit, desvios reportados. Build Release local sem warnings; histórico com um passo por commit; CI a confirmar.
+- [x] CI verde, zero warnings, histórico um passo por commit, desvios reportados. CI verde na run `dce79d7` (success); build Release sem warnings; um passo por commit; desvios abaixo.
 
 ## Desvios reportados
 
@@ -51,7 +51,12 @@ O `POST` é assíncrono (outbox) e devolve 202; o envio ocorre em background. Lo
 
 ## Nota de CI
 
-Não foi possível confirmar o estado do CI a partir do ambiente de execução (acesso a api.github.com bloqueado). A `WalkingSkeletonTests` esteve quebrada em runtime do Passo 7 ao Passo 10 por uma regressão de injeção de dependência (o consumer passou a exigir o resolver e o pipeline, não registrados no host da Api), corrigida no Passo 11. Recomenda-se confirmar o verde na aba Actions antes de considerar o item 9 e o último item da DoD fechados.
+Durante a maior parte da fase o acesso a api.github.com esteve bloqueado no ambiente de execução, o que escondeu duas falhas no CI:
+
+- Um teste comparando o `settings` jsonb pela string crua (`TenantProviderConfigStoreTests`), que o Postgres reformata no round trip. Entrou no Passo 4 e deixou o CI vermelho do Passo 4 ao 12. Corrigido para comparar por conteúdo (commit `dce79d7`).
+- Uma regressão de injeção de dependência na `WalkingSkeletonTests` (o consumer passou a exigir o resolver e o pipeline, não registrados no host da Api), do Passo 7 ao 10, corrigida no Passo 11.
+
+Com os dois corrigidos, a run `dce79d7` fechou verde (success): 66 testes unitários e a suíte de integração inteira, incluindo a ponta a ponta com Mailpit, passando.
 
 ## Verificação manual de referência
 
