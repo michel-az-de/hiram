@@ -15,4 +15,8 @@ public static class HiramDiagnostics
     public static readonly Counter<long> NotificationsAccepted = Meter.CreateCounter<long>("hiram.notifications.accepted");
     public static readonly Counter<long> OutboxDispatched = Meter.CreateCounter<long>("hiram.outbox.dispatched");
     public static readonly Counter<long> NotificationsShadowed = Meter.CreateCounter<long>("hiram.notifications.shadowed");
+    public static readonly Counter<long> NotificationsSent = Meter.CreateCounter<long>("hiram.notifications.sent");
+    public static readonly Counter<long> NotificationsFailed = Meter.CreateCounter<long>("hiram.notifications.failed");
+    public static readonly Counter<long> IdempotencyReplays = Meter.CreateCounter<long>("hiram.idempotency.replays");
+    public static readonly Histogram<double> SendDuration = Meter.CreateHistogram<double>("hiram.send.duration", unit: "ms");
 }

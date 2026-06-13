@@ -57,10 +57,15 @@ internal static class NotificationEndpoints
                 detail: "The idempotency key conflicts with an existing request that could not be resolved.");
         }
 
-        HiramDiagnostics.NotificationsAccepted.Add(1);
-
         if (result.Replayed)
+        {
+            HiramDiagnostics.IdempotencyReplays.Add(1);
             response.Headers["Idempotency-Replayed"] = "true";
+        }
+        else
+        {
+            HiramDiagnostics.NotificationsAccepted.Add(1);
+        }
 
         var body = new NotificationAccepted(result.NotificationId, ToWire(result.Status));
         return Results.Accepted($"/v1/notifications/{result.NotificationId}", body);

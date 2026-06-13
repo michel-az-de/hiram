@@ -56,6 +56,12 @@ public sealed class EmailNotificationProcessor
             return;
         }
 
+        using var logScope = _logger.BeginScope(new Dictionary<string, object>
+        {
+            ["tenant_id"] = notification.TenantId,
+            ["notification_id"] = notification.Id
+        });
+
         if (notification.Status is NotificationStatus.Sent or NotificationStatus.Failed)
         {
             // At-least-once redelivery of an already settled notification: nothing to send, let the worker ack.
@@ -76,6 +82,7 @@ public sealed class EmailNotificationProcessor
             notification.MarkSent();
             await _context.SaveChangesAsync(cancellationToken);
             HiramDiagnostics.NotificationsShadowed.Add(1);
+            _logger.LogInformation("Email shadowed, would send via {Provider}", resolved.Provider.Name);
             return;
         }
 
@@ -90,17 +97,27 @@ public sealed class EmailNotificationProcessor
                 var attemptOutcome = await SendOnceAsync(resolved, message, token, cancellationToken);
 
                 stopwatch.Stop();
+                HiramDiagnostics.SendDuration.Record(
+                    stopwatch.Elapsed.TotalMilliseconds,
+                    new KeyValuePair<string, object?>("hiram.provider", resolved.Provider.Name));
                 await RecordAttemptAsync(notification, attemptNumber, resolved.Provider.Name, attemptOutcome, stopwatch.Elapsed, startedAt, cancellationToken);
                 return attemptOutcome;
             },
             cancellationToken);
 
         if (outcome is SendOutcome.Sent)
+        {
             notification.MarkSent();
+            HiramDiagnostics.NotificationsSent.Add(1);
+        }
         else
+        {
             notification.MarkFailed();
+            HiramDiagnostics.NotificationsFailed.Add(1);
+        }
 
         await _context.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation("Email delivery finished with status {Status}", notification.Status);
 
         // The message is acked by the worker once this returns. There is deliberately no requeue: replay
         // and a dead letter queue arrive in F2, and requeue without a DLQ is an infinite loop.
@@ -112,19 +129,34 @@ public sealed class EmailNotificationProcessor
         CancellationToken pipelineToken,
         CancellationToken outerToken)
     {
+        using var activity = HiramDiagnostics.Messaging.StartActivity("send email", ActivityKind.Client);
+        activity?.SetTag("hiram.provider", resolved.Provider.Name);
+
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(pipelineToken);
         timeout.CancelAfter(PerAttemptTimeout);
 
+        SendOutcome outcome;
         try
         {
-            return await resolved.Provider.SendAsync(message, resolved.Settings, timeout.Token);
+            outcome = await resolved.Provider.SendAsync(message, resolved.Settings, timeout.Token);
         }
         catch (OperationCanceledException) when (!outerToken.IsCancellationRequested)
         {
             // The per-attempt timeout fired (not a shutdown); treat as transient so the pipeline retries.
-            return new SendOutcome.TransientFailure($"Send exceeded the {PerAttemptTimeout.TotalSeconds:0}s attempt timeout.");
+            outcome = new SendOutcome.TransientFailure($"Send exceeded the {PerAttemptTimeout.TotalSeconds:0}s attempt timeout.");
         }
+
+        activity?.SetTag("hiram.outcome", OutcomeName(outcome));
+        return outcome;
     }
+
+    private static string OutcomeName(SendOutcome outcome) => outcome switch
+    {
+        SendOutcome.Sent => "sent",
+        SendOutcome.TransientFailure => "transient_failure",
+        SendOutcome.PermanentFailure => "permanent_failure",
+        _ => "unknown"
+    };
 
     private async Task RecordAttemptAsync(
         NotificationRequest notification,

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net.Http.Json;
 using Hiram.Contracts;
 using Hiram.Dispatcher;
+using Hiram.Infrastructure;
 using Hiram.Infrastructure.Messaging;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -44,8 +45,11 @@ public class WalkingSkeletonTests : IAsyncLifetime
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Development");
-            builder.ConfigureServices(services =>
+            builder.ConfigureServices((context, services) =>
             {
+                // The API host does not run the send pipeline, so the in-process consumer needs the
+                // delivery services (resolver, providers pipeline) wired up like the dispatcher.
+                services.AddHiramEmailDelivery(context.Configuration);
                 services.AddHiramMessaging(rabbitConnection);
                 services.AddHostedService<OutboxRelayWorker>();
                 services.AddHostedService<EmailConsumerWorker>();
@@ -121,7 +125,9 @@ public class WalkingSkeletonTests : IAsyncLifetime
         var admin = _factory!.CreateClient();
         admin.DefaultRequestHeaders.Add("X-Admin-Key", AdminKey);
 
-        var tenantResponse = await admin.PostAsJsonAsync("/v1/admin/tenants", new { name = "easystok", deliveryMode = "live" });
+        // Shadow mode reaches the 'sent' terminal state without a live provider target; the full live
+        // path to Mailpit is exercised by the F1 end to end suite.
+        var tenantResponse = await admin.PostAsJsonAsync("/v1/admin/tenants", new { name = "easystok", deliveryMode = "shadow" });
         tenantResponse.EnsureSuccessStatusCode();
         var tenant = await tenantResponse.Content.ReadFromJsonAsync<TenantCreatedDto>();
 
