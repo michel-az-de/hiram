@@ -14,7 +14,7 @@ internal static class AdminEndpoints
 
     public static IEndpointRouteBuilder MapAdminEndpoints(this IEndpointRouteBuilder app)
     {
-        var admin = app.MapGroup("/v1/admin").AddEndpointFilter(RequireAdminKey);
+        var admin = app.MapGroup("/v1/admin").WithTags("Admin (provisional)").AddEndpointFilter(RequireAdminKey);
         admin.MapPost("/tenants", CreateTenantAsync);
         admin.MapPost("/api-keys", CreateApiKeyAsync);
         admin.MapDelete("/api-keys/{id:guid}", RevokeApiKeyAsync);

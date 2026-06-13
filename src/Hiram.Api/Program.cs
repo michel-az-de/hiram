@@ -1,6 +1,7 @@
 using Hiram.Api.Admin;
 using Hiram.Api.Authentication;
 using Hiram.Api.Notifications;
+using Hiram.Api.OpenApi;
 using Hiram.Application.Notifications;
 using Hiram.Infrastructure;
 using Hiram.Infrastructure.Persistence;
@@ -21,7 +22,7 @@ builder.AddHiramTelemetry("hiram-api", tracing => tracing
     .AddHttpClientInstrumentation());
 
 builder.Services.AddProblemDetails();
-builder.Services.AddOpenApi();
+builder.Services.AddHiramOpenApi();
 builder.Services.AddHiramInfrastructure(connectionString);
 builder.Services.AddHiramRedis(redisConnectionString);
 builder.Services.AddScoped<ISubmitNotification, SubmitNotificationHandler>();
@@ -39,7 +40,10 @@ if (app.Environment.IsDevelopment())
 app.UseMiddleware<ApiKeyMiddleware>();
 
 app.MapOpenApi();
-app.MapScalarApiReference();
+app.MapScalarApiReference(options => options
+    .WithTitle("Hiram API")
+    .EnableDarkMode()
+    .WithCustomCss(HiramApiDocs.ScalarCss));
 app.MapAdminEndpoints();
 app.MapNotificationEndpoints();
 

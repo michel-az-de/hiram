@@ -15,9 +15,9 @@ internal static class NotificationEndpoints
 
     public static IEndpointRouteBuilder MapNotificationEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/v1/notifications", SubmitAsync);
-        app.MapGet("/v1/notifications", ListAsync);
-        app.MapGet("/v1/notifications/{id:guid}", GetByIdAsync);
+        app.MapPost("/v1/notifications", SubmitAsync).WithTags("Notifications");
+        app.MapGet("/v1/notifications", ListAsync).WithTags("Notifications");
+        app.MapGet("/v1/notifications/{id:guid}", GetByIdAsync).WithTags("Notifications");
 
         return app;
     }
@@ -44,7 +44,19 @@ internal static class NotificationEndpoints
         var channel = ParseChannel(request.Channel)!.Value;
         var command = new SubmitNotificationCommand(tenant.TenantId, channel, request.Recipient, request.Subject, request.Body, idempotencyKey);
 
-        var result = await submit.SubmitAsync(command, cancellationToken);
+        SubmitNotificationResult result;
+        try
+        {
+            result = await submit.SubmitAsync(command, cancellationToken);
+        }
+        catch (DuplicateIdempotencyKeyException)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Idempotency conflict",
+                detail: "The idempotency key conflicts with an existing request that could not be resolved.");
+        }
+
         HiramDiagnostics.NotificationsAccepted.Add(1);
 
         if (result.Replayed)
