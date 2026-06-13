@@ -22,7 +22,7 @@ Hiram accepts a notification request, persists it together with an outbox row in
 
 ## Status
 
-F0 complete. The walking skeleton runs end to end: a `POST /v1/notifications` is persisted with its outbox row in one PostgreSQL transaction, relayed to RabbitMQ, consumed, and reflected as `published`, with a single OpenTelemetry trace spanning the API, the publish and the consume. Roadmap, phase plans and architecture decisions live in this repository:
+F1 complete. Email ships end to end on top of the F0 outbox skeleton, with production safety: real tenants and hashed API keys, honored `Idempotency-Key`, two interchangeable providers per tenant (SMTP via MailKit, Resend over HTTP), a Polly send pipeline that records one `DeliveryAttempt` per try, the full state machine (`accepted -> queued -> sending -> sent | failed | suppressed`), per-tenant shadow mode, and cursor-paginated audit queries. Roadmap, phase plans and architecture decisions live in this repository:
 
 | Document | Purpose |
 |---|---|
@@ -36,46 +36,54 @@ F0 complete. The walking skeleton runs end to end: a `POST /v1/notifications` is
 
 The dev infrastructure runs in Docker, the hosts run on .NET 10. Run everything from the repository root.
 
-1. Start Postgres, RabbitMQ, Redis and the Aspire Dashboard:
+1. Start Postgres, RabbitMQ, Redis, Mailpit and the Aspire Dashboard:
 
    ```bash
    docker compose -f docker-compose.dev.yml up -d
    ```
 
-2. Set the dev API key (kept in user-secrets, never committed):
+2. Set the admin key that guards the provisional admin endpoints (kept in user-secrets, never committed):
 
    ```bash
-   dotnet user-secrets set "Auth:DevApiKey" "dev-key-local" --project src/Hiram.Api
+   dotnet user-secrets set "Hiram:AdminKey" "admin-dev-local" --project src/Hiram.Api
    ```
 
-3. Start the API. It applies database migrations on startup and listens on `http://localhost:3357`:
+3. Start the API (applies migrations on startup, listens on `http://localhost:3357`) and, in another shell, the Dispatcher (outbox relay plus email consumer). Start the Dispatcher after the API so the schema already exists:
 
    ```bash
    dotnet run --project src/Hiram.Api
-   ```
-
-4. In another shell start the Dispatcher (outbox relay plus email consumer). Start it after the API so the schema already exists:
-
-   ```bash
    dotnet run --project src/Hiram.Dispatcher
    ```
 
-5. Submit a notification and read it back:
+4. Create a tenant and issue an API key. The clear key (`hk_live_...`) is shown only once:
+
+   ```bash
+   curl -s -X POST http://localhost:3357/v1/admin/tenants \
+     -H "X-Admin-Key: admin-dev-local" -H "Content-Type: application/json" \
+     -d '{"name":"easystok","deliveryMode":"live"}'
+
+   curl -s -X POST http://localhost:3357/v1/admin/api-keys \
+     -H "X-Admin-Key: admin-dev-local" -H "Content-Type: application/json" \
+     -d '{"tenantId":"<tenant-id>","name":"easystok-server"}'
+   ```
+
+5. Send a notification and read it back. An `Idempotency-Key` makes the call safe to retry:
 
    ```bash
    curl -i -X POST http://localhost:3357/v1/notifications \
-     -H "X-Api-Key: dev-key-local" -H "Content-Type: application/json" \
-     -d '{"channel":"email","recipient":"felipe@example.com","subject":"hello","body":"first slice"}'
+     -H "X-Api-Key: hk_live_..." -H "Idempotency-Key: evt-0001" -H "Content-Type: application/json" \
+     -d '{"channel":"email","recipient":"ops@example.com","subject":"hello","body":"f1"}'
 
-   curl -s http://localhost:3357/v1/notifications/<id> -H "X-Api-Key: dev-key-local"
+   curl -s http://localhost:3357/v1/notifications/<id> -H "X-Api-Key: hk_live_..."
    ```
 
-   The POST returns `202` with the id and status `accepted`. Within about a second the Dispatcher logs `Would send email for notification <id>` and the GET reports `published`.
+   The POST returns `202` with the id and status `accepted`. The Dispatcher delivers through the dev SMTP provider and the GET reports `sent` with its delivery attempts. Repeating the POST with the same `Idempotency-Key` returns the original id and the header `Idempotency-Replayed: true`. A tenant created with `"deliveryMode":"shadow"` reaches `sent` but records a `shadow_would_send` attempt without delivering.
 
 Where to look:
 
 - API reference (Scalar): `http://localhost:3357/scalar`
-- Distributed trace (Aspire Dashboard): `http://localhost:18888`, open the request trace to see the API, publish and consume spans under one trace id
+- Delivered email (Mailpit): `http://localhost:8025`
+- Distributed trace (Aspire Dashboard): `http://localhost:18888`, one trace id spanning the API, publish, consume and send spans
 - RabbitMQ management: `http://localhost:15672` (user `hiram`, password `hiram`)
 
 Run the tests with `dotnet test`. The integration suite uses Testcontainers and needs a running Docker engine.
