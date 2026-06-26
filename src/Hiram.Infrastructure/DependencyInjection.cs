@@ -21,6 +21,7 @@ public static class DependencyInjection
         services.AddDbContext<HiramDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<INotificationStore, NotificationStore>();
         services.AddScoped<INotificationReader, NotificationReader>();
+        services.AddScoped<IDeadLetterReplay, DeadLetterReplay>();
         services.AddScoped<ITenantStore, TenantStore>();
         services.AddScoped<IApiKeyStore, ApiKeyStore>();
         services.AddScoped<ITenantProviderConfigStore, TenantProviderConfigStore>();

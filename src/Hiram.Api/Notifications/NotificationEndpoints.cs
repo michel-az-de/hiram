@@ -18,9 +18,37 @@ internal static class NotificationEndpoints
         app.MapPost("/v1/notifications", SubmitAsync).WithTags("Notifications");
         app.MapGet("/v1/notifications", ListAsync).WithTags("Notifications");
         app.MapGet("/v1/notifications/{id:guid}", GetByIdAsync).WithTags("Notifications");
+        app.MapPost("/v1/notifications/{id:guid}/replay", ReplayAsync).WithTags("Notifications");
 
         return app;
     }
+
+    private static async Task<IResult> ReplayAsync(
+        Guid id,
+        IDeadLetterReplay replay,
+        TenantContext tenant,
+        CancellationToken cancellationToken)
+    {
+        using var activity = HiramDiagnostics.Messaging.StartActivity("replay notification");
+        activity?.SetTag("hiram.notification_id", id);
+
+        var outcome = await replay.ReplayAsync(tenant.TenantId, id, cancellationToken);
+        return outcome switch
+        {
+            ReplayOutcome.Replayed => Results.Accepted($"/v1/notifications/{id}", new NotificationAccepted(id, "queued")),
+            ReplayOutcome.NotFound => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Notification not found"),
+            ReplayOutcome.NotDeadLettered => ReplayConflict("not_dead_lettered", "Only a dead lettered notification can be replayed."),
+            ReplayOutcome.AlreadyReplayed => ReplayConflict("already_replayed", "The notification was already replayed."),
+            _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError)
+        };
+    }
+
+    private static IResult ReplayConflict(string code, string detail) =>
+        Results.Problem(
+            statusCode: StatusCodes.Status409Conflict,
+            title: "Replay conflict",
+            detail: detail,
+            extensions: new Dictionary<string, object?> { ["code"] = code });
 
     private static async Task<IResult> SubmitAsync(
         SubmitNotificationRequest request,
