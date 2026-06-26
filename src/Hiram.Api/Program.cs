@@ -2,6 +2,7 @@ using Hiram.Api.Admin;
 using Hiram.Api.Authentication;
 using Hiram.Api.Notifications;
 using Hiram.Api.OpenApi;
+using Hiram.Api.Templates;
 using Hiram.Application.Notifications;
 using Hiram.Infrastructure;
 using Hiram.Infrastructure.Persistence;
@@ -46,6 +47,7 @@ app.MapScalarApiReference(options => options
     .WithCustomCss(HiramApiDocs.ScalarCss));
 app.MapAdminEndpoints();
 app.MapNotificationEndpoints();
+app.MapTemplateEndpoints();
 
 app.Run();
 
