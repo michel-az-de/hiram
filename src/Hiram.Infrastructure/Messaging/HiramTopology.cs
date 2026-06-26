@@ -7,6 +7,8 @@ public static class HiramTopology
     public const string EmailRoutingKey = "email";
     public const string PushQueue = "hiram.notifications.push";
     public const string PushRoutingKey = "push";
+    public const string WebhookQueue = "hiram.notifications.webhook";
+    public const string WebhookRoutingKey = "webhook";
 
     public const string Dlx = "hiram.notifications.dlx";
     public const string DeadLetterQueue = "hiram.notifications.dead-letter";

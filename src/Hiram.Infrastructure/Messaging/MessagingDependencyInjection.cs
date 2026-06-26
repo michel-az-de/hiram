@@ -11,6 +11,7 @@ public static class MessagingDependencyInjection
         services.AddScoped<OutboxRelay>();
         services.AddScoped<EmailNotificationProcessor>();
         services.AddScoped<PushNotificationProcessor>();
+        services.AddHttpClient<WebhookDeliveryProcessor>();
 
         return services;
     }

@@ -19,6 +19,7 @@ builder.Services.AddHiramMessaging(rabbitMq);
 builder.Services.AddHostedService<OutboxRelayWorker>();
 builder.Services.AddHostedService<EmailConsumerWorker>();
 builder.Services.AddHostedService<PushConsumerWorker>();
+builder.Services.AddHostedService<WebhookConsumerWorker>();
 
 var host = builder.Build();
 host.Run();
