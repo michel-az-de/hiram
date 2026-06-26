@@ -1,10 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
+using Hiram.Application.Notifications;
 using Hiram.Contracts;
 using Hiram.Dispatcher;
 using Hiram.Domain.Notifications;
+using Hiram.Domain.Outbox;
 using Hiram.Domain.Tenants;
 using Hiram.Infrastructure;
 using Hiram.Infrastructure.Messaging;
@@ -13,6 +16,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Testcontainers.Redis;
@@ -172,6 +176,44 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
         var attempt = Assert.Single(detail.Attempts);
         Assert.Equal("permanent_failure", attempt.Outcome);
         Assert.False(attempt.Shadowed);
+    }
+
+    [Fact]
+    public async Task PoisonMessage_LandsInDeadLetterParkingLot()
+    {
+        // An outbox row pointing at a notification that never existed is deterministic poison once consumed.
+        var tenantId = Guid.NewGuid();
+        var missingNotificationId = Guid.NewGuid();
+
+        await using (var db = NewDb())
+        {
+            db.OutboxMessages.Add(new OutboxMessage(
+                Guid.NewGuid(), tenantId, HiramTopology.EmailRoutingKey,
+                JsonSerializer.Serialize(new OutboxNotificationPayload(
+                    missingNotificationId, tenantId, "email", "ops@example.com", "poison", "body")),
+                DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync();
+        }
+
+        Assert.True(await WaitForParkedMessageAsync());
+    }
+
+    private async Task<bool> WaitForParkedMessageAsync()
+    {
+        await using var connection = new RabbitMqConnection(_rabbit.GetConnectionString(), NullLogger<RabbitMqConnection>.Instance);
+        var rabbit = await connection.GetConnectionAsync(CancellationToken.None);
+        await using var channel = await rabbit.CreateChannelAsync();
+
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            var result = await channel.BasicGetAsync(HiramTopology.DeadLetterQueue, autoAck: true);
+            if (result is not null)
+                return true;
+
+            await Task.Delay(100);
+        }
+
+        return false;
     }
 
     private HiramDbContext NewDb() =>

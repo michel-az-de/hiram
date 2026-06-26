@@ -9,6 +9,8 @@ namespace Hiram.Dispatcher;
 
 public sealed class EmailConsumerWorker : BackgroundService
 {
+    private static readonly TimeSpan RequeueBackoff = TimeSpan.FromSeconds(2);
+
     private readonly RabbitMqConnection _connection;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<EmailConsumerWorker> _logger;
@@ -62,12 +64,42 @@ public sealed class EmailConsumerWorker : BackgroundService
 
             await _channel!.BasicAckAsync(args.DeliveryTag, multiple: false, args.CancellationToken);
         }
+        catch (PoisonMessageException ex)
+        {
+            // Deterministic poison (bad payload or a notification that cannot exist): park it for inspection
+            // instead of dropping it, then ack so it leaves the work queue.
+            _logger.LogWarning(ex, "Parking poison email message {DeliveryTag}", args.DeliveryTag);
+            await ParkAsync(args, ex.Message);
+            HiramDiagnostics.Poisoned.Add(1);
+            await _channel!.BasicAckAsync(args.DeliveryTag, multiple: false, args.CancellationToken);
+        }
         catch (Exception ex)
         {
-            // Reject without requeue so a poison message does not spin forever; replay and DLQ arrive in F2.
-            _logger.LogError(ex, "Failed to process email message {DeliveryTag}", args.DeliveryTag);
-            await _channel!.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: false, args.CancellationToken);
+            // Transient infrastructure failure (for example the database is unreachable): requeue so the broker
+            // redelivers once the dependency recovers. A long outage spins this loop, bounded only by the short
+            // backoff below, because scheduled retry with delay is deliberately out of scope for this slice.
+            _logger.LogError(ex, "Transient failure on email message {DeliveryTag}, requeuing", args.DeliveryTag);
+            await Task.Delay(RequeueBackoff, args.CancellationToken);
+            await _channel!.BasicNackAsync(args.DeliveryTag, multiple: false, requeue: true, args.CancellationToken);
         }
+    }
+
+    private async Task ParkAsync(BasicDeliverEventArgs args, string reason)
+    {
+        var headers = args.BasicProperties.Headers is { } existing
+            ? new Dictionary<string, object?>(existing)
+            : new Dictionary<string, object?>();
+        headers["x-dead-letter-reason"] = reason;
+
+        var properties = new BasicProperties
+        {
+            Persistent = true,
+            ContentType = args.BasicProperties.ContentType,
+            Headers = headers
+        };
+
+        await _channel!.BasicPublishAsync(
+            HiramTopology.Dlx, HiramTopology.DeadLetterRoutingKey, mandatory: false, properties, args.Body, args.CancellationToken);
     }
 
     private static ActivityContext ExtractContext(IDictionary<string, object?>? headers)

@@ -42,12 +42,18 @@ public sealed class EmailNotificationProcessor
 
     public async Task ProcessAsync(ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
     {
-        var payload = JsonSerializer.Deserialize<OutboxNotificationPayload>(body.Span);
-        if (payload is null)
+        OutboxNotificationPayload? payload;
+        try
         {
-            _logger.LogWarning("Received an email message with an empty payload, skipping");
-            return;
+            payload = JsonSerializer.Deserialize<OutboxNotificationPayload>(body.Span);
         }
+        catch (JsonException ex)
+        {
+            throw new PoisonMessageException("Email message payload is not valid JSON.", ex);
+        }
+
+        if (payload is null)
+            throw new PoisonMessageException("Email message payload is empty.");
 
         // Kept verbatim so a replay reproduces exactly what was attempted, not a re-render of the notification.
         var payloadJson = Encoding.UTF8.GetString(body.Span);
@@ -55,10 +61,9 @@ public sealed class EmailNotificationProcessor
         var notification = await _context.NotificationRequests
             .FirstOrDefaultAsync(x => x.Id == payload.NotificationId, cancellationToken);
         if (notification is null)
-        {
-            _logger.LogWarning("Notification {NotificationId} not found while consuming email message", payload.NotificationId);
-            return;
-        }
+            // The request and its outbox row are written in one transaction, so a missing notification at consume
+            // time is not a visibility race, it is poison: the id can never resolve and a retry cannot fix it.
+            throw new PoisonMessageException($"Notification {payload.NotificationId} was not found while consuming an email message.");
 
         using var logScope = _logger.BeginScope(new Dictionary<string, object>
         {

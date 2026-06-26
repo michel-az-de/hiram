@@ -210,4 +210,43 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         Assert.Equal("fake", attempts[0].Provider);
         Assert.False(string.IsNullOrEmpty(attempts[0].PayloadHash));
     }
+
+    [Fact]
+    public async Task Process_ThrowsPoison_WhenNotificationMissing()
+    {
+        var provider = new ScriptedProvider("fake", [new SendOutcome.Sent()]);
+        await using var context = NewContext();
+        var processor = BuildProcessor(context, provider);
+
+        await Assert.ThrowsAsync<PoisonMessageException>(() =>
+            processor.ProcessAsync(PayloadFor(Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Process_ThrowsPoison_WhenPayloadIsEmpty()
+    {
+        var provider = new ScriptedProvider("fake", [new SendOutcome.Sent()]);
+        await using var context = NewContext();
+        var processor = BuildProcessor(context, provider);
+        var emptyPayload = System.Text.Encoding.UTF8.GetBytes("null");
+
+        await Assert.ThrowsAsync<PoisonMessageException>(() =>
+            processor.ProcessAsync(emptyPayload, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Process_ThrowsNonPoison_WhenDatabaseUnreachable()
+    {
+        var provider = new ScriptedProvider("fake", [new SendOutcome.Sent()]);
+        // A context pointing at a port with no Postgres makes the load fail transiently, not deterministically.
+        await using var context = new HiramDbContext(new DbContextOptionsBuilder<HiramDbContext>()
+            .UseNpgsql("Host=127.0.0.1;Port=1;Database=none;Username=none;Password=none").Options);
+        var processor = BuildProcessor(context, provider);
+
+        var error = await Record.ExceptionAsync(() =>
+            processor.ProcessAsync(PayloadFor(Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None));
+
+        Assert.NotNull(error);
+        Assert.IsNotType<PoisonMessageException>(error);
+    }
 }
