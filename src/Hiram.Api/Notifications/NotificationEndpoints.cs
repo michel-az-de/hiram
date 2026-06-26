@@ -153,7 +153,7 @@ internal static class NotificationEndpoints
 
         NotificationChannel? channelFilter = null;
         if (channel is not null && (channelFilter = ParseChannel(channel)) is null)
-            return Results.ValidationProblem(new Dictionary<string, string[]> { ["channel"] = ["Channel must be one of: email."] });
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["channel"] = ["Channel must be one of: email, push."] });
 
         DateTimeOffset? cursorCreatedAt = null;
         Guid? cursorId = null;
@@ -229,7 +229,7 @@ internal static class NotificationEndpoints
         var errors = new Dictionary<string, string[]>();
 
         if (channel is null)
-            errors[nameof(request.Channel)] = ["Channel must be one of: email."];
+            errors[nameof(request.Channel)] = ["Channel must be one of: email, push."];
         if (string.IsNullOrWhiteSpace(request.Recipient))
             errors[nameof(request.Recipient)] = ["Recipient is required."];
 
@@ -253,6 +253,7 @@ internal static class NotificationEndpoints
         channel?.Trim().ToLowerInvariant() switch
         {
             "email" => NotificationChannel.Email,
+            "push" => NotificationChannel.Push,
             _ => null
         };
 

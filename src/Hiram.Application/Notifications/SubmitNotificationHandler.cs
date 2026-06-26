@@ -95,6 +95,7 @@ public sealed class SubmitNotificationHandler : ISubmitNotification
     private static string RoutingKeyFor(NotificationChannel channel) => channel switch
     {
         NotificationChannel.Email => "email",
+        NotificationChannel.Push => "push",
         _ => throw new ArgumentOutOfRangeException(nameof(channel), channel, "No routing key configured for channel.")
     };
 }

@@ -71,6 +71,7 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
                 services.AddHiramMessaging(rabbitConnection);
                 services.AddHostedService<OutboxRelayWorker>();
                 services.AddHostedService<EmailConsumerWorker>();
+                services.AddHostedService<PushConsumerWorker>();
             });
         });
     }
@@ -240,6 +241,23 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
         var expectedSubject = $"Hi Ada {token}";
         var inbox = await WaitForMailpit(expectedSubject);
         Assert.Contains(inbox, message => message.Subject == expectedSubject);
+    }
+
+    [Fact]
+    public async Task PushToUnknownSubscription_DeadLettersThroughTheDispatcher()
+    {
+        var (_, client) = await NewTenantClient("live");
+
+        // Channel push with a subscription id that was never registered flows through the push consumer and,
+        // finding no subscription, settles as a permanent failure dead letter. This exercises the whole push path.
+        var submit = await client.PostAsJsonAsync("/v1/notifications",
+            new { channel = "push", recipient = Guid.NewGuid().ToString(), subject = "title", body = "body" });
+        Assert.Equal(HttpStatusCode.Accepted, submit.StatusCode);
+        var id = (await submit.Content.ReadFromJsonAsync<NotificationAccepted>())!.Id;
+
+        var detail = await WaitForStatus(client, id, "dead_lettered");
+        Assert.Equal("dead_lettered", detail.Status);
+        Assert.Contains(detail.Attempts, attempt => attempt.Outcome == "permanent_failure");
     }
 
     [Fact]

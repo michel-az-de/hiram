@@ -68,6 +68,7 @@ public sealed class DeadLetterReplay : IDeadLetterReplay
     private static string RoutingKeyFor(NotificationChannel channel) => channel switch
     {
         NotificationChannel.Email => HiramTopology.EmailRoutingKey,
+        NotificationChannel.Push => HiramTopology.PushRoutingKey,
         _ => throw new ArgumentOutOfRangeException(nameof(channel), channel, "No routing key for channel.")
     };
 }
