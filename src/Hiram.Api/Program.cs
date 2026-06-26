@@ -2,6 +2,7 @@ using Hiram.Api.Admin;
 using Hiram.Api.Authentication;
 using Hiram.Api.Notifications;
 using Hiram.Api.OpenApi;
+using Hiram.Api.Push;
 using Hiram.Api.Templates;
 using Hiram.Application.Notifications;
 using Hiram.Infrastructure;
@@ -26,6 +27,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHiramOpenApi();
 builder.Services.AddHiramInfrastructure(connectionString);
 builder.Services.AddHiramRedis(redisConnectionString);
+builder.Services.AddHiramPush(builder.Configuration);
 builder.Services.AddScoped<ISubmitNotification, SubmitNotificationHandler>();
 builder.Services.AddScoped<TenantContext>();
 
@@ -48,6 +50,7 @@ app.MapScalarApiReference(options => options
 app.MapAdminEndpoints();
 app.MapNotificationEndpoints();
 app.MapTemplateEndpoints();
+app.MapPushEndpoints();
 
 app.Run();
 

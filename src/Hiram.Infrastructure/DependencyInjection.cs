@@ -59,6 +59,17 @@ public static class DependencyInjection
         return services;
     }
 
+    public static IServiceCollection AddHiramPush(this IServiceCollection services, IConfiguration configuration)
+    {
+        var vapid = configuration.GetSection("Hiram:Push:Vapid");
+        services.AddSingleton(new PushVapidOptions(
+            vapid["Subject"] ?? "mailto:admin@hiram.local",
+            vapid["PublicKey"] ?? string.Empty,
+            vapid["PrivateKey"] ?? string.Empty));
+
+        return services;
+    }
+
     public static IServiceCollection AddHiramRedis(this IServiceCollection services, string connectionString)
     {
         var options = ConfigurationOptions.Parse(connectionString);
