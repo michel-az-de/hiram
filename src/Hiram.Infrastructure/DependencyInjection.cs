@@ -4,6 +4,7 @@ using Hiram.Application.Notifications;
 using Hiram.Application.Push;
 using Hiram.Application.Tenancy;
 using Hiram.Application.Templates;
+using Hiram.Application.Webhooks;
 using Hiram.Infrastructure.Caching;
 using Hiram.Infrastructure.Delivery;
 using Hiram.Infrastructure.Persistence;
@@ -29,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<ITemplateStore, TemplateStore>();
         services.AddSingleton<ITemplateRenderer, ScribanTemplateRenderer>();
         services.AddScoped<IPushSubscriptionStore, PushSubscriptionStore>();
+        services.AddScoped<IWebhookEndpointStore, WebhookEndpointStore>();
         services.AddScoped<ITenantStore, TenantStore>();
         services.AddScoped<IApiKeyStore, ApiKeyStore>();
         services.AddScoped<ITenantProviderConfigStore, TenantProviderConfigStore>();
