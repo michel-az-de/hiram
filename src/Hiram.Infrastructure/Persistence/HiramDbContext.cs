@@ -1,6 +1,7 @@
 using Hiram.Domain.DeadLetters;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Outbox;
+using Hiram.Domain.Templates;
 using Hiram.Domain.Tenants;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,6 +22,7 @@ public sealed class HiramDbContext : DbContext
     public DbSet<TenantProviderConfig> TenantProviderConfigs => Set<TenantProviderConfig>();
     public DbSet<DeliveryAttempt> DeliveryAttempts => Set<DeliveryAttempt>();
     public DbSet<DeadLetterMessage> DeadLetterMessages => Set<DeadLetterMessage>();
+    public DbSet<Template> Templates => Set<Template>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
