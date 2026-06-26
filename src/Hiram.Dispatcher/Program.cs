@@ -14,9 +14,11 @@ builder.AddHiramTelemetry("hiram-dispatcher");
 
 builder.Services.AddHiramInfrastructure(postgres);
 builder.Services.AddHiramEmailDelivery(builder.Configuration);
+builder.Services.AddHiramPush(builder.Configuration);
 builder.Services.AddHiramMessaging(rabbitMq);
 builder.Services.AddHostedService<OutboxRelayWorker>();
 builder.Services.AddHostedService<EmailConsumerWorker>();
+builder.Services.AddHostedService<PushConsumerWorker>();
 
 var host = builder.Build();
 host.Run();

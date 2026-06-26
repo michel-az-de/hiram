@@ -10,6 +10,7 @@ public static class MessagingDependencyInjection
         services.AddSingleton(sp => new RabbitMqConnection(connectionString, sp.GetRequiredService<ILogger<RabbitMqConnection>>()));
         services.AddScoped<OutboxRelay>();
         services.AddScoped<EmailNotificationProcessor>();
+        services.AddScoped<PushNotificationProcessor>();
 
         return services;
     }

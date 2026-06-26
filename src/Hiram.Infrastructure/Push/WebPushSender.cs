@@ -27,7 +27,8 @@ public sealed class WebPushSender : IPushSender
 
         try
         {
-            await _client.SendNotificationAsync(target, payload, vapid);
+            // The library call does not take a token, so WaitAsync enforces the per attempt timeout the caller set.
+            await _client.SendNotificationAsync(target, payload, vapid).WaitAsync(cancellationToken);
             return new SendOutcome.Sent();
         }
         catch (WebPushException ex)
