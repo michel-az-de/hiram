@@ -1,3 +1,4 @@
+using Hiram.Domain.DeadLetters;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Outbox;
 using Hiram.Domain.Tenants;
@@ -19,6 +20,7 @@ public sealed class HiramDbContext : DbContext
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
     public DbSet<TenantProviderConfig> TenantProviderConfigs => Set<TenantProviderConfig>();
     public DbSet<DeliveryAttempt> DeliveryAttempts => Set<DeliveryAttempt>();
+    public DbSet<DeadLetterMessage> DeadLetterMessages => Set<DeadLetterMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
