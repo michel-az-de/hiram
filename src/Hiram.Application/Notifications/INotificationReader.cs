@@ -1,3 +1,4 @@
+using Hiram.Domain.DeadLetters;
 using Hiram.Domain.Notifications;
 
 namespace Hiram.Application.Notifications;
@@ -11,4 +12,6 @@ public interface INotificationReader
     Task<IReadOnlyList<NotificationRequest>> QueryAsync(NotificationQuery query, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<DeliveryAttempt>> AttemptsAsync(Guid tenantId, Guid notificationId, CancellationToken cancellationToken);
+
+    Task<DeadLetterMessage?> LatestDeadLetterAsync(Guid tenantId, Guid notificationId, CancellationToken cancellationToken);
 }

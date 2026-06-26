@@ -7,4 +7,5 @@ public sealed record NotificationDetailResponse(
     string Subject,
     string Status,
     DateTimeOffset CreatedAtUtc,
-    IReadOnlyList<DeliveryAttemptView> Attempts);
+    IReadOnlyList<DeliveryAttemptView> Attempts,
+    DeadLetterView? DeadLetter = null);

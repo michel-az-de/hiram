@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Hiram.Contracts;
+using Hiram.Domain.DeadLetters;
 using Hiram.Domain.Notifications;
 using Hiram.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
@@ -129,6 +130,49 @@ public class NotificationQueryTests : IAsyncLifetime
         Assert.Equal(1, detail.Attempts[0].AttemptNumber);
     }
 
+    [Fact]
+    public async Task List_FiltersByDeadLettered()
+    {
+        var (_, client) = await NewTenantClient();
+        var id = await Post(client, "to-dead-letter");
+
+        await using (var db = NewDb())
+        {
+            var notification = await db.NotificationRequests.FindAsync(id);
+            notification!.MarkSending();
+            notification.MarkDeadLettered();
+            await db.SaveChangesAsync();
+        }
+
+        var deadLettered = await client.GetFromJsonAsync<PageDto>("/v1/notifications?status=dead_lettered&limit=100");
+        Assert.Contains(deadLettered!.Items, item => item.Id == id);
+
+        var sent = await client.GetFromJsonAsync<PageDto>("/v1/notifications?status=sent&limit=100");
+        Assert.DoesNotContain(sent!.Items, item => item.Id == id);
+    }
+
+    [Fact]
+    public async Task Detail_IncludesDeadLetter_WhenPresent()
+    {
+        var (tenantId, client) = await NewTenantClient();
+        var id = await Post(client, "with-dead-letter");
+
+        await using (var db = NewDb())
+        {
+            db.DeadLetterMessages.Add(new DeadLetterMessage(
+                Guid.NewGuid(), tenantId, id, NotificationChannel.Email,
+                "{\"x\":1}", "permanent_failure:rejected", 1, DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync();
+        }
+
+        var detail = await client.GetFromJsonAsync<DetailDto>($"/v1/notifications/{id}");
+
+        Assert.NotNull(detail!.DeadLetter);
+        Assert.Equal("permanent_failure:rejected", detail.DeadLetter!.Reason);
+        Assert.Equal(1, detail.DeadLetter.AttemptCount);
+        Assert.Null(detail.DeadLetter.ReplayedAtUtc);
+    }
+
     private async Task<(Guid TenantId, HttpClient Client)> NewTenantClient()
     {
         var admin = _factory!.CreateClient();
@@ -163,7 +207,9 @@ public class NotificationQueryTests : IAsyncLifetime
 
     private sealed record SummaryDto(Guid Id, string Channel, string Recipient, string Subject, string Status, DateTimeOffset CreatedAtUtc);
 
-    private sealed record DetailDto(Guid Id, string Status, List<AttemptDto> Attempts);
+    private sealed record DetailDto(Guid Id, string Status, List<AttemptDto> Attempts, DeadLetterDto? DeadLetter = null);
 
     private sealed record AttemptDto(int AttemptNumber, string Provider, string Outcome, string? Error, double DurationMs, bool Shadowed, string? PayloadHash);
+
+    private sealed record DeadLetterDto(string Reason, int AttemptCount, DateTimeOffset CreatedAtUtc, DateTimeOffset? ReplayedAtUtc);
 }

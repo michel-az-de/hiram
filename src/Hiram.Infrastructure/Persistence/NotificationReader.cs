@@ -1,4 +1,5 @@
 using Hiram.Application.Notifications;
+using Hiram.Domain.DeadLetters;
 using Hiram.Domain.Notifications;
 using Microsoft.EntityFrameworkCore;
 
@@ -55,4 +56,11 @@ public sealed class NotificationReader : INotificationReader
             .Where(x => x.TenantId == tenantId && x.NotificationId == notificationId)
             .OrderBy(x => x.AttemptNumber)
             .ToListAsync(cancellationToken);
+
+    public Task<DeadLetterMessage?> LatestDeadLetterAsync(Guid tenantId, Guid notificationId, CancellationToken cancellationToken) =>
+        _context.DeadLetterMessages
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.NotificationId == notificationId)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
 }

@@ -2,6 +2,7 @@ using System.Text;
 using Hiram.Api.Authentication;
 using Hiram.Application.Notifications;
 using Hiram.Contracts;
+using Hiram.Domain.DeadLetters;
 using Hiram.Domain.Notifications;
 using Hiram.Infrastructure.Telemetry;
 using Microsoft.AspNetCore.Mvc;
@@ -150,6 +151,7 @@ internal static class NotificationEndpoints
             return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Notification not found");
 
         var attempts = await reader.AttemptsAsync(tenant.TenantId, id, cancellationToken);
+        var deadLetter = await reader.LatestDeadLetterAsync(tenant.TenantId, id, cancellationToken);
         var view = new NotificationDetailResponse(
             notification.Id,
             notification.Channel.ToString().ToLowerInvariant(),
@@ -157,7 +159,8 @@ internal static class NotificationEndpoints
             notification.Subject,
             ToWire(notification.Status),
             notification.CreatedAtUtc,
-            attempts.Select(ToAttemptView).ToList());
+            attempts.Select(ToAttemptView).ToList(),
+            deadLetter is null ? null : ToDeadLetterView(deadLetter));
 
         return Results.Ok(view);
     }
@@ -170,6 +173,9 @@ internal static class NotificationEndpoints
             notification.Subject,
             ToWire(notification.Status),
             notification.CreatedAtUtc);
+
+    private static DeadLetterView ToDeadLetterView(DeadLetterMessage deadLetter) =>
+        new(deadLetter.Reason, deadLetter.AttemptCount, deadLetter.CreatedAtUtc, deadLetter.ReplayedAtUtc);
 
     private static DeliveryAttemptView ToAttemptView(DeliveryAttempt attempt) =>
         new(
@@ -214,6 +220,7 @@ internal static class NotificationEndpoints
             "sent" => NotificationStatus.Sent,
             "failed" => NotificationStatus.Failed,
             "suppressed" => NotificationStatus.Suppressed,
+            "dead_lettered" => NotificationStatus.DeadLettered,
             _ => null
         };
 

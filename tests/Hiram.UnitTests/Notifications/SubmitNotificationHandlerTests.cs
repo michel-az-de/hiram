@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Hiram.Application.Abstractions;
 using Hiram.Application.Notifications;
+using Hiram.Domain.DeadLetters;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Outbox;
 
@@ -73,6 +74,9 @@ public class SubmitNotificationHandlerTests
 
         public Task<IReadOnlyList<DeliveryAttempt>> AttemptsAsync(Guid tenantId, Guid notificationId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<DeliveryAttempt>>([]);
+
+        public Task<DeadLetterMessage?> LatestDeadLetterAsync(Guid tenantId, Guid notificationId, CancellationToken cancellationToken) =>
+            Task.FromResult<DeadLetterMessage?>(null);
     }
 
     private sealed class FixedClock(DateTimeOffset now) : IClock
