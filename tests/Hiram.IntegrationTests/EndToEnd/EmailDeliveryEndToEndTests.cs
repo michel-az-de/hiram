@@ -221,8 +221,9 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
     [Fact]
     public async Task PoisonMessage_LandsInDeadLetterParkingLot()
     {
+        // Creating a client boots the host, which applies the migrations before the direct DB write below.
+        var (tenantId, _) = await NewTenantClient("live");
         // An outbox row pointing at a notification that never existed is deterministic poison once consumed.
-        var tenantId = Guid.NewGuid();
         var missingNotificationId = Guid.NewGuid();
 
         await using (var db = NewDb())
