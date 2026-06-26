@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Hiram · Multi-tenant notification delivery API</title>
+<meta name="description" content="Multi-tenant notification API for transactional email. Outbox-guaranteed delivery, idempotency, per-tenant providers and end-to-end OpenTelemetry tracing.">
+<link rel="canonical" href="https://hiram.dev/">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0A1428" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F8F7F4" media="(prefers-color-scheme: light)">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Hiram">
+<meta property="og:title" content="Hiram · Multi-tenant notification delivery API">
+<meta property="og:description" content="One REST API for transactional notifications, with outbox-guaranteed delivery. The word is never lost.">
+<meta property="og:url" content="https://hiram.dev/">
+<meta property="og:image" content="https://hiram.dev/assets/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="Hiram. The word is never lost.">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Hiram · Multi-tenant notification delivery API">
+<meta name="twitter:description" content="One REST API for transactional notifications, with outbox-guaranteed delivery. The word is never lost.">
+<meta name="twitter:image" content="https://hiram.dev/assets/social-preview.png">
+<meta name="twitter:image:alt" content="Hiram. The word is never lost.">
+
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('hiram-theme');
+    if (!t) { t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+})();
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://hiram.dev/#organization",
+      "name": "Hiram",
+      "url": "https://hiram.dev/",
+      "logo": "https://hiram.dev/assets/icon-512.png",
+      "description": "Multi-tenant notification delivery platform.",
+      "sameAs": ["https://github.com/michel-az-de/hiram"]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://hiram.dev/#website",
+      "url": "https://hiram.dev/",
+      "name": "Hiram",
+      "description": "Multi-tenant notification delivery API with outbox-guaranteed delivery.",
+      "inLanguage": "en",
+      "publisher": { "@id": "https://hiram.dev/#organization" }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "name": "Hiram",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Any",
+      "url": "https://hiram.dev/",
+      "description": "Multi-tenant notification API for transactional email, with outbox-guaranteed delivery, idempotency, per-tenant providers and end-to-end OpenTelemetry tracing.",
+      "publisher": { "@id": "https://hiram.dev/#organization" }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="Hiram, home">
+      <svg class="mark" viewBox="0 0 124 80" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="square" aria-hidden="true">
+        <rect x="36" y="14" width="76" height="52"/><path d="M39 17.5 L74 46 L109 17.5"/>
+        <path d="M10 31 H30"/><path d="M4 40 H26"/><path d="M12 49 H30"/>
+      </svg>
+      <span class="wordmark">Hiram&#8756;</span>
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#why">Why Hiram</a>
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#developers">Developers</a>
+    </nav>
+    <div class="nav-actions">
+      <button class="toggle" id="theme-toggle" type="button" aria-label="Switch theme">
+        <span class="toggle-label">Vault</span>
+      </button>
+      <a class="btn btn-primary btn-sm" href="https://github.com/michel-az-de/hiram#quick-start">Read the docs</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero mosaic" aria-labelledby="hero-title">
+    <div class="wrap">
+      <svg class="hero-mark" viewBox="0 0 124 80" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="square" aria-hidden="true">
+        <rect x="36" y="14" width="76" height="52"/><path d="M39 17.5 L74 46 L109 17.5"/>
+        <path d="M10 31 H30"/><path d="M4 40 H26"/><path d="M12 49 H30"/>
+      </svg>
+      <span class="lapidar eyebrow">Multi-tenant notification delivery</span>
+      <h1 id="hero-title">Reliable notification delivery, guaranteed by an <em>outbox</em>.</h1>
+      <p class="tagline">The word is never lost.</p>
+      <p class="lead">Hiram accepts a notification, writes it with its outbox row in a single transaction, and owns delivery from there: per-tenant providers, retries, idempotency and end-to-end tracing. If the database confirmed it, it will be delivered.</p>
+      <div class="btn-row">
+        <a class="btn btn-primary" href="https://github.com/michel-az-de/hiram#quick-start">Read the docs</a>
+        <a class="btn btn-secondary" href="https://github.com/michel-az-de/hiram">View on GitHub</a>
+      </div>
+      <p class="fineprint">Email is live today. Push, SMS and WhatsApp are on the roadmap, behind the same API.</p>
+    </div>
+  </section>
+
+  <section class="trust" aria-label="How it is built">
+    <div class="wrap">
+      <ul>
+        <li>Outbox pattern</li>
+        <li>.NET 10</li>
+        <li>PostgreSQL</li>
+        <li>OpenTelemetry traced</li>
+        <li>Multi-tenant by design</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="why" aria-labelledby="why-title">
+    <div class="wrap">
+      <div class="split">
+        <div>
+          <span class="lapidar eyebrow">Why Hiram</span>
+          <h2 id="why-title">If the database confirmed it, it will be delivered.</h2>
+          <p class="lead">Most notification stacks lose messages in the gap between your transaction and the send. Hiram closes that gap. The request and its outbox row commit together, so an accepted notification cannot quietly disappear.</p>
+          <ul class="invariant">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9 17.5 20 6.5"/></svg>
+              <span><strong>One transaction.</strong> The notification request and the outbox row commit together, or not at all.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9 17.5 20 6.5"/></svg>
+              <span><strong>No silent loss.</strong> Once the commit succeeds, the relay picks the message up and drives it to delivery.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9 17.5 20 6.5"/></svg>
+              <span><strong>Every attempt recorded.</strong> Each try writes a delivery attempt with its outcome, error and duration.</span>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <pre class="code"><span class="c3">$</span> curl -X POST <span class="c2">https://api.hiram.dev/v1/notifications</span> \
+  -H <span class="c1">"X-Api-Key: hk_live_7f3a&#8230;"</span> \
+  -H <span class="c1">"Idempotency-Key: evt-2207"</span> \
+  -d <span class="c1">'{"channel":"email","recipient":"ops@tenant.com",
+       "subject":"Order confirmed","body":"&#8230;"}'</span>
+
+<span class="c3">HTTP/1.1</span> <span class="c4">202 Accepted</span>
+{ <span class="c1">"id"</span>: "ntf_01HZX&#8230;", <span class="c1">"status"</span>: "accepted" }</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how" aria-labelledby="how-title">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="lapidar eyebrow">How it works</span>
+        <h2 id="how-title">Four steps from request to delivered</h2>
+        <p class="lead">A single POST starts a path with a guarantee built into the second step.</p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <h3>Accept</h3>
+          <p>POST to <code>/v1/notifications</code> with your API key. An <code>Idempotency-Key</code> makes the call safe to retry. You get <code>202 Accepted</code> at once.</p>
+        </div>
+        <div class="step">
+          <h3>Persist</h3>
+          <p>The request and its outbox row are written in one transaction. From this moment the notification cannot be lost.</p>
+        </div>
+        <div class="step">
+          <h3>Relay</h3>
+          <p>OutboxRelay publishes the message and resolves the provider configured for the tenant, SMTP or Resend for email.</p>
+        </div>
+        <div class="step">
+          <h3>Deliver</h3>
+          <p>A resilient send pipeline retries transient failures and records each attempt. Live tenants send for real, shadow tenants log without sending.</p>
+        </div>
+      </div>
+      <p class="statemachine">
+        <b>accepted</b><span class="arr">&rarr;</span><b>queued</b><span class="arr">&rarr;</span><b>sending</b><span class="arr">&rarr;</span><b>sent</b>
+        <span class="arr">&middot;</span> with <b>failed</b> and <b>suppressed</b> as terminal outcomes
+      </p>
+    </div>
+  </section>
+
+  <section id="features" aria-labelledby="features-title">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="lapidar eyebrow">What ships today</span>
+        <h2 id="features-title">Honest about what is built</h2>
+        <p class="lead">Email runs end to end in production. The rest of the platform is on a public roadmap, not in the marketing copy.</p>
+      </div>
+      <div class="feature-cols">
+        <div>
+          <h3><span class="badge badge-live">Available now</span></h3>
+          <ul class="feature-list">
+            <li class="col"><span class="name">Transactional email</span><span class="desc">Two interchangeable providers per tenant: SMTP via MailKit, Resend over HTTP.</span></li>
+            <li class="col"><span class="name">Idempotency</span><span class="desc">A client <code>Idempotency-Key</code> collapses retries into one send for 24 hours.</span></li>
+            <li class="col"><span class="name">Per-tenant API keys</span><span class="desc"><code>hk_live_</code> keys, stored only as a SHA-256 hash and revocable.</span></li>
+            <li class="col"><span class="name">Live and shadow modes</span><span class="desc">Shadow tenants exercise the full path and log a would-send without delivering.</span></li>
+            <li class="col"><span class="name">Delivery audit</span><span class="desc">Cursor-paginated queries with every attempt, outcome and latency.</span></li>
+            <li class="col"><span class="name">End-to-end tracing</span><span class="desc">One OpenTelemetry trace spans accept, publish, consume and send.</span></li>
+            <li class="col"><span class="name">Multi-tenant isolation</span><span class="desc">Every domain table carries a tenant from the first migration.</span></li>
+          </ul>
+        </div>
+        <div>
+          <h3><span class="badge badge-soon">On the roadmap</span></h3>
+          <ul class="feature-list">
+            <li class="col"><span class="name">Push, SMS and WhatsApp</span><span class="desc">More channels behind the same request contract.</span></li>
+            <li class="col"><span class="name">Templates</span><span class="desc">Versioned, per-tenant message templates with variables.</span></li>
+            <li class="col"><span class="name">Signed status webhooks</span><span class="desc">Delivery callbacks verified with <code>X-Hiram-Signature</code>.</span></li>
+            <li class="col"><span class="name">Metering and credits</span><span class="desc">An append-only credit ledger with per-tenant quotas.</span></li>
+            <li class="col"><span class="name">Configurable AI autonomy</span><span class="desc">Apprentice, Fellow and Master modes with a decision log and budget.</span></li>
+            <li class="col"><span class="name">Admin and dev portal</span><span class="desc">Tenant self-service, keys, dashboards and the Trestleboard changelog.</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="developers" aria-labelledby="dev-title">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="lapidar eyebrow">For developers</span>
+        <h2 id="dev-title">A plain REST API, documented like one</h2>
+        <p class="lead">No SDK lock-in and no ceremony. JSON over HTTPS, predictable status codes and precise errors. Authenticate once at the Handshake, send, and read delivery back with cursor pagination.</p>
+      </div>
+      <div class="grid cols-2" style="margin-top:8px">
+        <div class="card">
+          <h3>Read delivery back</h3>
+          <p>Query any notification and its attempts. Statuses map one to one to what the engine actually did.</p>
+          <table style="margin-top:18px">
+            <thead><tr><th>Notification</th><th>Channel</th><th>Status</th><th>p99</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">ntf_01HZX4</td><td>email</td><td><span class="status st-delivered"><i></i>sent</span></td><td class="mono">412 ms</td></tr>
+              <tr><td class="mono">ntf_01HZX7</td><td>email</td><td><span class="status st-queued"><i></i>queued</span></td><td class="mono">&#8212;</td></tr>
+              <tr><td class="mono">ntf_01HZX9</td><td>email</td><td><span class="status st-failed"><i></i>failed</span></td><td class="mono">2.1 s</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h3>Built on a sober stack</h3>
+          <p>.NET 10 and ASP.NET Core at the edge, EF Core on PostgreSQL, RabbitMQ for the relay, Redis for fast paths and OpenTelemetry across all of it.</p>
+          <p style="margin-top:14px">Run the whole thing locally with Docker and a single <code>dotnet run</code> per host. The API listens on port <code>3357</code>.</p>
+          <p style="margin-top:18px"><a href="https://github.com/michel-az-de/hiram#quick-start">Read the quick start on GitHub &rarr;</a></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="roadmap" aria-labelledby="roadmap-title">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="lapidar eyebrow">Roadmap</span>
+        <h2 id="roadmap-title">Built in phases, in the open</h2>
+        <p class="lead">Reliability first. Each phase ships a working slice before the next one opens.</p>
+      </div>
+      <div class="timeline">
+        <div class="phase">
+          <span class="ph-id">F0 <span class="done">done</span></span>
+          <div><h3>Walking skeleton</h3><p>Outbox, relay, consume and one trace from end to end.</p></div>
+        </div>
+        <div class="phase">
+          <span class="ph-id">F1 <span class="done">done</span></span>
+          <div><h3>Email in production</h3><p>Real providers, idempotency, shadow mode, API keys and delivery audit.</p></div>
+        </div>
+        <div class="phase">
+          <span class="ph-id">F2 next</span>
+          <div><h3>Push, templates, webhooks</h3><p>Channels beyond email, signed status webhooks and a dead-letter queue.</p></div>
+        </div>
+        <div class="phase">
+          <span class="ph-id">F3</span>
+          <div><h3>Metering and quotas</h3><p>A credit ledger and per-tenant rate limits.</p></div>
+        </div>
+        <div class="phase">
+          <span class="ph-id">F4</span>
+          <div><h3>Intelligence</h3><p>Configurable AI autonomy with a decision log and a budget.</p></div>
+        </div>
+        <div class="phase">
+          <span class="ph-id">F5</span>
+          <div><h3>Portal</h3><p>Admin and dev portal, tenant self-service and the Trestleboard changelog.</p></div>
+        </div>
+        <div class="phase">
+          <span class="ph-id">F6</span>
+          <div><h3>Production hardening</h3><p>k3s and KEDA, load tests and runbooks.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="start" aria-labelledby="start-title">
+    <div class="wrap">
+      <div class="card-ashlar cta-final">
+        <span class="lapidar">Get started</span>
+        <h2 id="start-title">Start with the Handshake.</h2>
+        <p class="lead">Spin up the dev stack, issue an API key and send your first notification in a few minutes. Everything runs locally on .NET 10 and Docker.</p>
+        <div class="btn-row">
+          <a class="btn btn-primary" href="https://github.com/michel-az-de/hiram#quick-start">Read the quick start</a>
+          <a class="btn btn-secondary" href="https://github.com/michel-az-de/hiram">View on GitHub</a>
+        </div>
+        <p class="keyline">POST /v1/notifications &middot; 202 Accepted &middot; X-Hiram-Signature on webhooks (F2)</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <div class="brand">
+          <svg class="mark" viewBox="0 0 124 80" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="square" aria-hidden="true">
+            <rect x="36" y="14" width="76" height="52"/><path d="M39 17.5 L74 46 L109 17.5"/>
+            <path d="M10 31 H30"/><path d="M4 40 H26"/><path d="M12 49 H30"/>
+          </svg>
+          <span class="wordmark">Hiram&#8756;</span>
+        </div>
+        <p class="f-tag">The word is never lost. One API for reliable, multi-tenant notification delivery.</p>
+      </div>
+      <nav aria-label="Footer">
+        <div class="col">
+          <span class="lapidar">Product</span>
+          <a href="#why">Why Hiram</a>
+          <a href="#how">How it works</a>
+          <a href="#roadmap">Roadmap</a>
+        </div>
+        <div class="col">
+          <span class="lapidar">Developers</span>
+          <a href="https://github.com/michel-az-de/hiram#quick-start">Quick start</a>
+          <a href="https://github.com/michel-az-de/hiram">GitHub</a>
+          <a href="#developers">API overview</a>
+        </div>
+      </nav>
+    </div>
+    <div class="legal">
+      <span>Proprietary. All rights reserved.</span>
+      <span class="al">&#169; 2026 &#183; A&#8756;L&#8756; 6026</span>
+    </div>
+  </div>
+</footer>
+
+<script src="scripts/theme.js" defer></script>
+</body>
+</html>
