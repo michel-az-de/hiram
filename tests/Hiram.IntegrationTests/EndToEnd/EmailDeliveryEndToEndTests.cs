@@ -219,6 +219,30 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task TemplatedSubmit_RendersAndDeliversToMailpit()
+    {
+        var (_, client) = await NewTenantClient("live");
+        var token = Guid.NewGuid().ToString("N");
+        var templateName = $"welcome-{token}";
+
+        var create = await client.PostAsJsonAsync("/v1/templates",
+            new { channel = "email", name = templateName, subject = $"Hi {{{{ name }}}} {token}", body = "Welcome {{ name }}" });
+        create.EnsureSuccessStatusCode();
+
+        var submit = await client.PostAsJsonAsync("/v1/notifications",
+            new { channel = "email", recipient = "ops@example.com", template = templateName, data = new { name = "Ada" } });
+        Assert.Equal(HttpStatusCode.Accepted, submit.StatusCode);
+        var id = (await submit.Content.ReadFromJsonAsync<NotificationAccepted>())!.Id;
+
+        var detail = await WaitForStatus(client, id, "sent");
+        Assert.Equal("sent", detail.Status);
+
+        var expectedSubject = $"Hi Ada {token}";
+        var inbox = await WaitForMailpit(expectedSubject);
+        Assert.Contains(inbox, message => message.Subject == expectedSubject);
+    }
+
+    [Fact]
     public async Task PoisonMessage_LandsInDeadLetterParkingLot()
     {
         // Creating a client boots the host, which applies the migrations before the direct DB write below.

@@ -132,6 +132,30 @@ public class TemplateEndpointsTests : IAsyncLifetime
         Assert.Empty(listB!);
     }
 
+    [Fact]
+    public async Task TemplatedSubmit_MissingTemplate_Returns404()
+    {
+        var client = await NewTenantClient();
+
+        var response = await client.PostAsJsonAsync("/v1/notifications",
+            new { channel = "email", recipient = "ops@example.com", template = "does-not-exist", data = new { name = "Ada" } });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TemplatedSubmit_MissingVariable_Returns400()
+    {
+        var client = await NewTenantClient();
+        await client.PostAsJsonAsync("/v1/templates",
+            new CreateTemplateRequest("email", "needs-name", "Hi {{ name }}", "Body {{ name }}"));
+
+        var response = await client.PostAsJsonAsync("/v1/notifications",
+            new { channel = "email", recipient = "ops@example.com", template = "needs-name", data = new { } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     private async Task<HttpClient> NewTenantClient()
     {
         var admin = _factory!.CreateClient();

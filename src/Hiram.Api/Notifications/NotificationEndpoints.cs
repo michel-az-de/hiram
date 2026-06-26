@@ -1,6 +1,7 @@
 using System.Text;
 using Hiram.Api.Authentication;
 using Hiram.Application.Notifications;
+using Hiram.Application.Templates;
 using Hiram.Contracts;
 using Hiram.Domain.DeadLetters;
 using Hiram.Domain.Notifications;
@@ -51,15 +52,20 @@ internal static class NotificationEndpoints
             detail: detail,
             extensions: new Dictionary<string, object?> { ["code"] = code });
 
+    private static readonly IReadOnlyDictionary<string, object?> EmptyData = new Dictionary<string, object?>();
+
     private static async Task<IResult> SubmitAsync(
         SubmitNotificationRequest request,
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         ISubmitNotification submit,
+        ITemplateStore templates,
+        ITemplateRenderer renderer,
         TenantContext tenant,
         HttpResponse response,
         CancellationToken cancellationToken)
     {
-        var errors = Validate(request);
+        var channel = ParseChannel(request.Channel);
+        var errors = Validate(request, channel);
         if (errors.Count > 0)
             return Results.ValidationProblem(errors);
 
@@ -70,8 +76,38 @@ internal static class NotificationEndpoints
                 ["idempotencyKey"] = ["Idempotency-Key must be at most 255 characters."]
             });
 
-        var channel = ParseChannel(request.Channel)!.Value;
-        var command = new SubmitNotificationCommand(tenant.TenantId, channel, request.Recipient, request.Subject, request.Body, idempotencyKey);
+        string subject;
+        string body;
+        if (request.Template is not null)
+        {
+            var template = await templates.FindByNameAsync(tenant.TenantId, channel!.Value, request.Template, cancellationToken);
+            if (template is null)
+                return Results.Problem(
+                    statusCode: StatusCodes.Status404NotFound,
+                    title: "Template not found",
+                    detail: $"No template named '{request.Template}' exists for channel '{request.Channel}'.");
+
+            try
+            {
+                // Rendered at submit and stored, so the dispatcher, dead letter and replay stay template unaware.
+                subject = renderer.Render(template.Subject, request.Data ?? EmptyData);
+                body = renderer.Render(template.Body, request.Data ?? EmptyData);
+            }
+            catch (TemplateRenderException ex)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["data"] = [$"Template render failed: {ex.Message}"]
+                });
+            }
+        }
+        else
+        {
+            subject = request.Subject!;
+            body = request.Body!;
+        }
+
+        var command = new SubmitNotificationCommand(tenant.TenantId, channel!.Value, request.Recipient, subject, body, idempotencyKey);
 
         SubmitNotificationResult result;
         try
@@ -96,8 +132,8 @@ internal static class NotificationEndpoints
             HiramDiagnostics.NotificationsAccepted.Add(1);
         }
 
-        var body = new NotificationAccepted(result.NotificationId, ToWire(result.Status));
-        return Results.Accepted($"/v1/notifications/{result.NotificationId}", body);
+        var accepted = new NotificationAccepted(result.NotificationId, ToWire(result.Status));
+        return Results.Accepted($"/v1/notifications/{result.NotificationId}", accepted);
     }
 
     private static async Task<IResult> ListAsync(
@@ -188,18 +224,27 @@ internal static class NotificationEndpoints
             attempt.PayloadHash,
             attempt.CreatedAtUtc);
 
-    private static Dictionary<string, string[]> Validate(SubmitNotificationRequest request)
+    private static Dictionary<string, string[]> Validate(SubmitNotificationRequest request, NotificationChannel? channel)
     {
         var errors = new Dictionary<string, string[]>();
 
-        if (ParseChannel(request.Channel) is null)
+        if (channel is null)
             errors[nameof(request.Channel)] = ["Channel must be one of: email."];
         if (string.IsNullOrWhiteSpace(request.Recipient))
             errors[nameof(request.Recipient)] = ["Recipient is required."];
-        if (string.IsNullOrWhiteSpace(request.Subject))
-            errors[nameof(request.Subject)] = ["Subject is required."];
-        if (string.IsNullOrWhiteSpace(request.Body))
-            errors[nameof(request.Body)] = ["Body is required."];
+
+        var hasTemplate = !string.IsNullOrWhiteSpace(request.Template);
+        var hasDirect = !string.IsNullOrWhiteSpace(request.Subject) || !string.IsNullOrWhiteSpace(request.Body);
+
+        if (hasTemplate && hasDirect)
+            errors[nameof(request.Template)] = ["Provide either subject and body, or a template, not both."];
+        else if (!hasTemplate)
+        {
+            if (string.IsNullOrWhiteSpace(request.Subject))
+                errors[nameof(request.Subject)] = ["Subject is required when no template is given."];
+            if (string.IsNullOrWhiteSpace(request.Body))
+                errors[nameof(request.Body)] = ["Body is required when no template is given."];
+        }
 
         return errors;
     }
