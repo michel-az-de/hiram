@@ -148,7 +148,7 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PermanentFailure_EndsFailed_WithSinglePermanentAttempt()
+    public async Task PermanentFailure_DeadLetters_WithSinglePermanentAttempt()
     {
         var (tenantId, client) = await NewTenantClient("live");
 
@@ -166,9 +166,9 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
         }
 
         var id = await PostAccepted(client, "ops@example.com", $"fail-{Guid.NewGuid():N}");
-        var detail = await WaitForStatus(client, id, "failed");
+        var detail = await WaitForStatus(client, id, "dead_lettered");
 
-        Assert.Equal("failed", detail.Status);
+        Assert.Equal("dead_lettered", detail.Status);
         var attempt = Assert.Single(detail.Attempts);
         Assert.Equal("permanent_failure", attempt.Outcome);
         Assert.False(attempt.Shadowed);

@@ -3,6 +3,7 @@ using Hiram.Application.Abstractions;
 using Hiram.Application.Delivery;
 using Hiram.Application.Notifications;
 using Hiram.Application.Tenancy;
+using Hiram.Domain.DeadLetters;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Tenants;
 using Hiram.Infrastructure.Messaging;
@@ -116,6 +117,15 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         return (await context.NotificationRequests.FindAsync(notificationId))!.Status;
     }
 
+    private async Task<DeadLetterMessage?> DeadLetterFor(Guid notificationId)
+    {
+        await using var context = NewContext();
+        return await context.DeadLetterMessages
+            .Where(d => d.NotificationId == notificationId)
+            .OrderByDescending(d => d.CreatedAtUtc)
+            .FirstOrDefaultAsync();
+    }
+
     [Fact]
     public async Task Process_RecoversOnSecondAttempt_WhenFirstIsTransient()
     {
@@ -134,7 +144,7 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Process_FailsWithoutRetry_WhenPermanent()
+    public async Task Process_DeadLettersWithoutRetry_WhenPermanent()
     {
         var (tenantId, notificationId) = await Seed(DeliveryMode.Live);
         var provider = new ScriptedProvider("fake", [new SendOutcome.PermanentFailure("rejected")]);
@@ -142,17 +152,22 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         await using (var context = NewContext())
             await BuildProcessor(context, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None);
 
-        Assert.Equal(NotificationStatus.Failed, await StatusOf(notificationId));
+        Assert.Equal(NotificationStatus.DeadLettered, await StatusOf(notificationId));
         Assert.Equal(1, provider.Calls);
 
         var attempts = await AttemptsFor(notificationId);
         Assert.Single(attempts);
         Assert.Equal(DeliveryOutcome.PermanentFailure, attempts[0].Outcome);
         Assert.Equal("rejected", attempts[0].Error);
+
+        var deadLetter = await DeadLetterFor(notificationId);
+        Assert.NotNull(deadLetter);
+        Assert.Equal(1, deadLetter!.AttemptCount);
+        Assert.StartsWith("permanent_failure", deadLetter.Reason);
     }
 
     [Fact]
-    public async Task Process_FailsAfterThreeAttempts_WhenAlwaysTransient()
+    public async Task Process_DeadLettersAfterThreeAttempts_WhenAlwaysTransient()
     {
         var (tenantId, notificationId) = await Seed(DeliveryMode.Live);
         var provider = new ScriptedProvider("fake", Enumerable.Repeat<SendOutcome>(new SendOutcome.TransientFailure("temporary"), 5));
@@ -160,7 +175,7 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         await using (var context = NewContext())
             await BuildProcessor(context, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None);
 
-        Assert.Equal(NotificationStatus.Failed, await StatusOf(notificationId));
+        Assert.Equal(NotificationStatus.DeadLettered, await StatusOf(notificationId));
         Assert.Equal(3, provider.Calls);
 
         var attempts = await AttemptsFor(notificationId);
@@ -168,6 +183,11 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         Assert.Equal(new[] { 1, 2, 3 }, attempts.Select(a => a.AttemptNumber).ToArray());
         Assert.All(attempts, a => Assert.Equal("fake", a.Provider));
         Assert.All(attempts, a => Assert.True(a.Duration >= TimeSpan.Zero));
+
+        var deadLetter = await DeadLetterFor(notificationId);
+        Assert.NotNull(deadLetter);
+        Assert.Equal(3, deadLetter!.AttemptCount);
+        Assert.StartsWith("exhausted_transient", deadLetter.Reason);
     }
 
     [Fact]

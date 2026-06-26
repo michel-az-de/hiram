@@ -5,6 +5,7 @@ using System.Text.Json;
 using Hiram.Application.Abstractions;
 using Hiram.Application.Delivery;
 using Hiram.Application.Notifications;
+using Hiram.Domain.DeadLetters;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Tenants;
 using Hiram.Infrastructure.Persistence;
@@ -48,6 +49,9 @@ public sealed class EmailNotificationProcessor
             return;
         }
 
+        // Kept verbatim so a replay reproduces exactly what was attempted, not a re-render of the notification.
+        var payloadJson = Encoding.UTF8.GetString(body.Span);
+
         var notification = await _context.NotificationRequests
             .FirstOrDefaultAsync(x => x.Id == payload.NotificationId, cancellationToken);
         if (notification is null)
@@ -62,9 +66,10 @@ public sealed class EmailNotificationProcessor
             ["notification_id"] = notification.Id
         });
 
-        if (notification.Status is NotificationStatus.Sent or NotificationStatus.Failed)
+        if (notification.Status is NotificationStatus.Sent or NotificationStatus.Failed or NotificationStatus.DeadLettered)
         {
             // At-least-once redelivery of an already settled notification: nothing to send, let the worker ack.
+            // Failed is kept here only to inert historical F1 rows; the live path now settles as dead lettered.
             return;
         }
 
@@ -112,16 +117,37 @@ public sealed class EmailNotificationProcessor
         }
         else
         {
-            notification.MarkFailed();
+            var (reason, attemptCount) = DeadLetterReason(outcome, attemptNumber);
+            _context.DeadLetterMessages.Add(new DeadLetterMessage(
+                Guid.NewGuid(),
+                notification.TenantId,
+                notification.Id,
+                notification.Channel,
+                payloadJson,
+                reason,
+                attemptCount,
+                _clock.UtcNow));
+
+            notification.MarkDeadLettered();
             HiramDiagnostics.NotificationsFailed.Add(1);
+            HiramDiagnostics.NotificationsDeadLettered.Add(1);
         }
 
         await _context.SaveChangesAsync(cancellationToken);
         _logger.LogInformation("Email delivery finished with status {Status}", notification.Status);
 
-        // The message is acked by the worker once this returns. There is deliberately no requeue: replay
-        // and a dead letter queue arrive in F2, and requeue without a DLQ is an infinite loop.
+        // The message is acked by the worker once this returns. An exhausted or permanent failure now ends
+        // dead lettered, recoverable through an explicit replay, so there is still deliberately no broker requeue.
     }
+
+    private static (string Reason, int AttemptCount) DeadLetterReason(SendOutcome outcome, int attemptCount) => outcome switch
+    {
+        SendOutcome.PermanentFailure permanent => (Truncate($"permanent_failure:{permanent.Reason}"), attemptCount),
+        SendOutcome.TransientFailure transient => (Truncate($"exhausted_transient:{transient.Reason}"), attemptCount),
+        _ => throw new ArgumentOutOfRangeException(nameof(outcome))
+    };
+
+    private static string Truncate(string reason) => reason.Length <= 256 ? reason : reason[..256];
 
     private static async Task<SendOutcome> SendOnceAsync(
         ResolvedEmailProvider resolved,

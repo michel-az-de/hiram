@@ -189,7 +189,11 @@ internal static class NotificationEndpoints
             _ => null
         };
 
-    private static string ToWire(NotificationStatus status) => status.ToString().ToLowerInvariant();
+    private static string ToWire(NotificationStatus status) => status switch
+    {
+        NotificationStatus.DeadLettered => "dead_lettered",
+        _ => status.ToString().ToLowerInvariant()
+    };
 
     private static string ToWire(DeliveryOutcome outcome) => outcome switch
     {
