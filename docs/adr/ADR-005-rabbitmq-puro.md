@@ -46,4 +46,4 @@ Necessidade real de sagas distribuídas, segundo transporte de mensageria, ou vo
 ## Itens de ação
 
 1. [x] F0: relay e consumers com client puro, trace propagado por headers AMQP.
-2. [ ] F2: DLQ e replay próprios (ADR-011).
+2. [x] F2: DLQ e replay próprios, endereçado pela ADR-011.
