@@ -179,6 +179,46 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Replay_RedeliversDeadLetteredNotification_ToMailpit()
+    {
+        var (tenantId, client) = await NewTenantClient("live");
+        var subject = $"replay-{Guid.NewGuid():N}";
+
+        // A per-tenant SMTP config pointing nowhere makes the first delivery fail and dead letter.
+        await using (var db = NewDb())
+        {
+            db.TenantProviderConfigs.Add(new TenantProviderConfig(
+                tenantId,
+                NotificationChannel.Email,
+                "smtp",
+                "{\"host\":\"localhost\",\"from\":\"no-reply@hiram.dev\",\"security\":\"none\"}",
+                secretProtected: null,
+                DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync();
+        }
+
+        var id = await PostAccepted(client, "ops@example.com", subject);
+        await WaitForStatus(client, id, "dead_lettered");
+
+        // Drop the broken config so the resolver falls back to the platform default that points at Mailpit.
+        await using (var db = NewDb())
+        {
+            await db.TenantProviderConfigs
+                .Where(c => c.TenantId == tenantId && c.Channel == NotificationChannel.Email)
+                .ExecuteDeleteAsync();
+        }
+
+        var replay = await client.PostAsync($"/v1/notifications/{id}/replay", content: null);
+        Assert.Equal(HttpStatusCode.Accepted, replay.StatusCode);
+
+        var detail = await WaitForStatus(client, id, "sent");
+        Assert.Equal("sent", detail.Status);
+
+        var inbox = await WaitForMailpit(subject);
+        Assert.Contains(inbox, message => message.Subject == subject);
+    }
+
+    [Fact]
     public async Task PoisonMessage_LandsInDeadLetterParkingLot()
     {
         // An outbox row pointing at a notification that never existed is deterministic poison once consumed.
