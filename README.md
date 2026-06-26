@@ -12,6 +12,12 @@
   and end-to-end OpenTelemetry.
 </p>
 
+<p align="center">
+  <a href="https://github.com/michel-az-de/hiram/actions/workflows/ci.yml"><img src="https://github.com/michel-az-de/hiram/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/.NET-10-512BD4.svg" alt=".NET 10">
+</p>
+
 ---
 
 ## What this is
@@ -19,6 +25,27 @@
 Hiram accepts a notification request, persists it together with an outbox row in a single PostgreSQL transaction, and takes responsibility from there: channel routing, per-tenant providers, retries, status webhooks signed with `X-Hiram-Signature`, and a credit ledger for usage. If the database confirmed it, it will be delivered.
 
 **Stack:** .NET 10 · ASP.NET Core · EF Core · PostgreSQL · RabbitMQ · Redis · OpenTelemetry · Docker · k3s + KEDA
+
+## Architecture
+
+```mermaid
+flowchart LR
+  client[Tenant app] -->|API key| api[Hiram.Api]
+  api -->|idempotency| redis[(Redis)]
+  api -->|request plus outbox in one tx| pg[(PostgreSQL)]
+  pg -.->|skip locked| relay[Outbox relay]
+  relay --> mq{{RabbitMQ exchange hiram.notifications}}
+  mq --> email[Email consumer]
+  mq --> push[Push consumer]
+  mq --> webhook[Webhook consumer]
+  email --> smtp[SMTP or Resend]
+  push --> vapid[Web Push VAPID]
+  webhook --> hook[Tenant endpoint, X-Hiram-Signature]
+  email -. exhausted .-> dlq[(dead letter)]
+  push -. exhausted .-> dlq
+```
+
+The founding invariant: the API writes the `NotificationRequest` and its `OutboxMessage` in one PostgreSQL transaction, so an accepted notification is never lost. The Dispatcher relays the outbox to RabbitMQ with `FOR UPDATE SKIP LOCKED`, and per-channel consumers deliver, retry, dead letter and replay over the same spine.
 
 ## Status
 
@@ -90,4 +117,4 @@ Run the tests with `dotnet test`. The integration suite uses Testcontainers and 
 
 ## License
 
-Proprietary. All rights reserved.
+MIT. See [LICENSE](LICENSE).
