@@ -2,14 +2,14 @@
   "name": "Hiram",
   "short_name": "Hiram",
   "description": "Multi-tenant notification delivery API with outbox-guaranteed delivery.",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#0A1428",
   "theme_color": "#0A1428",
   "icons": [
-    { "src": "/assets/favicon.svg", "type": "image/svg+xml", "sizes": "any" },
-    { "src": "/assets/icon-192.png", "type": "image/png", "sizes": "192x192" },
-    { "src": "/assets/icon-512.png", "type": "image/png", "sizes": "512x512" }
+    { "src": "assets/favicon.svg", "type": "image/svg+xml", "sizes": "any" },
+    { "src": "assets/icon-192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "assets/icon-512.png", "type": "image/png", "sizes": "512x512" }
   ]
 }

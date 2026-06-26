@@ -27,10 +27,10 @@
 <meta name="twitter:image" content="https://hiram.dev/assets/social-preview.png">
 <meta name="twitter:image:alt" content="Hiram. The word is never lost.">
 
-<link rel="icon" href="/favicon.ico" sizes="48x48">
-<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
-<link rel="manifest" href="/site.webmanifest">
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
 
 <script>
 (function () {
@@ -77,6 +77,18 @@
       "url": "https://hiram.dev/",
       "description": "Multi-tenant notification API for transactional email, with outbox-guaranteed delivery, idempotency, per-tenant providers and end-to-end OpenTelemetry tracing.",
       "publisher": { "@id": "https://hiram.dev/#organization" }
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://hiram.dev/#faq",
+      "mainEntity": [
+        { "@type": "Question", "name": "What is Hiram?", "acceptedAnswer": { "@type": "Answer", "text": "Hiram is a multi-tenant notification platform. You send a notification through one REST API and Hiram owns delivery: persistence, provider routing, retries and audit." } },
+        { "@type": "Question", "name": "Which channels are available today?", "acceptedAnswer": { "@type": "Answer", "text": "Transactional email is live in production, through SMTP or Resend per tenant. Push, SMS and WhatsApp are on the roadmap, behind the same request contract." } },
+        { "@type": "Question", "name": "How does Hiram guarantee delivery?", "acceptedAnswer": { "@type": "Answer", "text": "The notification request and its outbox row are written in a single PostgreSQL transaction. Once that commit succeeds the message cannot be lost, and a relay drives it to delivery with retries." } },
+        { "@type": "Question", "name": "Is Hiram multi-tenant?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Every domain table carries a tenant from the first migration, and each tenant has isolated API keys, providers and delivery mode." } },
+        { "@type": "Question", "name": "How do I authenticate and send?", "acceptedAnswer": { "@type": "Answer", "text": "Authenticate at the Handshake with a per-tenant API key, then POST to /v1/notifications. An Idempotency-Key makes the call safe to retry, and you can read delivery back with cursor pagination." } },
+        { "@type": "Question", "name": "Is it production ready?", "acceptedAnswer": { "@type": "Answer", "text": "Email is production ready as of phase F1, with real providers, idempotency, shadow mode and full delivery audit. Later phases add channels, metering and a portal." } }
+      ]
     }
   ]
 }
@@ -100,6 +112,7 @@
       <a href="#how">How it works</a>
       <a href="#features">Features</a>
       <a href="#developers">Developers</a>
+      <a href="#faq">FAQ</a>
     </nav>
     <div class="nav-actions">
       <button class="toggle" id="theme-toggle" type="button" aria-label="Switch theme">
@@ -315,6 +328,41 @@
     </div>
   </section>
 
+  <section id="faq" aria-labelledby="faq-title">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="lapidar eyebrow">FAQ</span>
+        <h2 id="faq-title">Questions, answered plainly</h2>
+      </div>
+      <div class="faq">
+        <div class="faq-item">
+          <h3>What is Hiram?</h3>
+          <p>Hiram is a multi-tenant notification platform. You send a notification through one REST API and Hiram owns delivery: persistence, provider routing, retries and audit.</p>
+        </div>
+        <div class="faq-item">
+          <h3>Which channels are available today?</h3>
+          <p>Transactional email is live in production, through SMTP or Resend per tenant. Push, SMS and WhatsApp are on the roadmap, behind the same request contract.</p>
+        </div>
+        <div class="faq-item">
+          <h3>How does Hiram guarantee delivery?</h3>
+          <p>The notification request and its outbox row are written in a single PostgreSQL transaction. Once that commit succeeds the message cannot be lost, and a relay drives it to delivery with retries.</p>
+        </div>
+        <div class="faq-item">
+          <h3>Is Hiram multi-tenant?</h3>
+          <p>Yes. Every domain table carries a tenant from the first migration, and each tenant has isolated API keys, providers and delivery mode.</p>
+        </div>
+        <div class="faq-item">
+          <h3>How do I authenticate and send?</h3>
+          <p>Authenticate at the Handshake with a per-tenant API key, then POST to /v1/notifications. An Idempotency-Key makes the call safe to retry, and you can read delivery back with cursor pagination.</p>
+        </div>
+        <div class="faq-item">
+          <h3>Is it production ready?</h3>
+          <p>Email is production ready as of phase F1, with real providers, idempotency, shadow mode and full delivery audit. Later phases add channels, metering and a portal.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section id="start" aria-labelledby="start-title">
     <div class="wrap">
       <div class="card-ashlar cta-final">
@@ -351,6 +399,7 @@
           <a href="#why">Why Hiram</a>
           <a href="#how">How it works</a>
           <a href="#roadmap">Roadmap</a>
+          <a href="#faq">FAQ</a>
         </div>
         <div class="col">
           <span class="lapidar">Developers</span>

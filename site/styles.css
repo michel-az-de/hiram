@@ -238,6 +238,14 @@ section { padding:88px 0; border-top:1px solid var(--border); scroll-margin-top:
 .phase h3 { font-size:17px; margin-bottom:4px; }
 .phase p { color:var(--muted); font-size:14px; }
 
+/* FAQ */
+
+.faq { display:grid; margin-top:8px; }
+.faq-item { padding:22px 0; border-bottom:1px solid var(--border); }
+.faq-item:last-child { border-bottom:none; }
+.faq-item h3 { font-size:18px; }
+.faq-item p { color:var(--muted); font-size:15px; max-width:760px; margin-top:6px; }
+
 /* Final CTA */
 
 .cta-final { text-align:left; }
