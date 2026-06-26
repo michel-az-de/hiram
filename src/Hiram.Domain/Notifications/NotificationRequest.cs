@@ -73,4 +73,22 @@ public sealed class NotificationRequest
     {
         Status = NotificationStatus.Failed;
     }
+
+    public void MarkDeadLettered()
+    {
+        if (Status is not (NotificationStatus.Sending or NotificationStatus.Failed))
+            throw new InvalidOperationException(
+                $"Only a sending or failed notification can be dead lettered, current status is {Status}.");
+
+        Status = NotificationStatus.DeadLettered;
+    }
+
+    public void RequeueForReplay()
+    {
+        if (Status != NotificationStatus.DeadLettered)
+            throw new InvalidOperationException(
+                $"Only a dead lettered notification can be requeued for replay, current status is {Status}.");
+
+        Status = NotificationStatus.Queued;
+    }
 }

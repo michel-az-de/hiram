@@ -123,4 +123,55 @@ public class NotificationRequestTests
     {
         Assert.Null(CreateValid().IdempotencyKey);
     }
+
+    [Fact]
+    public void MarkDeadLettered_TransitionsFromSending()
+    {
+        var request = CreateValid();
+        request.MarkSending();
+
+        request.MarkDeadLettered();
+
+        Assert.Equal(NotificationStatus.DeadLettered, request.Status);
+    }
+
+    [Fact]
+    public void MarkDeadLettered_TransitionsFromFailed()
+    {
+        var request = CreateValid();
+        request.MarkFailed();
+
+        request.MarkDeadLettered();
+
+        Assert.Equal(NotificationStatus.DeadLettered, request.Status);
+    }
+
+    [Fact]
+    public void MarkDeadLettered_Throws_WhenStillAccepted()
+    {
+        var request = CreateValid();
+
+        Assert.Throws<InvalidOperationException>(request.MarkDeadLettered);
+    }
+
+    [Fact]
+    public void RequeueForReplay_TransitionsFromDeadLetteredToQueued()
+    {
+        var request = CreateValid();
+        request.MarkSending();
+        request.MarkDeadLettered();
+
+        request.RequeueForReplay();
+
+        Assert.Equal(NotificationStatus.Queued, request.Status);
+    }
+
+    [Fact]
+    public void RequeueForReplay_Throws_WhenNotDeadLettered()
+    {
+        var request = CreateValid();
+        request.MarkSending();
+
+        Assert.Throws<InvalidOperationException>(request.RequeueForReplay);
+    }
 }

@@ -7,5 +7,6 @@ public enum NotificationStatus
     Sending = 3,
     Sent = 4,
     Failed = 5,
-    Suppressed = 6
+    Suppressed = 6,
+    DeadLettered = 7
 }
