@@ -4,6 +4,7 @@ using Hiram.Api.Notifications;
 using Hiram.Api.OpenApi;
 using Hiram.Api.Push;
 using Hiram.Api.Templates;
+using Hiram.Api.Webhooks;
 using Hiram.Application.Notifications;
 using Hiram.Infrastructure;
 using Hiram.Infrastructure.Persistence;
@@ -51,6 +52,7 @@ app.MapAdminEndpoints();
 app.MapNotificationEndpoints();
 app.MapTemplateEndpoints();
 app.MapPushEndpoints();
+app.MapWebhookEndpoints();
 
 app.Run();
 

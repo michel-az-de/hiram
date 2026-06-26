@@ -24,6 +24,8 @@ public static class DependencyInjection
     public static IServiceCollection AddHiramInfrastructure(this IServiceCollection services, string connectionString)
     {
         services.AddDbContext<HiramDbContext>(options => options.UseNpgsql(connectionString));
+        services.AddDataProtection();
+        services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
         services.AddScoped<INotificationStore, NotificationStore>();
         services.AddScoped<INotificationReader, NotificationReader>();
         services.AddScoped<IDeadLetterReplay, DeadLetterReplay>();
@@ -46,9 +48,6 @@ public static class DependencyInjection
     // reads the tenant config through a request scoped DbContext and gets a fresh Resend client per message.
     public static IServiceCollection AddHiramEmailDelivery(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDataProtection();
-        services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
-
         var platform = configuration.GetSection("Hiram:Email:Platform");
         var settings = platform.GetSection("Settings").GetChildren().ToDictionary(child => child.Key, child => child.Value ?? string.Empty);
         services.AddSingleton(new PlatformEmailDefaults(
