@@ -7,6 +7,7 @@ using Hiram.Application.Templates;
 using Hiram.Infrastructure.Caching;
 using Hiram.Infrastructure.Delivery;
 using Hiram.Infrastructure.Persistence;
+using Hiram.Infrastructure.Push;
 using Hiram.Infrastructure.Security;
 using Hiram.Infrastructure.Templates;
 using Hiram.Infrastructure.Time;
@@ -66,6 +67,7 @@ public static class DependencyInjection
             vapid["Subject"] ?? "mailto:admin@hiram.local",
             vapid["PublicKey"] ?? string.Empty,
             vapid["PrivateKey"] ?? string.Empty));
+        services.AddHttpClient<IPushSender, WebPushSender>();
 
         return services;
     }
