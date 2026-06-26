@@ -7,6 +7,7 @@ using Hiram.Infrastructure.Caching;
 using Hiram.Infrastructure.Delivery;
 using Hiram.Infrastructure.Persistence;
 using Hiram.Infrastructure.Security;
+using Hiram.Infrastructure.Templates;
 using Hiram.Infrastructure.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -24,6 +25,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationReader, NotificationReader>();
         services.AddScoped<IDeadLetterReplay, DeadLetterReplay>();
         services.AddScoped<ITemplateStore, TemplateStore>();
+        services.AddSingleton<ITemplateRenderer, ScribanTemplateRenderer>();
         services.AddScoped<ITenantStore, TenantStore>();
         services.AddScoped<IApiKeyStore, ApiKeyStore>();
         services.AddScoped<ITenantProviderConfigStore, TenantProviderConfigStore>();
