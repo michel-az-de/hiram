@@ -96,12 +96,14 @@ section { padding:88px 0; border-top:1px solid var(--border); scroll-margin-top:
 .nav-actions { display:flex; align-items:center; gap:12px; }
 
 .toggle {
+  display:inline-flex; align-items:center; gap:8px;
   background:var(--surface); color:var(--text);
   border:1px solid var(--border-strong); border-radius:var(--r-sm);
   padding:8px 14px; font-family:var(--f-body); font-size:13px; font-weight:500;
   cursor:pointer; transition:border-color .15s var(--ease);
 }
 .toggle:hover { border-color:var(--ring); }
+.toggle-ico { width:14px; height:14px; flex:none; color:var(--orient-500); }
 
 /* Buttons */
 

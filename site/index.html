@@ -100,7 +100,7 @@
 
 <header class="site-header">
   <div class="wrap">
-    <a class="brand" href="/" aria-label="Hiram, home">
+    <a class="brand" href="./" aria-label="Hiram, home">
       <svg class="mark" viewBox="0 0 124 80" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="square" aria-hidden="true">
         <rect x="36" y="14" width="76" height="52"/><path d="M39 17.5 L74 46 L109 17.5"/>
         <path d="M10 31 H30"/><path d="M4 40 H26"/><path d="M12 49 H30"/>
@@ -115,7 +115,8 @@
       <a href="#faq">FAQ</a>
     </nav>
     <div class="nav-actions">
-      <button class="toggle" id="theme-toggle" type="button" aria-label="Switch theme">
+      <button class="toggle" id="theme-toggle" type="button" aria-label="Switch color theme">
+        <svg class="toggle-ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 1.5 A6.5 6.5 0 0 1 8 14.5 Z" fill="currentColor"/></svg>
         <span class="toggle-label">Vault</span>
       </button>
       <a class="btn btn-primary btn-sm" href="https://github.com/michel-az-de/hiram#quick-start">Read the docs</a>
@@ -232,7 +233,7 @@
       </div>
       <div class="feature-cols">
         <div>
-          <h3><span class="badge badge-live">Available now</span></h3>
+          <h3>Live capabilities <span class="badge badge-live">Available now</span></h3>
           <ul class="feature-list">
             <li class="col"><span class="name">Transactional email</span><span class="desc">Two interchangeable providers per tenant: SMTP via MailKit, Resend over HTTP.</span></li>
             <li class="col"><span class="name">Idempotency</span><span class="desc">A client <code>Idempotency-Key</code> collapses retries into one send for 24 hours.</span></li>
@@ -244,13 +245,13 @@
           </ul>
         </div>
         <div>
-          <h3><span class="badge badge-soon">On the roadmap</span></h3>
+          <h3>Coming capabilities <span class="badge badge-soon">On the roadmap</span></h3>
           <ul class="feature-list">
             <li class="col"><span class="name">Push, SMS and WhatsApp</span><span class="desc">More channels behind the same request contract.</span></li>
             <li class="col"><span class="name">Templates</span><span class="desc">Versioned, per-tenant message templates with variables.</span></li>
             <li class="col"><span class="name">Signed status webhooks</span><span class="desc">Delivery callbacks verified with <code>X-Hiram-Signature</code>.</span></li>
             <li class="col"><span class="name">Metering and credits</span><span class="desc">An append-only credit ledger with per-tenant quotas.</span></li>
-            <li class="col"><span class="name">Configurable AI autonomy</span><span class="desc">Apprentice, Fellow and Master modes with a decision log and budget.</span></li>
+            <li class="col"><span class="name">Configurable AI autonomy</span><span class="desc">Three autonomy levels with a decision log and budget.</span></li>
             <li class="col"><span class="name">Admin and dev portal</span><span class="desc">Tenant self-service, keys, dashboards and the Trestleboard changelog.</span></li>
           </ul>
         </div>
@@ -270,7 +271,7 @@
           <h3>Read delivery back</h3>
           <p>Query any notification and its attempts. Statuses map one to one to what the engine actually did.</p>
           <table style="margin-top:18px">
-            <thead><tr><th>Notification</th><th>Channel</th><th>Status</th><th>p99</th></tr></thead>
+            <thead><tr><th scope="col">Notification</th><th scope="col">Channel</th><th scope="col">Status</th><th scope="col">Latency</th></tr></thead>
             <tbody>
               <tr><td class="mono">ntf_01HZX4</td><td>email</td><td><span class="status st-delivered"><i></i>sent</span></td><td class="mono">412 ms</td></tr>
               <tr><td class="mono">ntf_01HZX7</td><td>email</td><td><span class="status st-queued"><i></i>queued</span></td><td class="mono">n/a</td></tr>

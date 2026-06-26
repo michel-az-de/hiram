@@ -7,7 +7,9 @@
   function sync() {
     var dark = root.getAttribute('data-theme') === 'dark';
     if (lbl) lbl.textContent = dark ? 'Vault' : 'Stone';
-    btn.setAttribute('aria-label', dark ? 'Switch to the stone theme' : 'Switch to the vault theme');
+    // aria-pressed reflects whether the light (Stone) theme is active
+    btn.setAttribute('aria-pressed', dark ? 'false' : 'true');
+    btn.setAttribute('aria-label', dark ? 'Theme: Vault. Activate to switch to Stone.' : 'Theme: Stone. Activate to switch to Vault.');
   }
 
   sync();
