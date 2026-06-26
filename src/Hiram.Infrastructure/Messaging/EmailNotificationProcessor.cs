@@ -138,6 +138,7 @@ public sealed class EmailNotificationProcessor
             HiramDiagnostics.NotificationsDeadLettered.Add(1);
         }
 
+        await Webhooks.WebhookOutbox.TryEnqueueAsync(_context, notification, _clock, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
         _logger.LogInformation("Email delivery finished with status {Status}", notification.Status);
 

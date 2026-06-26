@@ -6,6 +6,7 @@ using Hiram.Application.Tenancy;
 using Hiram.Domain.DeadLetters;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Tenants;
+using Hiram.Domain.Webhooks;
 using Hiram.Infrastructure.Messaging;
 using Hiram.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -248,5 +249,38 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
 
         Assert.NotNull(error);
         Assert.IsNotType<PoisonMessageException>(error);
+    }
+
+    [Fact]
+    public async Task Process_EmitsWebhookOutbox_WhenTenantHasEndpoint()
+    {
+        var (tenantId, notificationId) = await Seed(DeliveryMode.Live);
+        await using (var seed = NewContext())
+        {
+            seed.WebhookEndpoints.Add(new WebhookEndpoint(
+                Guid.NewGuid(), tenantId, "https://t.example.com/h", "protected:secret", DateTimeOffset.UtcNow));
+            await seed.SaveChangesAsync();
+        }
+        var provider = new ScriptedProvider("fake", [new SendOutcome.Sent()]);
+
+        await using (var context = NewContext())
+            await BuildProcessor(context, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None);
+
+        await using var verify = NewContext();
+        var webhookOutbox = await verify.OutboxMessages.Where(o => o.TenantId == tenantId && o.Type == "webhook").ToListAsync();
+        Assert.Single(webhookOutbox);
+    }
+
+    [Fact]
+    public async Task Process_DoesNotEmitWebhook_WhenTenantHasNoEndpoint()
+    {
+        var (tenantId, notificationId) = await Seed(DeliveryMode.Live);
+        var provider = new ScriptedProvider("fake", [new SendOutcome.Sent()]);
+
+        await using (var context = NewContext())
+            await BuildProcessor(context, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None);
+
+        await using var verify = NewContext();
+        Assert.Empty(await verify.OutboxMessages.Where(o => o.TenantId == tenantId && o.Type == "webhook").ToListAsync());
     }
 }
