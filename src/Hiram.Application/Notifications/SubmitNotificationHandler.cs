@@ -1,6 +1,9 @@
 using System.Diagnostics;
+using System.Text;
 using System.Text.Json;
 using Hiram.Application.Abstractions;
+using Hiram.Application.Metering;
+using Hiram.Domain.Metering;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Outbox;
 
@@ -12,17 +15,20 @@ public sealed class SubmitNotificationHandler : ISubmitNotification
     private readonly INotificationReader _reader;
     private readonly IIdempotencyKeys _idempotency;
     private readonly IClock _clock;
+    private readonly ICreditCalculator _calculator;
 
     public SubmitNotificationHandler(
         INotificationStore store,
         INotificationReader reader,
         IIdempotencyKeys idempotency,
-        IClock clock)
+        IClock clock,
+        ICreditCalculator calculator)
     {
         _store = store;
         _reader = reader;
         _idempotency = idempotency;
         _clock = clock;
+        _calculator = calculator;
     }
 
     public async Task<SubmitNotificationResult> SubmitAsync(SubmitNotificationCommand command, CancellationToken cancellationToken)
@@ -64,9 +70,13 @@ public sealed class SubmitNotificationHandler : ISubmitNotification
             now,
             Activity.Current?.Id);
 
+        var payloadBytes = Encoding.UTF8.GetByteCount(command.Subject) + Encoding.UTF8.GetByteCount(command.Body);
+        var cost = _calculator.Cost(command.Channel, payloadBytes);
+        var ledgerEntry = CreditLedgerEntry.Debit(command.TenantId, notificationId, cost, "notification:accepted", now);
+
         try
         {
-            await _store.SaveAsync(request, outbox, cancellationToken);
+            await _store.SaveAsync(request, outbox, ledgerEntry, cancellationToken);
         }
         catch (DuplicateIdempotencyKeyException)
         {

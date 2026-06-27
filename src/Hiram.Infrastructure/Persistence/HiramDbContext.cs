@@ -1,4 +1,5 @@
 using Hiram.Domain.DeadLetters;
+using Hiram.Domain.Metering;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Outbox;
 using Hiram.Domain.Push;
@@ -27,6 +28,7 @@ public sealed class HiramDbContext : DbContext
     public DbSet<Template> Templates => Set<Template>();
     public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
     public DbSet<WebhookEndpoint> WebhookEndpoints => Set<WebhookEndpoint>();
+    public DbSet<CreditLedgerEntry> CreditLedger => Set<CreditLedgerEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

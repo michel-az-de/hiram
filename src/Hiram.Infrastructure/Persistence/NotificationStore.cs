@@ -1,4 +1,5 @@
 using Hiram.Application.Notifications;
+using Hiram.Domain.Metering;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Outbox;
 using Microsoft.EntityFrameworkCore;
@@ -17,13 +18,14 @@ public sealed class NotificationStore : INotificationStore
         _context = context;
     }
 
-    public async Task SaveAsync(NotificationRequest request, OutboxMessage outbox, CancellationToken cancellationToken)
+    public async Task SaveAsync(NotificationRequest request, OutboxMessage outbox, CreditLedgerEntry ledgerEntry, CancellationToken cancellationToken)
     {
-        // One transaction so the request and its outbox row commit together or not at all.
+        // One transaction so the request, its outbox row and the credit debit commit together or not at all.
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
         _context.NotificationRequests.Add(request);
         _context.OutboxMessages.Add(outbox);
+        _context.CreditLedger.Add(ledgerEntry);
 
         try
         {

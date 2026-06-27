@@ -1,3 +1,4 @@
+using Hiram.Domain.Metering;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Outbox;
 using Hiram.Infrastructure.Persistence;
@@ -36,6 +37,9 @@ public class NotificationStoreTests : IAsyncLifetime
     private static OutboxMessage NewOutbox(Guid id) =>
         new(id, DevTenant, "email", "{}", DateTimeOffset.UtcNow);
 
+    private static CreditLedgerEntry NewLedger(Guid notificationId) =>
+        CreditLedgerEntry.Debit(DevTenant, notificationId, 1, "notification:accepted", DateTimeOffset.UtcNow);
+
     [Fact]
     public async Task Save_WritesRequestAndOutboxRowTogether()
     {
@@ -45,12 +49,13 @@ public class NotificationStoreTests : IAsyncLifetime
         await using (var context = NewContext())
         {
             var store = new NotificationStore(context);
-            await store.SaveAsync(NewRequest(requestId), NewOutbox(outboxId), CancellationToken.None);
+            await store.SaveAsync(NewRequest(requestId), NewOutbox(outboxId), NewLedger(requestId), CancellationToken.None);
         }
 
         await using var verify = NewContext();
         Assert.NotNull(await verify.NotificationRequests.FindAsync(requestId));
         Assert.NotNull(await verify.OutboxMessages.FindAsync(outboxId));
+        Assert.True(await verify.CreditLedger.AnyAsync(l => l.NotificationId == requestId));
     }
 
     [Fact]
@@ -71,10 +76,11 @@ public class NotificationStoreTests : IAsyncLifetime
         {
             var store = new NotificationStore(context);
             await Assert.ThrowsAsync<DbUpdateException>(() =>
-                store.SaveAsync(NewRequest(requestId), NewOutbox(blockingOutboxId), CancellationToken.None));
+                store.SaveAsync(NewRequest(requestId), NewOutbox(blockingOutboxId), NewLedger(requestId), CancellationToken.None));
         }
 
         await using var verify = NewContext();
         Assert.Null(await verify.NotificationRequests.FindAsync(requestId));
+        Assert.False(await verify.CreditLedger.AnyAsync(l => l.NotificationId == requestId));
     }
 }
