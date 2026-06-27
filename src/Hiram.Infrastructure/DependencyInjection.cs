@@ -1,10 +1,12 @@
 using Hiram.Application.Abstractions;
 using Hiram.Application.Delivery;
+using Hiram.Application.Metering;
 using Hiram.Application.Notifications;
 using Hiram.Application.Push;
 using Hiram.Application.Tenancy;
 using Hiram.Application.Templates;
 using Hiram.Application.Webhooks;
+using Hiram.Domain.Notifications;
 using Hiram.Infrastructure.Caching;
 using Hiram.Infrastructure.Delivery;
 using Hiram.Infrastructure.Persistence;
@@ -69,6 +71,23 @@ public static class DependencyInjection
             vapid["PublicKey"] ?? string.Empty,
             vapid["PrivateKey"] ?? string.Empty));
         services.AddHttpClient<IPushSender, WebPushSender>();
+
+        return services;
+    }
+
+    public static IServiceCollection AddHiramMetering(this IServiceCollection services, IConfiguration configuration)
+    {
+        var section = configuration.GetSection("Hiram:Metering");
+
+        var channelBase = new Dictionary<NotificationChannel, long>();
+        foreach (var child in section.GetSection("ChannelBase").GetChildren())
+        {
+            if (Enum.TryParse<NotificationChannel>(child.Key, ignoreCase: true, out var channel) && long.TryParse(child.Value, out var value))
+                channelBase[channel] = value;
+        }
+
+        services.AddSingleton(new CreditRates(channelBase, section.GetValue("DefaultBase", 1L), section.GetValue("PerKilobyte", 1L)));
+        services.AddSingleton<ICreditCalculator, CreditCalculator>();
 
         return services;
     }
