@@ -2,6 +2,7 @@ using Hiram.Domain.Blocks;
 using Hiram.Domain.Consents;
 using Hiram.Domain.DeadLetters;
 using Hiram.Domain.Events;
+using Hiram.Domain.Messaging;
 using Hiram.Domain.Metering;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Outbox;
@@ -28,6 +29,7 @@ public sealed class HiramDbContext : DbContext
     public DbSet<Routine> Routines => Set<Routine>();
     public DbSet<Consent> Consents => Set<Consent>();
     public DbSet<Block> Blocks => Set<Block>();
+    public DbSet<MessageClaim> MessageClaims => Set<MessageClaim>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
     public DbSet<TenantProviderConfig> TenantProviderConfigs => Set<TenantProviderConfig>();

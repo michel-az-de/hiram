@@ -3,6 +3,7 @@ using Hiram.Application.Delivery;
 using Hiram.Application.Blocks;
 using Hiram.Application.Consents;
 using Hiram.Application.Events;
+using Hiram.Application.Messaging;
 using Hiram.Application.Routines;
 using Hiram.Application.Metering;
 using Hiram.Application.Notifications;
@@ -47,6 +48,8 @@ public static class DependencyInjection
         services.AddScoped<ChannelResolver>();
         services.AddSingleton(new WindowScheduler(() => TimeSpan.FromSeconds(Random.Shared.Next(0, 300))));
         services.AddSingleton<DailyLimitPolicy>();
+        services.AddScoped<IMessageClaimStore, MessageClaimStore>();
+        services.AddScoped<MessageDispatchGuard>();
         services.AddScoped<INotificationReader, NotificationReader>();
         services.AddScoped<IDeadLetterReplay, DeadLetterReplay>();
         services.AddScoped<ITemplateStore, TemplateStore>();
