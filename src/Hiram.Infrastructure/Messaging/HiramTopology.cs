@@ -10,6 +10,11 @@ public static class HiramTopology
     public const string WebhookQueue = "hiram.notifications.webhook";
     public const string WebhookRoutingKey = "webhook";
 
+    // Raw events land here for the routine engine to fan out. The consumer arrives in step 1.2; until
+    // then the queue holds the messages instead of dropping them as unroutable.
+    public const string EventQueue = "hiram.notifications.event";
+    public const string EventRoutingKey = "event";
+
     public const string Dlx = "hiram.notifications.dlx";
     public const string DeadLetterQueue = "hiram.notifications.dead-letter";
     public const string DeadLetterRoutingKey = "dead-letter";

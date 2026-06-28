@@ -1,11 +1,13 @@
 using Hiram.Api.Admin;
 using Hiram.Api.Authentication;
+using Hiram.Api.Events;
 using Hiram.Api.Health;
 using Hiram.Api.Notifications;
 using Hiram.Api.OpenApi;
 using Hiram.Api.Push;
 using Hiram.Api.Templates;
 using Hiram.Api.Webhooks;
+using Hiram.Application.Events;
 using Hiram.Application.Notifications;
 using Hiram.Infrastructure;
 using Hiram.Infrastructure.Persistence;
@@ -48,6 +50,7 @@ builder.Services.AddHiramRedis(redisConnectionString);
 builder.Services.AddHiramPush(builder.Configuration);
 builder.Services.AddHiramMetering(builder.Configuration);
 builder.Services.AddScoped<ISubmitNotification, SubmitNotificationHandler>();
+builder.Services.AddScoped<IIngestEvent, IngestEventHandler>();
 builder.Services.AddScoped<TenantContext>();
 builder.Services.AddHealthChecks()
     .AddCheck<PostgresHealthCheck>("postgres", tags: ["ready"])
@@ -71,6 +74,7 @@ app.MapScalarApiReference(options => options
     .WithCustomCss(HiramApiDocs.ScalarCss));
 app.MapAdminEndpoints();
 app.MapNotificationEndpoints();
+app.MapEventEndpoints();
 app.MapTemplateEndpoints();
 app.MapPushEndpoints();
 app.MapWebhookEndpoints();

@@ -1,4 +1,5 @@
 using Hiram.Domain.DeadLetters;
+using Hiram.Domain.Events;
 using Hiram.Domain.Metering;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Outbox;
@@ -20,6 +21,7 @@ public sealed class HiramDbContext : DbContext
 
     public DbSet<NotificationRequest> NotificationRequests => Set<NotificationRequest>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<NotificationEvent> Events => Set<NotificationEvent>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
     public DbSet<TenantProviderConfig> TenantProviderConfigs => Set<TenantProviderConfig>();

@@ -1,5 +1,6 @@
 using Hiram.Application.Abstractions;
 using Hiram.Application.Delivery;
+using Hiram.Application.Events;
 using Hiram.Application.Metering;
 using Hiram.Application.Notifications;
 using Hiram.Application.Push;
@@ -30,6 +31,7 @@ public static class DependencyInjection
         services.AddHiramDataProtection(dataProtectionKeyRingPath);
         services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
         services.AddScoped<INotificationStore, NotificationStore>();
+        services.AddScoped<IEventStore, EventStore>();
         services.AddScoped<INotificationReader, NotificationReader>();
         services.AddScoped<IDeadLetterReplay, DeadLetterReplay>();
         services.AddScoped<ITemplateStore, TemplateStore>();

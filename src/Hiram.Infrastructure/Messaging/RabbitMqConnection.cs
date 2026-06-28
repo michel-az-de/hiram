@@ -81,6 +81,11 @@ public sealed class RabbitMqConnection : IAsyncDisposable
         await channel.QueueBindAsync(HiramTopology.WebhookQueue, HiramTopology.Exchange, HiramTopology.WebhookRoutingKey,
             cancellationToken: cancellationToken);
 
+        await channel.QueueDeclareAsync(HiramTopology.EventQueue, durable: true, exclusive: false, autoDelete: false,
+            cancellationToken: cancellationToken);
+        await channel.QueueBindAsync(HiramTopology.EventQueue, HiramTopology.Exchange, HiramTopology.EventRoutingKey,
+            cancellationToken: cancellationToken);
+
         // Parking lot for poison messages the consumer cannot ever process. Declared additively so the existing
         // work queue keeps its arguments and no second declare hits a precondition mismatch.
         await channel.ExchangeDeclareAsync(HiramTopology.Dlx, ExchangeType.Direct, durable: true, autoDelete: false,
