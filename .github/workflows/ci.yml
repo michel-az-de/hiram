@@ -38,3 +38,19 @@ jobs:
       # Testcontainers talks to the Docker engine preinstalled on the runner.
       - name: Test
         run: dotnet test Hiram.sln --configuration Release --no-build --verbosity normal
+
+  docker-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Builds prove the Dockerfiles publish cleanly; the build stage runs the same Release publish
+      # (warnings as errors) the test job does.
+      - name: Build api image
+        run: docker build -f src/Hiram.Api/Dockerfile -t hiram-api:ci .
+
+      - name: Build dispatcher image
+        run: docker build -f src/Hiram.Dispatcher/Dockerfile -t hiram-dispatcher:ci .

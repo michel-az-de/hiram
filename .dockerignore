@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.idea/
+.git/
+.github/
+.claude/
+docs/
+plans/
+tests/
+*.md
+LICENSE
+**/appsettings.Development.json
