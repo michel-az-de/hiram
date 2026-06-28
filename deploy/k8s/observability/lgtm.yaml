@@ -1,0 +1,46 @@
+# ADR-003 / step 0.11: single-container LGTM (Grafana, Loki, Tempo, Mimir/Prometheus) for the VM. Both
+# hosts export OTLP here via OTEL_EXPORTER_OTLP_ENDPOINT. Retention is short by design: the VM is small
+# and telemetry must not starve the ERP (ADR-016 memory budget). Storage is ephemeral here; point it at
+# a small PVC if history across restarts is needed.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lgtm
+  namespace: hiram
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lgtm
+  template:
+    metadata:
+      labels:
+        app: lgtm
+    spec:
+      containers:
+        - name: lgtm
+          image: grafana/otel-lgtm:latest
+          ports:
+            - { name: otlp-grpc, containerPort: 4317 }
+            - { name: otlp-http, containerPort: 4318 }
+            - { name: grafana, containerPort: 3000 }
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lgtm
+  namespace: hiram
+spec:
+  selector:
+    app: lgtm
+  ports:
+    - { name: otlp-grpc, port: 4317, targetPort: 4317 }
+    - { name: otlp-http, port: 4318, targetPort: 4318 }
+    - { name: grafana, port: 3000, targetPort: 3000 }
