@@ -1,3 +1,4 @@
+using Hiram.Domain.Blocks;
 using Hiram.Domain.Consents;
 using Hiram.Domain.DeadLetters;
 using Hiram.Domain.Events;
@@ -26,6 +27,7 @@ public sealed class HiramDbContext : DbContext
     public DbSet<NotificationEvent> Events => Set<NotificationEvent>();
     public DbSet<Routine> Routines => Set<Routine>();
     public DbSet<Consent> Consents => Set<Consent>();
+    public DbSet<Block> Blocks => Set<Block>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
     public DbSet<TenantProviderConfig> TenantProviderConfigs => Set<TenantProviderConfig>();

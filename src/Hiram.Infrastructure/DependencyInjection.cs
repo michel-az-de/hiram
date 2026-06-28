@@ -1,5 +1,6 @@
 using Hiram.Application.Abstractions;
 using Hiram.Application.Delivery;
+using Hiram.Application.Blocks;
 using Hiram.Application.Consents;
 using Hiram.Application.Events;
 using Hiram.Application.Routines;
@@ -40,6 +41,8 @@ public static class DependencyInjection
         services.AddScoped<IConsentStore, ConsentStore>();
         services.AddScoped<ConsentPolicy>();
         services.AddScoped<ConsentReconciler>();
+        services.AddScoped<IBlockStore, BlockStore>();
+        services.AddScoped<BlockGate>();
         services.AddScoped<INotificationReader, NotificationReader>();
         services.AddScoped<IDeadLetterReplay, DeadLetterReplay>();
         services.AddScoped<ITemplateStore, TemplateStore>();

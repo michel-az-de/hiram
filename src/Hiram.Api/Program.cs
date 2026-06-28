@@ -1,5 +1,6 @@
 using Hiram.Api.Admin;
 using Hiram.Api.Authentication;
+using Hiram.Api.Blocks;
 using Hiram.Api.Consents;
 using Hiram.Api.Events;
 using Hiram.Api.Health;
@@ -77,6 +78,7 @@ app.MapAdminEndpoints();
 app.MapNotificationEndpoints();
 app.MapEventEndpoints();
 app.MapConsentEndpoints();
+app.MapBlockEndpoints();
 app.MapTemplateEndpoints();
 app.MapPushEndpoints();
 app.MapWebhookEndpoints();
