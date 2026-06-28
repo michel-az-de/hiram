@@ -14,6 +14,7 @@ using Hiram.Infrastructure.Push;
 using Hiram.Infrastructure.Security;
 using Hiram.Infrastructure.Templates;
 using Hiram.Infrastructure.Time;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,10 +24,10 @@ namespace Hiram.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddHiramInfrastructure(this IServiceCollection services, string connectionString)
+    public static IServiceCollection AddHiramInfrastructure(this IServiceCollection services, string connectionString, string? dataProtectionKeyRingPath = null)
     {
         services.AddDbContext<HiramDbContext>(options => options.UseNpgsql(connectionString));
-        services.AddDataProtection();
+        services.AddHiramDataProtection(dataProtectionKeyRingPath);
         services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
         services.AddScoped<INotificationStore, NotificationStore>();
         services.AddScoped<INotificationReader, NotificationReader>();
@@ -42,6 +43,18 @@ public static class DependencyInjection
         services.AddSingleton<IEmailProvider, SmtpEmailProvider>();
         services.AddHttpClient<IEmailProvider, ResendEmailProvider>(client =>
             client.BaseAddress = new Uri("https://api.resend.com/"));
+
+        return services;
+    }
+
+    public static IServiceCollection AddHiramDataProtection(this IServiceCollection services, string? keyRingPath = null)
+    {
+        // Api and dispatcher are separate processes: they must share the same key ring and the same
+        // application discriminator, otherwise the dispatcher cannot decrypt the tenant secrets the
+        // api encrypted. The key ring path is a shared volume in production.
+        var dataProtection = services.AddDataProtection().SetApplicationName("hiram");
+        if (!string.IsNullOrWhiteSpace(keyRingPath))
+            dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keyRingPath));
 
         return services;
     }

@@ -26,7 +26,7 @@ builder.AddHiramTelemetry("hiram-api", tracing => tracing
 
 builder.Services.AddProblemDetails();
 builder.Services.AddHiramOpenApi();
-builder.Services.AddHiramInfrastructure(connectionString);
+builder.Services.AddHiramInfrastructure(connectionString, builder.Configuration["DataProtection:KeysPath"]);
 builder.Services.AddHiramRedis(redisConnectionString);
 builder.Services.AddHiramPush(builder.Configuration);
 builder.Services.AddHiramMetering(builder.Configuration);

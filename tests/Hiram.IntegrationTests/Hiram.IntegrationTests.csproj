@@ -29,6 +29,9 @@
     <ProjectReference Include="..\..\src\Hiram.Application\Hiram.Application.csproj" />
     <ProjectReference Include="..\..\src\Hiram.Contracts\Hiram.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Hiram.Domain\Hiram.Domain.csproj" />
+    <ProjectReference Include="..\Hiram.DataProtectionProbe\Hiram.DataProtectionProbe.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
   </ItemGroup>
 
 </Project>
