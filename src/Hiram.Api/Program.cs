@@ -1,5 +1,6 @@
 using Hiram.Api.Admin;
 using Hiram.Api.Authentication;
+using Hiram.Api.Health;
 using Hiram.Api.Notifications;
 using Hiram.Api.OpenApi;
 using Hiram.Api.Push;
@@ -9,6 +10,7 @@ using Hiram.Application.Notifications;
 using Hiram.Infrastructure;
 using Hiram.Infrastructure.Persistence;
 using Hiram.Infrastructure.Telemetry;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
@@ -47,6 +49,9 @@ builder.Services.AddHiramPush(builder.Configuration);
 builder.Services.AddHiramMetering(builder.Configuration);
 builder.Services.AddScoped<ISubmitNotification, SubmitNotificationHandler>();
 builder.Services.AddScoped<TenantContext>();
+builder.Services.AddHealthChecks()
+    .AddCheck<PostgresHealthCheck>("postgres", tags: ["ready"])
+    .AddCheck<RedisHealthCheck>("redis", tags: ["ready"]);
 
 var app = builder.Build();
 
@@ -69,6 +74,10 @@ app.MapNotificationEndpoints();
 app.MapTemplateEndpoints();
 app.MapPushEndpoints();
 app.MapWebhookEndpoints();
+
+// Liveness runs no checks: the process is up. Readiness gates on the dependencies the api needs.
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 
 app.Run();
 
