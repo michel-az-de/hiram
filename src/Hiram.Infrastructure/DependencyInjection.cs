@@ -43,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<ConsentReconciler>();
         services.AddScoped<IBlockStore, BlockStore>();
         services.AddScoped<BlockGate>();
+        services.AddScoped<ChannelResolver>();
         services.AddScoped<INotificationReader, NotificationReader>();
         services.AddScoped<IDeadLetterReplay, DeadLetterReplay>();
         services.AddScoped<ITemplateStore, TemplateStore>();
