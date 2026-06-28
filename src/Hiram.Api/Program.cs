@@ -17,6 +17,21 @@ var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("Hiram")
     ?? throw new InvalidOperationException("Connection string 'Hiram' is not configured.");
+
+// Production runs migrations as a separate --migrate-only job, never on a serving replica, because
+// several replicas starting at once would race without an advisory lock. --dry-run prints the
+// idempotent script for review without touching the database.
+if (args.Contains("--migrate-only"))
+{
+    var migrationOptions = new DbContextOptionsBuilder<HiramDbContext>().UseNpgsql(connectionString).Options;
+    await using var migrationContext = new HiramDbContext(migrationOptions);
+    if (args.Contains("--dry-run"))
+        await Console.Out.WriteAsync(HiramSchema.GenerateScript(migrationContext));
+    else
+        await HiramSchema.ApplyAsync(migrationContext);
+    return 0;
+}
+
 var redisConnectionString = builder.Configuration.GetConnectionString("Redis")
     ?? throw new InvalidOperationException("Connection string 'Redis' is not configured.");
 
@@ -35,11 +50,11 @@ builder.Services.AddScoped<TenantContext>();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+if (builder.Configuration.GetValue<bool>("Hiram:MigrateOnStartup"))
 {
     await using var scope = app.Services.CreateAsyncScope();
     var database = scope.ServiceProvider.GetRequiredService<HiramDbContext>();
-    await database.Database.MigrateAsync();
+    await HiramSchema.ApplyAsync(database);
 }
 
 app.UseMiddleware<ApiKeyMiddleware>();
@@ -56,5 +71,7 @@ app.MapPushEndpoints();
 app.MapWebhookEndpoints();
 
 app.Run();
+
+return 0;
 
 public partial class Program;
