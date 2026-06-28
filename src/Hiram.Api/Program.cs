@@ -1,5 +1,6 @@
 using Hiram.Api.Admin;
 using Hiram.Api.Authentication;
+using Hiram.Api.Consents;
 using Hiram.Api.Events;
 using Hiram.Api.Health;
 using Hiram.Api.Notifications;
@@ -75,6 +76,7 @@ app.MapScalarApiReference(options => options
 app.MapAdminEndpoints();
 app.MapNotificationEndpoints();
 app.MapEventEndpoints();
+app.MapConsentEndpoints();
 app.MapTemplateEndpoints();
 app.MapPushEndpoints();
 app.MapWebhookEndpoints();
