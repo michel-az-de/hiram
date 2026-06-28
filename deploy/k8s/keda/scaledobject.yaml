@@ -1,0 +1,52 @@
+# ADR-016 / step 0.10: KEDA scales the dispatcher by RabbitMQ queue depth. maxReplicaCount is bound by
+# the connection budget (deploy/pgbouncer/connection-budget.md), not chosen freely: more replicas must
+# never starve the shared Postgres. KEDA scales on the busiest of the three channel queues.
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: rabbitmq-auth
+  namespace: hiram
+spec:
+  secretTargetRef:
+    - parameter: host
+      name: hiram-secrets
+      key: ConnectionStrings__RabbitMq
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: hiram-dispatcher
+  namespace: hiram
+spec:
+  scaleTargetRef:
+    name: hiram-dispatcher
+  minReplicaCount: 1
+  # Confirm against the connection budget before raising: replicas_max * pool_per_replica via PgBouncer
+  # plus the ERP allocation plus admin reserve must stay under Postgres max_connections.
+  maxReplicaCount: 8
+  cooldownPeriod: 120
+  triggers:
+    - type: rabbitmq
+      metadata:
+        protocol: amqp
+        queueName: hiram.notifications.email
+        mode: QueueLength
+        value: "50"
+      authenticationRef:
+        name: rabbitmq-auth
+    - type: rabbitmq
+      metadata:
+        protocol: amqp
+        queueName: hiram.notifications.push
+        mode: QueueLength
+        value: "50"
+      authenticationRef:
+        name: rabbitmq-auth
+    - type: rabbitmq
+      metadata:
+        protocol: amqp
+        queueName: hiram.notifications.webhook
+        mode: QueueLength
+        value: "50"
+      authenticationRef:
+        name: rabbitmq-auth
