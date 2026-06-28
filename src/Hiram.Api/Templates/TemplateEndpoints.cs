@@ -16,6 +16,7 @@ internal static class TemplateEndpoints
         app.MapGet("/v1/templates", ListAsync).WithTags("Templates");
         app.MapGet("/v1/templates/{id:guid}", GetByIdAsync).WithTags("Templates");
         app.MapPut("/v1/templates/{id:guid}", UpdateAsync).WithTags("Templates");
+        app.MapPost("/v1/templates/{id:guid}/approve", ApproveAsync).WithTags("Templates");
         app.MapDelete("/v1/templates/{id:guid}", DeleteAsync).WithTags("Templates");
 
         return app;
@@ -92,6 +93,15 @@ internal static class TemplateEndpoints
 
         var template = await store.GetAsync(tenant.TenantId, id, cancellationToken);
         return Results.Ok(ToResponse(template!));
+    }
+
+    private static async Task<IResult> ApproveAsync(
+        Guid id, ITemplateStore store, TenantContext tenant, CancellationToken cancellationToken)
+    {
+        var approved = await store.ApproveAsync(tenant.TenantId, id, cancellationToken);
+        return approved
+            ? Results.NoContent()
+            : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Template not found");
     }
 
     private static async Task<IResult> DeleteAsync(

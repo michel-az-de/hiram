@@ -17,6 +17,9 @@ internal sealed class TemplateConfiguration : IEntityTypeConfiguration<Template>
         builder.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
         builder.Property(x => x.Subject).HasColumnName("subject").IsRequired();
         builder.Property(x => x.Body).HasColumnName("body").IsRequired();
+        builder.Property(x => x.Approved).HasColumnName("approved").HasDefaultValue(false).IsRequired();
+        builder.Property(x => x.Version).HasColumnName("version").HasDefaultValue(1).IsRequired();
+        builder.Property(x => x.Checksum).HasColumnName("checksum").HasMaxLength(64).HasDefaultValue("").IsRequired();
         builder.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
         builder.Property(x => x.UpdatedAtUtc).HasColumnName("updated_at_utc").IsRequired();
 

@@ -17,10 +17,8 @@ public sealed class TemplateApprovalLookup : ITemplateApprovalLookup
     {
         var template = await _templates.FindByNameAsync(tenantId, channel, templateName, cancellationToken);
 
-        // The explicit approval flag arrives in step 1.3 (template extended with approval/version/checksum).
-        // Until then an existing template counts as approved.
         return template is null
             ? new TemplateApproval(Exists: false, Approved: false)
-            : new TemplateApproval(Exists: true, Approved: true);
+            : new TemplateApproval(Exists: true, Approved: template.Approved);
     }
 }

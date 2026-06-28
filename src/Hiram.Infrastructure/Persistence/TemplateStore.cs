@@ -60,6 +60,18 @@ public sealed class TemplateStore : ITemplateStore
         return true;
     }
 
+    public async Task<bool> ApproveAsync(Guid tenantId, Guid id, CancellationToken cancellationToken)
+    {
+        var template = await _context.Templates
+            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == id, cancellationToken);
+        if (template is null)
+            return false;
+
+        template.Approve();
+        await _context.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<bool> DeleteAsync(Guid tenantId, Guid id, CancellationToken cancellationToken)
     {
         var deleted = await _context.Templates

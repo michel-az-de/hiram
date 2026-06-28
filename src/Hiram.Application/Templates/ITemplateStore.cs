@@ -15,5 +15,7 @@ public interface ITemplateStore
 
     Task<bool> UpdateAsync(Guid tenantId, Guid id, string subject, string body, DateTimeOffset updatedAtUtc, CancellationToken cancellationToken);
 
+    Task<bool> ApproveAsync(Guid tenantId, Guid id, CancellationToken cancellationToken);
+
     Task<bool> DeleteAsync(Guid tenantId, Guid id, CancellationToken cancellationToken);
 }

@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Hiram.Domain.Notifications;
 
 namespace Hiram.Domain.Templates;
@@ -10,6 +12,9 @@ public sealed class Template
     public string Name { get; private set; }
     public string Subject { get; private set; }
     public string Body { get; private set; }
+    public bool Approved { get; private set; }
+    public int Version { get; private set; }
+    public string Checksum { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset UpdatedAtUtc { get; private set; }
 
@@ -19,6 +24,7 @@ public sealed class Template
         Name = null!;
         Subject = null!;
         Body = null!;
+        Checksum = null!;
     }
 
     public Template(
@@ -49,6 +55,9 @@ public sealed class Template
         Name = name;
         Subject = subject;
         Body = body;
+        Version = 1;
+        Approved = false;
+        Checksum = ComputeChecksum(subject, body);
         CreatedAtUtc = createdAtUtc;
         UpdatedAtUtc = createdAtUtc;
     }
@@ -62,6 +71,15 @@ public sealed class Template
 
         Subject = subject;
         Body = body;
+        Version++;
+        // Content changed, so a prior approval no longer applies: it must be approved again before use.
+        Approved = false;
+        Checksum = ComputeChecksum(subject, body);
         UpdatedAtUtc = updatedAtUtc;
     }
+
+    public void Approve() => Approved = true;
+
+    private static string ComputeChecksum(string subject, string body) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{subject}\n{body}")));
 }
