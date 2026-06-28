@@ -4,6 +4,7 @@ using Hiram.Domain.Metering;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Outbox;
 using Hiram.Domain.Push;
+using Hiram.Domain.Routines;
 using Hiram.Domain.Templates;
 using Hiram.Domain.Tenants;
 using Hiram.Domain.Webhooks;
@@ -22,6 +23,7 @@ public sealed class HiramDbContext : DbContext
     public DbSet<NotificationRequest> NotificationRequests => Set<NotificationRequest>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<NotificationEvent> Events => Set<NotificationEvent>();
+    public DbSet<Routine> Routines => Set<Routine>();
     public DbSet<Tenant> Tenants => Set<Tenant>();
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
     public DbSet<TenantProviderConfig> TenantProviderConfigs => Set<TenantProviderConfig>();
