@@ -7,6 +7,7 @@ using Hiram.Application.Routines;
 using Hiram.Application.Metering;
 using Hiram.Application.Notifications;
 using Hiram.Application.Push;
+using Hiram.Application.Scheduling;
 using Hiram.Application.Tenancy;
 using Hiram.Application.Templates;
 using Hiram.Application.Webhooks;
@@ -44,6 +45,8 @@ public static class DependencyInjection
         services.AddScoped<IBlockStore, BlockStore>();
         services.AddScoped<BlockGate>();
         services.AddScoped<ChannelResolver>();
+        services.AddSingleton(new WindowScheduler(() => TimeSpan.FromSeconds(Random.Shared.Next(0, 300))));
+        services.AddSingleton<DailyLimitPolicy>();
         services.AddScoped<INotificationReader, NotificationReader>();
         services.AddScoped<IDeadLetterReplay, DeadLetterReplay>();
         services.AddScoped<ITemplateStore, TemplateStore>();

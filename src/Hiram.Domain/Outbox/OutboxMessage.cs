@@ -13,6 +13,10 @@ public sealed class OutboxMessage
     // under the same trace as the request that produced it.
     public string? TraceParent { get; private set; }
 
+    // When set, the relay holds the row until this instant (window deferral, ADR-020). Null publishes
+    // immediately, which is the direct path's behaviour.
+    public DateTimeOffset? DispatchAt { get; private set; }
+
     // Parameterless ctor exists so EF Core can materialize rows without re-running creation invariants.
     private OutboxMessage()
     {
@@ -20,7 +24,7 @@ public sealed class OutboxMessage
         Payload = null!;
     }
 
-    public OutboxMessage(Guid id, Guid tenantId, string type, string payload, DateTimeOffset createdAtUtc, string? traceParent = null)
+    public OutboxMessage(Guid id, Guid tenantId, string type, string payload, DateTimeOffset createdAtUtc, string? traceParent = null, DateTimeOffset? dispatchAt = null)
     {
         if (id == Guid.Empty)
             throw new ArgumentException("Outbox message id is required.", nameof(id));
@@ -38,6 +42,7 @@ public sealed class OutboxMessage
         CreatedAtUtc = createdAtUtc;
         ProcessedAtUtc = null;
         TraceParent = traceParent;
+        DispatchAt = dispatchAt;
     }
 
     public bool IsProcessed => ProcessedAtUtc is not null;

@@ -88,6 +88,41 @@ public class OutboxRelayTests : IAsyncLifetime
         Assert.Equal(storedPayload, published);
     }
 
+    [Fact]
+    public async Task DirectNotification_StillPublishesImmediately_WithDeferralQuery()
+    {
+        var directId = Guid.NewGuid();
+        var deferredId = Guid.NewGuid();
+
+        await using (var seed = NewContext())
+        {
+            seed.OutboxMessages.Add(new OutboxMessage(
+                directId, DevTenant, HiramTopology.EmailRoutingKey, "{}", DateTimeOffset.UtcNow));
+            seed.OutboxMessages.Add(new OutboxMessage(
+                deferredId, DevTenant, HiramTopology.EmailRoutingKey, "{}", DateTimeOffset.UtcNow,
+                traceParent: null, dispatchAt: DateTimeOffset.UtcNow.AddHours(2)));
+            await seed.SaveChangesAsync();
+        }
+
+        await using var connection = new RabbitMqConnection(_rabbit.GetConnectionString(), NullLogger<RabbitMqConnection>.Instance);
+
+        int relayed;
+        await using (var context = NewContext())
+        {
+            var relay = new OutboxRelay(context, connection, new FixedClock(DateTimeOffset.UtcNow), NullLogger<OutboxRelay>.Instance);
+            relayed = await relay.RelayPendingAsync(CancellationToken.None);
+        }
+
+        // The direct row (dispatch_at null) publishes immediately; the deferred row is held.
+        Assert.Equal(1, relayed);
+
+        await using var verify = NewContext();
+        var direct = await verify.OutboxMessages.FindAsync(directId);
+        var deferred = await verify.OutboxMessages.FindAsync(deferredId);
+        Assert.NotNull(direct!.ProcessedAtUtc);
+        Assert.Null(deferred!.ProcessedAtUtc);
+    }
+
     private static async Task<string?> ReadFromQueueAsync(RabbitMqConnection connection, string queue)
     {
         var rabbit = await connection.GetConnectionAsync(CancellationToken.None);

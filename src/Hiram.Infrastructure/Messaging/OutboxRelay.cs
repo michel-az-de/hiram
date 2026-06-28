@@ -12,9 +12,12 @@ public sealed class OutboxRelay
 {
     // Lock the oldest unprocessed rows and skip rows another worker already holds, so several
     // relays can share the load without double publishing within a transaction.
+    // dispatch_at gates deferred rows (window deferral, ADR-020); NULL means publish immediately, which
+    // keeps the direct path unchanged. The due-check uses the database clock (now()), not the app clock.
     private const string LockBatchSql =
         "SELECT * FROM notifications.outbox_messages " +
-        "WHERE processed_at_utc IS NULL ORDER BY created_at_utc FOR UPDATE SKIP LOCKED LIMIT 50";
+        "WHERE processed_at_utc IS NULL AND (dispatch_at IS NULL OR dispatch_at <= now()) " +
+        "ORDER BY created_at_utc FOR UPDATE SKIP LOCKED LIMIT 50";
 
     private readonly HiramDbContext _context;
     private readonly RabbitMqConnection _connection;
