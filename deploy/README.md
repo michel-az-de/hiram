@@ -23,6 +23,16 @@ a validação final acontece no CI (build das imagens, lint de manifests) e no a
 5. Subir Api, Dispatcher, RabbitMQ, Redis e KEDA pelos manifests.
 6. Agendar `dr/hiram-backup.sh` em cron, com saída para fora da VM.
 
+## Hardening do host (VM do EasyStok)
+
+Ações do operador no host e no compose do EasyStok, fora dos manifests do Hiram:
+
+- Proteger o Postgres do OOM killer: `oom_score_adj` negativo (e reserva de memória) no serviço Postgres
+  do compose do EasyStok, para que, sob pressão, a vítima não seja o banco do ERP (ADR-016).
+- Isolamento de banco: REVOKE CONNECT na base do EasyStok para PUBLIC (ver `sql/`).
+- Orçamento de memória da VM: somar limits do compose do EasyStok mais os limits do k3s, com folga para
+  o kernel, antes de elevar o teto de réplica do KEDA.
+
 ## Restore
 
 - Banco: `pg_restore --clean --if-exists --dbname=hiram hiram-<stamp>.dump`.

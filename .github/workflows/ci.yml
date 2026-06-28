@@ -54,3 +54,23 @@ jobs:
 
       - name: Build dispatcher image
         run: docker build -f src/Hiram.Dispatcher/Dockerfile -t hiram-dispatcher:ci .
+
+  deploy-manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Syntax gate for the deploy artifacts. Full k3s apply is a live/operator step, not CI.
+      - name: Validate deploy manifests are well-formed YAML
+        run: |
+          python3 - <<'PY'
+          import glob, sys, yaml
+          bad = 0
+          for f in glob.glob('deploy/**/*.yaml', recursive=True) + glob.glob('deploy/**/*.yml', recursive=True):
+              try:
+                  list(yaml.safe_load_all(open(f)))
+              except Exception as e:
+                  print(f"FAIL {f}: {e}")
+                  bad += 1
+          sys.exit(1 if bad else 0)
+          PY

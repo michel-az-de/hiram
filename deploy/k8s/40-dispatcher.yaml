@@ -1,0 +1,57 @@
+# ADR-016 / step 0.9: the dispatcher. No HTTP surface. It decrypts tenant secrets, so it mounts the same
+# key ring volume as the api. Base 1 replica; KEDA scales it by queue depth within the connection budget
+# (step 0.10). terminationGracePeriodSeconds gives the in-flight drain (step 0.6) room to finish.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hiram-dispatcher
+  namespace: hiram
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hiram-dispatcher
+  template:
+    metadata:
+      labels:
+        app: hiram-dispatcher
+    spec:
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dispatcher
+          image: hiram-dispatcher:latest
+          envFrom:
+            - configMapRef:
+                name: hiram-config
+            - secretRef:
+                name: hiram-secrets
+          volumeMounts:
+            - name: keyring
+              mountPath: /var/hiram/dataprotection-keys
+          # Minimal liveness without extra packages: confirm pid 1 is still the dispatcher. Detecting a
+          # hung-but-alive worker needs an app heartbeat, tracked as a follow-up.
+          livenessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "grep -q Hiram.Dispatcher /proc/1/cmdline"]
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "192Mi"
+            limits:
+              cpu: "1000m"
+              memory: "384Mi"
+      volumes:
+        - name: keyring
+          persistentVolumeClaim:
+            claimName: hiram-keyring

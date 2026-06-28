@@ -1,0 +1,35 @@
+# ADR-016 / step 0.9: namespace and configuration. Secrets are a template only; create the real
+# hiram-secrets out of band from .env.hiram.example. Never commit real values.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hiram
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hiram-config
+  namespace: hiram
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  # Serving replicas never migrate; the migrate-only Job owns schema changes.
+  Hiram__MigrateOnStartup: "false"
+  DataProtection__KeysPath: "/var/hiram/dataprotection-keys"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://lgtm.hiram.svc.cluster.local:4317"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hiram-secrets
+  namespace: hiram
+type: Opaque
+stringData:
+  # Hiram reaches Postgres through PgBouncer (transaction pooling), never the server directly.
+  ConnectionStrings__Hiram: "Host=pgbouncer.hiram.svc.cluster.local;Port=6432;Database=hiram;Username=hiram;Password=CHANGE_ME;Maximum Pool Size=10;Max Auto Prepare=0"
+  ConnectionStrings__RabbitMq: "amqp://hiram:CHANGE_ME@rabbitmq.hiram.svc.cluster.local:5672/"
+  ConnectionStrings__Redis: "redis.hiram.svc.cluster.local:6379,abortConnect=false"
+  Hiram__AdminKey: "CHANGE_ME"
+  Hiram__Email__Platform__Provider: "smtp"
+  Hiram__Push__Vapid__Subject: "mailto:ops@example.com"
+  Hiram__Push__Vapid__PublicKey: "CHANGE_ME"
+  Hiram__Push__Vapid__PrivateKey: "CHANGE_ME"
