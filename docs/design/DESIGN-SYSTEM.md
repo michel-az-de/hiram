@@ -1,6 +1,6 @@
 # Hiram, design system
 
-> v0.1, 2026-06-10. Expressão visual da assinatura definida em docs/BRAND.md. Fonte canônica de tokens em docs/design/tokens.json. Referência viva em docs/design/reference.html.
+> v0.2, 2026-06-30. Expressão visual da assinatura definida em docs/BRAND.md. Fonte canônica de tokens em docs/design/tokens.json. Referência viva em docs/design/reference.html. A v0.2 documenta as extensões do site de apresentação: abóbada no hero, profundidade contida, chrome de terminal e movimento.
 
 ## Conceito: a pedra e o céu
 
@@ -77,6 +77,23 @@ Escala (base 16): 12, 14, 16, 18, 20, 24, 32, 40, 56. Line-height 1.6 no corpo, 
 
 Sóbria, precisa, ativa. Sentence case em tudo exceto o wordmark e labels lapidares. Verbos exatos nos controles (Enviar notificação, Revogar chave). Erros dizem o que aconteceu e como resolver, sem desculpas e sem mistério. A lenda só aparece onde o BRAND.md autoriza (404 das docs). Nenhum jargão maçônico na semântica da interface.
 
+## Extensões do site (v0.2)
+
+A landing e o hub learn realizam o sistema com quatro extensões visuais, todas dentro das regras acima. As variáveis novas são de apresentação e vivem no `:root` de `site/styles.css`, sem divergir os valores de cor do tokens.json.
+
+- **Abóbada no hero.** O token `--hero-vault`, um gradiente radial por tema, acende o topo do hero e entrega a leitura de céu que o conceito promete. Aparece só no hero, nunca atrás de texto denso, e convive com o pavimento mosaico.
+- **Profundidade contida.** No escuro a hierarquia continua por borda e superfície. O realce fica reservado a dois lugares: o token `--glow`, uma sombra colorida por tema, no CTA primário, e uma elevação mínima no code block. Cards de destaque recebem um colchete de canto neutro, um detalhe de instrumento em cor de borda, que nunca substitui o canto lapidado.
+- **Chrome de terminal.** O code block, vitrine do produto, ganha uma barra de topo com rótulo mono e três marcadores quadrados monocromáticos, que ecoam o traço de ponta quadrada do logo. O código permanece sempre escuro nos dois temas.
+- **Tinta de acento, `--accent-ink`.** Acentos dourados de texto, como o realce do título, os números de passo, os ids de fase e as setas do fluxo, usam ouro no escuro e ouro profundo (orient-700) no claro, para garantir contraste AA. O ouro de ação segue reservado ao CTA e ao commit do trace. Logos permanecem isentos de contraste.
+
+## Movimento
+
+O movimento é opcional e à prova de palco. Fica todo atrás de `prefers-reduced-motion`, é estático por padrão e revela por progressão, nunca escondendo conteúdo quando o script não roda.
+
+- **Trace do outbox.** No hero, o fluxo Accept, Persist, Relay, Deliver aparece como um diagrama vertical. O caminho é frio, em lodge; só o commit transacional e o pulso vivo usam a cor de ação do tema. Um pulso percorre o caminho e pausa no commit. Sem animação, o diagrama fica completo e legível.
+- **Reveals no scroll.** Blocos de conteúdo sobem e surgem ao entrar na viewport, por IntersectionObserver. O estado revelado é o padrão do CSS: se o script não roda ou o movimento está reduzido, tudo aparece.
+- **Classes de tempo.** Microinterações, como hover e troca de tema, ficam entre 150 e 250ms. Reveals e movimento ambiente podem ir até cerca de 600ms, com laços lentos para o pulso. Todos usam o easing `cubic-bezier(.2,0,0,1)`.
+
 ## Checklist de conformidade
 
 1. Contraste AA mínimo em texto e controles nos dois temas.
@@ -84,4 +101,4 @@ Sóbria, precisa, ativa. Sentence case em tudo exceto o wordmark e labels lapida
 3. Ouro no máximo uma vez por momento de tela como ação.
 4. Um canto lapidado por vista, no máximo.
 5. Nenhuma cor, fonte ou forma do EasyStok.
-6. Reduced motion respeitado; transições entre 150 e 250ms.
+6. Reduced motion respeitado. Microinterações entre 150 e 250ms; reveals e movimento ambiente até cerca de 600ms, sempre estáticos por padrão.
