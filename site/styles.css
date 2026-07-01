@@ -93,7 +93,8 @@ main > section:nth-of-type(2n) { background:var(--band); }
 
 /* Header */
 
-.site-header { position:sticky; top:0; z-index:40; background:color-mix(in srgb,var(--bg) 88%,transparent); backdrop-filter:blur(10px); border-bottom:1px solid var(--border); }
+.site-header { position:sticky; top:0; z-index:40; background:color-mix(in srgb,var(--bg) 88%,transparent); backdrop-filter:blur(10px); }
+.site-header::after { content:""; position:absolute; left:0; right:0; bottom:0; height:1px; background:linear-gradient(90deg,transparent,var(--border-strong),transparent); }
 .site-header .wrap { display:flex; align-items:center; justify-content:space-between; gap:16px; padding-top:16px; padding-bottom:16px; }
 .brand { display:flex; align-items:center; gap:12px; color:var(--text); }
 .brand:hover { text-decoration:none; }
@@ -199,9 +200,11 @@ main > section:nth-of-type(2n) { background:var(--band); }
 .cols-3 { grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
 
 .card {
+  position:relative;
   background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md);
   padding:26px; box-shadow:var(--shadow); transition:border-color .15s var(--ease);
 }
+.card::after { content:""; position:absolute; top:11px; right:11px; width:9px; height:9px; border-top:1.5px solid var(--border-strong); border-right:1.5px solid var(--border-strong); opacity:.6; pointer-events:none; }
 .card:hover { border-color:var(--border-strong); }
 .card p { color:var(--muted); font-size:15px; margin-top:8px; }
 
@@ -242,14 +245,14 @@ main > section:nth-of-type(2n) { background:var(--band); }
 .step { position:relative; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); padding:24px; }
 .step::before {
   counter-increment:step; content:counter(step,decimal-leading-zero);
-  font-family:var(--f-mono); font-size:13px; color:var(--orient-500);
+  font-family:var(--f-mono); font-size:13px; color:var(--accent-ink);
   display:block; margin-bottom:12px;
 }
 .step h3 { font-size:18px; }
 .step p { color:var(--muted); font-size:14px; margin-top:6px; }
 .statemachine { margin-top:28px; font-family:var(--f-mono); font-size:13px; color:var(--muted); overflow-x:auto; white-space:nowrap; padding-bottom:4px; }
 .statemachine b { color:var(--text); font-weight:500; }
-.statemachine .arr { color:var(--orient-500); padding:0 8px; }
+.statemachine .arr { color:var(--accent-ink); padding:0 8px; }
 
 /* Feature columns */
 
@@ -279,7 +282,7 @@ main > section:nth-of-type(2n) { background:var(--band); }
 .timeline { display:grid; gap:0; margin-top:8px; }
 .phase { display:grid; grid-template-columns:120px 1fr; gap:24px; padding:20px 0; border-bottom:1px solid var(--border); align-items:baseline; }
 .phase:last-child { border-bottom:none; }
-.phase .ph-id { font-family:var(--f-mono); font-size:14px; color:var(--orient-500); }
+.phase .ph-id { font-family:var(--f-mono); font-size:14px; color:var(--accent-ink); }
 .phase .ph-id .done { color:var(--acacia-500); }
 .phase h3 { font-size:17px; margin-bottom:4px; }
 .phase p { color:var(--muted); font-size:14px; }
@@ -295,7 +298,7 @@ main > section:nth-of-type(2n) { background:var(--band); }
 /* Final CTA */
 
 .cta-final { text-align:left; }
-.cta-final .lapidar { color:var(--orient-500); }
+.cta-final .lapidar { color:var(--accent-ink); }
 .cta-final h2 { margin-top:10px; }
 .cta-final .btn-row { margin-top:24px; }
 .cta-final .keyline { margin-top:22px; font-family:var(--f-mono); font-size:13px; color:var(--muted); }
@@ -313,6 +316,11 @@ footer .col a { color:var(--text); font-size:14px; }
 footer .col a:hover { color:var(--link); }
 footer .legal { margin-top:40px; padding-top:24px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
 footer .al { font-family:var(--f-mono); font-size:13px; color:var(--muted); }
+
+/* Depth microdetails and scroll reveals */
+.btn-primary:not(.btn-sm) { box-shadow:var(--glow); }
+.reveal-on .reveal { opacity:0; transform:translateY(16px); transition:opacity .55s var(--ease), transform .55s var(--ease); }
+.reveal-on .reveal.is-visible { opacity:1; transform:none; }
 
 /* Responsive */
 
