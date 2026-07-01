@@ -27,6 +27,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="../styles.css">
+<link rel="stylesheet" href="console.css">
 </head>
 <body>
 
@@ -150,31 +151,48 @@
         <div class="console-head">
           <span class="concept-ep">POST /v1/notifications</span>
           <div class="console-modes" role="group" aria-label="Modo do console">
-            <span class="console-mode is-active">Palco</span>
-            <span class="console-mode">Ao vivo</span>
+            <button type="button" class="console-mode is-active" data-mode="palco" aria-pressed="true">Palco</button>
+            <button type="button" class="console-mode" data-mode="live" aria-pressed="false">Ao vivo</button>
           </div>
         </div>
         <div class="console-body">
-          <div class="terminal">
-            <div class="terminal-bar">
-              <span class="tsq"></span><span class="tsq"></span><span class="tsq"></span>
-              <span class="terminal-label">requisição</span>
+          <form class="console-form" id="console-form">
+            <div class="field">
+              <label class="lapidar" for="c-recipient">Destinatário</label>
+              <input id="c-recipient" name="recipient" type="email" value="loja@tenant.dev" autocomplete="off" spellcheck="false">
             </div>
-            <pre class="code"><span class="c3">$</span> curl -X POST <span class="c2">http://localhost:3357/v1/notifications</span> \
+            <div class="field">
+              <label class="lapidar" for="c-subject">Assunto</label>
+              <input id="c-subject" name="subject" type="text" value="Pedido confirmado" autocomplete="off">
+            </div>
+            <div class="console-actions">
+              <button type="button" id="console-send" class="btn btn-primary">Enviar notificação</button>
+              <span class="console-hint" id="console-hint">Modo palco: resposta determinística, sem rede.</span>
+            </div>
+          </form>
+          <div class="console-io">
+            <div class="terminal">
+              <div class="terminal-bar">
+                <span class="tsq"></span><span class="tsq"></span><span class="tsq"></span>
+                <span class="terminal-label">requisição</span>
+              </div>
+              <pre class="code" id="console-request"><span class="c3">$</span> curl -X POST <span class="c2">http://localhost:3357/v1/notifications</span> \
   -H <span class="c1">"X-Api-Key: hk_live_demo&#8230;"</span> \
-  -H <span class="c1">"Idempotency-Key: palco-01"</span> \
+  -H <span class="c1">"Idempotency-Key: palco-4207"</span> \
   -d <span class="c1">'{"channel":"email","recipient":"loja@tenant.dev",
-       "subject":"Pedido confirmado","body":"&#8230;"}'</span></pre>
-          </div>
-          <div class="terminal">
-            <div class="terminal-bar">
-              <span class="tsq"></span><span class="tsq"></span><span class="tsq"></span>
-              <span class="terminal-label">resposta · palco</span>
+       "subject":"Pedido confirmado"}'</span></pre>
             </div>
-            <pre class="code"><span class="c3">HTTP/1.1</span> <span class="c4">202 Accepted</span>
-{ <span class="c1">"id"</span>: "ntf_01HZX&#8230;", <span class="c1">"status"</span>: "accepted" }</pre>
+            <div class="terminal">
+              <div class="terminal-bar">
+                <span class="tsq"></span><span class="tsq"></span><span class="tsq"></span>
+                <span class="terminal-label">resposta · palco</span>
+              </div>
+              <pre class="code" id="console-response"><span class="c3">HTTP/1.1</span> <span class="c4">202 Accepted</span>
+{ <span class="c1">"id"</span>: "ntf_01HZX37V", <span class="c1">"status"</span>: "accepted" }</pre>
+            </div>
           </div>
-          <p class="console-note">Prévia do painel. As respostas em palco são fixtures determinísticas; o modo ao vivo passa a disparar de verdade nos próximos passos.</p>
+          <div class="console-flow" id="console-flow" aria-live="polite" aria-label="Estado da entrega"></div>
+          <p class="console-note">O modo palco usa fixtures determinísticas, à prova de rede. O modo ao vivo, que dispara contra a API local na mesma origem, chega no próximo passo.</p>
         </div>
       </div>
     </div>
@@ -217,5 +235,6 @@
 
 <script src="../scripts/theme.js" defer></script>
 <script src="../scripts/motion.js" defer></script>
+<script type="module" src="console.js"></script>
 </body>
 </html>

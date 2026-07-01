@@ -1,0 +1,39 @@
+/* Interactive demo console for the learn hub. Consumes the CSS vars from ../styles.css, no new tokens. */
+
+.console { margin-top:8px; background:var(--surface); border:1px solid var(--border-strong); border-radius:var(--r-lg); overflow:hidden; box-shadow:var(--shadow); }
+.console-head { display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+
+.console-modes { display:flex; gap:6px; margin-left:auto; }
+.console-mode {
+  font-family:var(--f-display); font-weight:600; font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+  padding:6px 13px; border-radius:999px; border:1px solid var(--border-strong); color:var(--muted);
+  background:transparent; cursor:pointer; transition:border-color .15s var(--ease), color .15s var(--ease);
+}
+.console-mode:hover { color:var(--text); border-color:var(--ring); }
+.console-mode.is-active { background:var(--action-bg); color:var(--action-text); border-color:transparent; }
+
+.console-body { padding:18px; display:grid; gap:18px; }
+
+.console-form { display:grid; gap:14px; }
+.console-form .field { display:grid; gap:6px; }
+.console-form label { color:var(--muted); }
+.console-form input {
+  font-family:var(--f-body); font-size:15px; color:var(--text);
+  background:var(--bg); border:1px solid var(--border-strong); border-radius:var(--r-sm); padding:10px 12px;
+}
+.console-actions { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.console-hint, .console-note { color:var(--muted); font-size:13px; }
+
+.console-io { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.console-io .terminal { box-shadow:none; }
+
+.console-flow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-family:var(--f-mono); font-size:13px; }
+.console-flow:empty { display:none; }
+.flow-step { color:var(--muted); padding:4px 11px; border:1px solid var(--border); border-radius:999px; transition:color .2s var(--ease), background .2s var(--ease), border-color .2s var(--ease); }
+.flow-step.active { color:var(--action-text); background:var(--action-bg); border-color:transparent; }
+.flow-step.done { color:var(--st-delivered); border-color:color-mix(in srgb,var(--st-delivered) 40%,transparent); }
+.flow-arr { color:var(--accent-ink); }
+
+@media (max-width:680px) {
+  .console-io { grid-template-columns:1fr; }
+}
