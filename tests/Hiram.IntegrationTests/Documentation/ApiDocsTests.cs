@@ -113,6 +113,9 @@ public class ApiDocsTests : IAsyncLifetime
 
         var createTenant = root.GetProperty("paths").GetProperty("/v1/admin/tenants").GetProperty("post");
         Assert.Contains("AdminKey", SecuritySchemes(createTenant));
+
+        var bootstrap = root.GetProperty("paths").GetProperty("/demo/bootstrap").GetProperty("post");
+        Assert.Contains("AdminKey", SecuritySchemes(bootstrap));
     }
 
     private static IEnumerable<string> SecuritySchemes(JsonElement operation)

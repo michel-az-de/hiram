@@ -29,6 +29,9 @@ internal static class DemoEndpoints
         IClock clock,
         CancellationToken cancellationToken)
     {
+        // Check then create under a fixed id keeps this idempotent for the sequential calls a presenter
+        // makes. Two truly concurrent first-time bootstraps would race and the second insert would hit
+        // the tenant unique key, surfacing as a 500, which is acceptable for this dev-only helper.
         if (!await tenants.ExistsAsync(DemoTenantId, cancellationToken))
         {
             var tenant = new Tenant(DemoTenantId, DemoTenantName, DeliveryMode.Shadow, clock.UtcNow);
