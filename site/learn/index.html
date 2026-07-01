@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>Hiram · Aprender e demonstrar</title>
-<meta name="description" content="Hub pedagogico do Hiram: os conceitos da plataforma de notificacoes multi-tenant, com console de demonstracao ao vivo.">
+<meta name="description" content="Hub pedagógico do Hiram: os conceitos da plataforma de notificações multi-tenant, com console de demonstração ao vivo.">
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#0A1428" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#F8F7F4" media="(prefers-color-scheme: light)">
@@ -30,39 +30,192 @@
 </head>
 <body>
 
-<a class="skip-link" href="#conteudo">Pular para o conteudo</a>
+<a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
 
 <header class="site-header">
   <div class="wrap">
-    <a class="brand" href="../index.html">
-      <span class="wordmark">Hiram</span>
+    <a class="brand" href="../index.html" aria-label="Hiram, início">
+      <svg class="mark" viewBox="0 0 124 80" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="square" aria-hidden="true">
+        <rect x="36" y="14" width="76" height="52"/><path d="M39 17.5 L74 46 L109 17.5"/>
+        <path d="M10 31 H30"/><path d="M4 40 H26"/><path d="M12 49 H30"/>
+      </svg>
+      <span class="wordmark">Hiram&#8756;</span>
     </a>
+    <nav class="nav-links" aria-label="Primária">
+      <a href="#conceitos">Conceitos</a>
+      <a href="#console">Console</a>
+      <a href="/scalar">Referência da API</a>
+    </nav>
     <div class="nav-actions">
-      <a class="toggle" href="/scalar">Referencia da API</a>
+      <button class="toggle" id="theme-toggle" type="button" aria-label="Alternar tema de cor">
+        <svg class="toggle-ico" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 1.5 A6.5 6.5 0 0 1 8 14.5 Z" fill="currentColor"/></svg>
+        <span class="toggle-label">Vault</span>
+      </button>
+      <a class="btn btn-primary btn-sm" href="../index.html">Site</a>
     </div>
   </div>
 </header>
 
 <main id="conteudo">
-  <section class="hero mosaic">
+
+  <section class="hero mosaic" aria-labelledby="hero-title">
     <div class="wrap">
-      <p class="lapidar eyebrow">Aprender e demonstrar</p>
-      <h1>A plataforma Hiram, <em>ao vivo</em>.</h1>
-      <p class="tagline">A palavra nao se perde.</p>
-      <p class="lead">
-        Este hub reune os conceitos que tornam o Hiram uma plataforma multi-tenant de
-        notificacoes confiavel, cada um com um painel para experimentar contra a API de verdade.
-        O conteudo completo e o console de demonstracao chegam nos proximos passos.
-      </p>
+      <span class="lapidar eyebrow">Aprender e demonstrar</span>
+      <h1 id="hero-title">A plataforma Hiram, <em>ao vivo</em>.</h1>
+      <p class="tagline">A palavra não se perde.</p>
+      <p class="lead">Este hub reúne os conceitos que tornam o Hiram uma plataforma multi-tenant de notificações confiável, cada um com um painel para experimentar contra a API de verdade. O conteúdo completo e o console interativo chegam nos próximos passos, guiados pelo ADR-021.</p>
     </div>
   </section>
+
+  <section id="conceitos" aria-labelledby="conceitos-title">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="lapidar eyebrow">Os conceitos</span>
+        <h2 id="conceitos-title">Dez ideias que sustentam a entrega</h2>
+        <p class="lead">Cada conceito é uma peça vendável do Hiram, aqui com o endpoint ou cabeçalho que o expõe. Verde é o que já roda em produção; o restante está no roadmap público.</p>
+      </div>
+      <div class="grid cols-3">
+        <article class="card concept">
+          <span class="lapidar idx">01</span>
+          <h3>Outbox transacional</h3>
+          <p>O request e a linha de outbox são gravados na mesma transação. Se o commit passou, a notificação não se perde.</p>
+          <div class="concept-foot"><span class="badge badge-live">Ao vivo</span><span class="concept-ep">POST /v1/notifications</span></div>
+        </article>
+        <article class="card concept">
+          <span class="lapidar idx">02</span>
+          <h3>Idempotência</h3>
+          <p>Um Idempotency-Key colapsa retentativas na mesma entrega por 24 horas, então o retry é sempre seguro.</p>
+          <div class="concept-foot"><span class="badge badge-live">Ao vivo</span><span class="concept-ep">Idempotency-Key</span></div>
+        </article>
+        <article class="card concept">
+          <span class="lapidar idx">03</span>
+          <h3>Isolamento multi-tenant</h3>
+          <p>Toda tabela de domínio carrega um tenant desde a primeira migration, com chaves e providers próprios.</p>
+          <div class="concept-foot"><span class="badge badge-live">Ao vivo</span><span class="concept-ep">tenant_id</span></div>
+        </article>
+        <article class="card concept">
+          <span class="lapidar idx">04</span>
+          <h3>Handshake e chaves</h3>
+          <p>Autentique com uma chave por tenant, guardada só como hash SHA-256 e revogável a qualquer momento.</p>
+          <div class="concept-foot"><span class="badge badge-live">Ao vivo</span><span class="concept-ep">X-Api-Key</span></div>
+        </article>
+        <article class="card concept">
+          <span class="lapidar idx">05</span>
+          <h3>Relay e provider</h3>
+          <p>O OutboxRelay publica a mensagem e resolve o provider do tenant, SMTP ou Resend para email.</p>
+          <div class="concept-foot"><span class="badge badge-live">Ao vivo</span><span class="concept-ep">OutboxRelay</span></div>
+        </article>
+        <article class="card concept">
+          <span class="lapidar idx">06</span>
+          <h3>Modos live e shadow</h3>
+          <p>Tenants shadow exercem o caminho inteiro e registram um envio, sem entregar de verdade.</p>
+          <div class="concept-foot"><span class="badge badge-live">Ao vivo</span><span class="concept-ep">delivery_mode</span></div>
+        </article>
+        <article class="card concept">
+          <span class="lapidar idx">07</span>
+          <h3>Auditoria de entrega</h3>
+          <p>Consulte cada tentativa, com resultado, erro e latência, por paginação de cursor.</p>
+          <div class="concept-foot"><span class="badge badge-live">Ao vivo</span><span class="concept-ep">GET /v1/notifications</span></div>
+        </article>
+        <article class="card concept">
+          <span class="lapidar idx">08</span>
+          <h3>Tracing ponta a ponta</h3>
+          <p>Um trace do OpenTelemetry cobre aceite, publicação, consumo e envio em um só fio.</p>
+          <div class="concept-foot"><span class="badge badge-live">Ao vivo</span><span class="concept-ep">traceparent</span></div>
+        </article>
+        <article class="card concept">
+          <span class="lapidar idx">09</span>
+          <h3>Webhooks assinados</h3>
+          <p>Callbacks de entrega verificados com uma assinatura da casa em cada requisição.</p>
+          <div class="concept-foot"><span class="badge badge-soon">Roadmap F2</span><span class="concept-ep">X-Hiram-Signature</span></div>
+        </article>
+        <article class="card concept">
+          <span class="lapidar idx">10</span>
+          <h3>Autonomia de IA</h3>
+          <p>Três níveis, Aprendiz, Companheiro e Mestre, com log de decisão e orçamento por tenant.</p>
+          <div class="concept-foot"><span class="badge badge-soon">Roadmap F4</span><span class="concept-ep">autonomy</span></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="console" aria-labelledby="console-title">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="lapidar eyebrow">Console de demonstração</span>
+        <h2 id="console-title">Experimente contra a API</h2>
+        <p class="lead">Dois modos: palco, com respostas determinísticas à prova de rede, e ao vivo, que dispara contra a API local na mesma origem. Abaixo, a forma do painel; o console interativo chega com o ADR-021.</p>
+      </div>
+      <div class="console">
+        <div class="console-head">
+          <span class="concept-ep">POST /v1/notifications</span>
+          <div class="console-modes" role="group" aria-label="Modo do console">
+            <span class="console-mode is-active">Palco</span>
+            <span class="console-mode">Ao vivo</span>
+          </div>
+        </div>
+        <div class="console-body">
+          <div class="terminal">
+            <div class="terminal-bar">
+              <span class="tsq"></span><span class="tsq"></span><span class="tsq"></span>
+              <span class="terminal-label">requisição</span>
+            </div>
+            <pre class="code"><span class="c3">$</span> curl -X POST <span class="c2">http://localhost:3357/v1/notifications</span> \
+  -H <span class="c1">"X-Api-Key: hk_live_demo&#8230;"</span> \
+  -H <span class="c1">"Idempotency-Key: palco-01"</span> \
+  -d <span class="c1">'{"channel":"email","recipient":"loja@tenant.dev",
+       "subject":"Pedido confirmado","body":"&#8230;"}'</span></pre>
+          </div>
+          <div class="terminal">
+            <div class="terminal-bar">
+              <span class="tsq"></span><span class="tsq"></span><span class="tsq"></span>
+              <span class="terminal-label">resposta · palco</span>
+            </div>
+            <pre class="code"><span class="c3">HTTP/1.1</span> <span class="c4">202 Accepted</span>
+{ <span class="c1">"id"</span>: "ntf_01HZX&#8230;", <span class="c1">"status"</span>: "accepted" }</pre>
+          </div>
+          <p class="console-note">Prévia do painel. As respostas em palco são fixtures determinísticas; o modo ao vivo passa a disparar de verdade nos próximos passos.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <footer>
   <div class="wrap">
-    <p class="al">Hiram · ambiente de desenvolvimento</p>
+    <div class="top">
+      <div>
+        <div class="brand">
+          <svg class="mark" viewBox="0 0 124 80" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="square" aria-hidden="true">
+            <rect x="36" y="14" width="76" height="52"/><path d="M39 17.5 L74 46 L109 17.5"/>
+            <path d="M10 31 H30"/><path d="M4 40 H26"/><path d="M12 49 H30"/>
+          </svg>
+          <span class="wordmark">Hiram&#8756;</span>
+        </div>
+        <p class="f-tag">A palavra não se perde. Hub pedagógico do ambiente de desenvolvimento.</p>
+      </div>
+      <nav aria-label="Rodapé">
+        <div class="col">
+          <span class="lapidar">Aprender</span>
+          <a href="#conceitos">Conceitos</a>
+          <a href="#console">Console</a>
+        </div>
+        <div class="col">
+          <span class="lapidar">Referência</span>
+          <a href="/scalar">API</a>
+          <a href="../index.html">Site</a>
+        </div>
+      </nav>
+    </div>
+    <div class="legal">
+      <span>Ambiente de desenvolvimento</span>
+      <span class="al">Hiram&#8756;</span>
+    </div>
   </div>
 </footer>
 
+<script src="../scripts/theme.js" defer></script>
+<script src="../scripts/motion.js" defer></script>
 </body>
 </html>
