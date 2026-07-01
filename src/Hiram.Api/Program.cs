@@ -2,6 +2,7 @@ using Hiram.Api.Admin;
 using Hiram.Api.Authentication;
 using Hiram.Api.Blocks;
 using Hiram.Api.Consents;
+using Hiram.Api.Demo;
 using Hiram.Api.Events;
 using Hiram.Api.Health;
 using Hiram.Api.Notifications;
@@ -69,8 +70,9 @@ if (builder.Configuration.GetValue<bool>("Hiram:MigrateOnStartup"))
 }
 
 // In development the api also serves the static learn hub and demo console from site/, on the same
-// origin as /scalar so the browser console can reach /v1 without CORS. The gate keeps this surface
-// out of production, and mounting site/ at the root mirrors the eventual static publish so the pages
+// origin as /scalar so the browser console can reach /v1 without CORS. The same gate exposes
+// POST /demo/bootstrap so the console can mint a demo tenant and key. The gate keeps this surface out
+// of production, and mounting site/ at the root mirrors the eventual static publish so the pages
 // resolve ../styles.css exactly as they will when hosted standalone.
 if (app.Environment.IsDevelopment())
 {
@@ -81,6 +83,8 @@ if (app.Environment.IsDevelopment())
         app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = site });
         app.UseStaticFiles(new StaticFileOptions { FileProvider = site });
     }
+
+    app.MapDemoBootstrapEndpoint();
 }
 
 app.UseMiddleware<ApiKeyMiddleware>();
