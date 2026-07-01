@@ -16,6 +16,7 @@ using Hiram.Infrastructure.Persistence;
 using Hiram.Infrastructure.Telemetry;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 
@@ -65,6 +66,21 @@ if (builder.Configuration.GetValue<bool>("Hiram:MigrateOnStartup"))
     await using var scope = app.Services.CreateAsyncScope();
     var database = scope.ServiceProvider.GetRequiredService<HiramDbContext>();
     await HiramSchema.ApplyAsync(database);
+}
+
+// In development the api also serves the static learn hub and demo console from site/, on the same
+// origin as /scalar so the browser console can reach /v1 without CORS. The gate keeps this surface
+// out of production, and mounting site/ at the root mirrors the eventual static publish so the pages
+// resolve ../styles.css exactly as they will when hosted standalone.
+if (app.Environment.IsDevelopment())
+{
+    var siteRoot = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", "..", "site"));
+    if (Directory.Exists(siteRoot))
+    {
+        var site = new PhysicalFileProvider(siteRoot);
+        app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = site });
+        app.UseStaticFiles(new StaticFileOptions { FileProvider = site });
+    }
 }
 
 app.UseMiddleware<ApiKeyMiddleware>();

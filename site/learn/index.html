@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Hiram · Aprender e demonstrar</title>
+<meta name="description" content="Hub pedagogico do Hiram: os conceitos da plataforma de notificacoes multi-tenant, com console de demonstracao ao vivo.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0A1428" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F8F7F4" media="(prefers-color-scheme: light)">
+
+<link rel="icon" href="../favicon.ico" sizes="48x48">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('hiram-theme');
+    if (!t) { t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+})();
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+
+<a class="skip-link" href="#conteudo">Pular para o conteudo</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="../index.html">
+      <span class="wordmark">Hiram</span>
+    </a>
+    <div class="nav-actions">
+      <a class="toggle" href="/scalar">Referencia da API</a>
+    </div>
+  </div>
+</header>
+
+<main id="conteudo">
+  <section class="hero mosaic">
+    <div class="wrap">
+      <p class="lapidar eyebrow">Aprender e demonstrar</p>
+      <h1>A plataforma Hiram, <em>ao vivo</em>.</h1>
+      <p class="tagline">A palavra nao se perde.</p>
+      <p class="lead">
+        Este hub reune os conceitos que tornam o Hiram uma plataforma multi-tenant de
+        notificacoes confiavel, cada um com um painel para experimentar contra a API de verdade.
+        O conteudo completo e o console de demonstracao chegam nos proximos passos.
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p class="al">Hiram · ambiente de desenvolvimento</p>
+  </div>
+</footer>
+
+</body>
+</html>

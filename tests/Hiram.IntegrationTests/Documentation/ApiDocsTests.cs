@@ -1,3 +1,4 @@
+using System.Net;
 using Hiram.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -51,5 +52,40 @@ public class ApiDocsTests : IAsyncLifetime
         Assert.Contains("X-Api-Key", document);
         Assert.Contains("X-Admin-Key", document);
         Assert.Contains("Idempotency-Replayed", document);
+    }
+
+    [Fact]
+    public async Task LearnHub_IsServedInDevelopmentWithoutApiKey()
+    {
+        var client = _factory!.CreateClient();
+
+        var response = await client.GetAsync("/learn/index.html");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("Hiram", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task SharedStylesheet_IsReachableForLearnPages()
+    {
+        var client = _factory!.CreateClient();
+
+        var response = await client.GetAsync("/styles.css");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/css", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task LearnHub_IsNotServedInProduction()
+    {
+        await using var production = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.UseEnvironment("Production"));
+        var client = production.CreateClient();
+
+        var response = await client.GetAsync("/learn/index.html");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 }
