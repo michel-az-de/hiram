@@ -127,20 +127,46 @@
 <main id="main">
 
   <section class="hero mosaic" aria-labelledby="hero-title">
-    <div class="wrap">
-      <svg class="hero-mark" viewBox="0 0 124 80" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="square" aria-hidden="true">
-        <rect x="36" y="14" width="76" height="52"/><path d="M39 17.5 L74 46 L109 17.5"/>
-        <path d="M10 31 H30"/><path d="M4 40 H26"/><path d="M12 49 H30"/>
-      </svg>
-      <span class="lapidar eyebrow">Multi-tenant notification delivery</span>
-      <h1 id="hero-title">Reliable notification delivery, guaranteed by an <em>outbox</em>.</h1>
-      <p class="tagline">The word is never lost.</p>
-      <p class="lead">Hiram accepts a notification, writes it with its outbox row in a single transaction, and owns delivery from there: per-tenant providers, retries, idempotency and end-to-end tracing. If the database confirmed it, it will be delivered.</p>
-      <div class="btn-row">
-        <a class="btn btn-primary" href="https://github.com/michel-az-de/hiram#quick-start">Read the docs</a>
-        <a class="btn btn-secondary" href="https://github.com/michel-az-de/hiram">View on GitHub</a>
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <span class="lapidar eyebrow">Multi-tenant notification delivery</span>
+        <h1 id="hero-title">Reliable notification delivery, guaranteed by an <em>outbox</em>.</h1>
+        <p class="tagline">The word is never lost.</p>
+        <p class="lead">Hiram accepts a notification, writes it with its outbox row in a single transaction, and owns delivery from there: per-tenant providers, retries, idempotency and end-to-end tracing. If the database confirmed it, it will be delivered.</p>
+        <div class="btn-row">
+          <a class="btn btn-primary" href="https://github.com/michel-az-de/hiram#quick-start">Read the docs</a>
+          <a class="btn btn-secondary" href="https://github.com/michel-az-de/hiram">View on GitHub</a>
+        </div>
+        <p class="fineprint">Email is live today. Push, SMS and WhatsApp are on the roadmap, behind the same API.</p>
       </div>
-      <p class="fineprint">Email is live today. Push, SMS and WhatsApp are on the roadmap, behind the same API.</p>
+      <div class="hero-trace">
+        <svg class="trace" viewBox="0 0 320 470" role="img" aria-label="Delivery path: accept, persist in one transaction, relay, then deliver.">
+          <line class="trace-spine" x1="26" y1="46" x2="26" y2="436"/>
+          <line class="trace-flow" x1="26" y1="46" x2="26" y2="436"/>
+          <g class="tnode">
+            <circle class="tdot" cx="26" cy="46" r="6"/>
+            <text class="tt" x="50" y="42">Accept</text>
+            <text class="ts" x="50" y="61">POST /v1/notifications</text>
+          </g>
+          <g class="tnode tnode-commit">
+            <circle class="tring" cx="26" cy="176" r="12"/>
+            <circle class="tdot" cx="26" cy="176" r="6"/>
+            <text class="tt" x="50" y="172">Persist</text>
+            <text class="ts" x="50" y="191">request + outbox, one commit</text>
+          </g>
+          <g class="tnode">
+            <circle class="tdot" cx="26" cy="306" r="6"/>
+            <text class="tt" x="50" y="302">Relay</text>
+            <text class="ts" x="50" y="321">OutboxRelay picks it up</text>
+          </g>
+          <g class="tnode">
+            <circle class="tdot" cx="26" cy="436" r="6"/>
+            <text class="tt" x="50" y="432">Deliver</text>
+            <text class="ts" x="50" y="451">sent, every attempt recorded</text>
+          </g>
+          <circle class="trace-pulse" cx="26" cy="46" r="4"/>
+        </svg>
+      </div>
     </div>
   </section>
 
@@ -418,5 +444,6 @@
 </footer>
 
 <script src="scripts/theme.js" defer></script>
+<script src="scripts/motion.js" defer></script>
 </body>
 </html>
