@@ -186,10 +186,11 @@ main > section:nth-of-type(2n) { background:var(--band); }
 
 /* Trust strip */
 
-.trust { padding:28px 0; border-top:1px solid var(--border); }
-.trust ul { list-style:none; display:flex; flex-wrap:wrap; gap:14px 40px; align-items:center; }
-.trust li { color:var(--muted); font-family:var(--f-display); font-weight:600; font-size:12px; letter-spacing:.18em; text-transform:uppercase; display:flex; align-items:center; gap:10px; }
-.trust li::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--orient-500); flex:none; }
+.trust { padding:20px 0; border-top:1px solid var(--border); }
+.trust ul { list-style:none; display:flex; flex-wrap:wrap; align-items:center; }
+.trust li { color:var(--muted); font-family:var(--f-display); font-weight:600; font-size:12px; letter-spacing:.18em; text-transform:uppercase; display:flex; align-items:center; padding:4px 22px; }
+.trust li:first-child { padding-left:0; }
+.trust li + li { border-left:1px solid var(--border-strong); }
 
 /* Grids */
 
@@ -227,6 +228,13 @@ main > section:nth-of-type(2n) { background:var(--band); }
 .code .c2 { color:var(--lodge-300); }
 .code .c3 { color:#7E8DA6; }
 .code .c4 { color:var(--acacia-300); }
+
+/* Terminal chrome for the request showcase */
+.terminal { border:1px solid var(--border-strong); border-radius:var(--r-md); overflow:hidden; box-shadow:0 18px 44px -26px rgba(2,6,16,.6); }
+.terminal-bar { display:flex; align-items:center; gap:7px; padding:11px 16px; background:var(--surface); border-bottom:1px solid var(--border); }
+.terminal-bar .tsq { width:8px; height:8px; background:var(--border-strong); flex:none; }
+.terminal-label { margin-left:auto; font-family:var(--f-mono); font-size:12px; color:var(--muted); letter-spacing:.02em; }
+.terminal .code { border:none; border-radius:0; }
 
 /* How it works, numbered steps */
 

@@ -205,7 +205,12 @@
           </ul>
         </div>
         <div>
-          <pre class="code"><span class="c3">$</span> curl -X POST <span class="c2">https://api.hiram.dev/v1/notifications</span> \
+          <div class="terminal">
+            <div class="terminal-bar">
+              <span class="tsq"></span><span class="tsq"></span><span class="tsq"></span>
+              <span class="terminal-label">POST /v1/notifications</span>
+            </div>
+            <pre class="code"><span class="c3">$</span> curl -X POST <span class="c2">https://api.hiram.dev/v1/notifications</span> \
   -H <span class="c1">"X-Api-Key: hk_live_7f3a&#8230;"</span> \
   -H <span class="c1">"Idempotency-Key: evt-2207"</span> \
   -d <span class="c1">'{"channel":"email","recipient":"ops@tenant.com",
@@ -213,6 +218,7 @@
 
 <span class="c3">HTTP/1.1</span> <span class="c4">202 Accepted</span>
 { <span class="c1">"id"</span>: "ntf_01HZX&#8230;", <span class="c1">"status"</span>: "accepted" }</pre>
+          </div>
         </div>
       </div>
     </div>
