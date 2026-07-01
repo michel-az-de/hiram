@@ -68,4 +68,4 @@ Necessidade de servir a demo fora de Development, de apontar o console para outr
 1. [x] Servir `site/` sob `/learn` na Hiram.Api, gated a Development, com `site/learn/index.html` (passo 1).
 2. [x] Hub pedagógico dos dez conceitos, diagrama E2E e console híbrido Live mais palco (passos 2 a 5, 7).
 3. [x] Endpoint `POST /demo/bootstrap` dev-only, idempotente, guardado por `X-Admin-Key` (passo 6).
-4. [ ] Tema completo do Scalar e metadados OpenAPI para estudo (passos 8 a 10).
+4. [x] Tema completo do Scalar e metadados OpenAPI para estudo (passos 8 a 10).
