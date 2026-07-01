@@ -30,17 +30,105 @@ internal static class HiramApiDocs
                 Description = "Provisional operator key (Hiram:AdminKey) guarding the /v1/admin routes."
             };
 
+            document.Tags = Tags;
+
+            foreach (var path in document.Paths)
+            {
+                if (path.Value.Operations is not { } operations)
+                    continue;
+
+                var scheme = SecuritySchemeFor(path.Key);
+                foreach (var operation in operations)
+                {
+                    if (scheme is not null)
+                    {
+                        operation.Value.Security =
+                        [
+                            new OpenApiSecurityRequirement
+                            {
+                                [new OpenApiSecuritySchemeReference(scheme, document)] = new List<string>()
+                            }
+                        ];
+                    }
+
+                    var key = (operation.Key.ToString()!.ToUpperInvariant(), path.Key);
+                    if (Summaries.TryGetValue(key, out var summary))
+                        operation.Value.Summary = summary;
+                }
+            }
+
             return Task.CompletedTask;
         }));
 
         return services;
     }
 
-    // Dark theme aligned to the brand palette: navy background, gold accent.
+    // Tenant keys guard /v1, the operator key guards /v1/admin and the dev-only /demo helper, and
+    // everything else (docs, health) is public.
+    private static string? SecuritySchemeFor(string path) =>
+        path.StartsWith("/v1/admin", StringComparison.Ordinal) || path.StartsWith("/demo/", StringComparison.Ordinal) ? "AdminKey"
+        : path.StartsWith("/v1/", StringComparison.Ordinal) ? "ApiKey"
+        : null;
+
+    private static readonly Dictionary<(string Method, string Path), string> Summaries = new()
+    {
+        [("POST", "/v1/notifications")] = "Send a notification",
+        [("GET", "/v1/notifications")] = "List notifications with cursor pagination",
+        [("GET", "/v1/notifications/{id}")] = "Read a notification and its delivery attempts",
+        [("POST", "/v1/notifications/{id}/replay")] = "Replay a dead-lettered notification",
+        [("POST", "/v1/admin/tenants")] = "Create a tenant",
+        [("POST", "/v1/admin/api-keys")] = "Issue a tenant API key",
+        [("DELETE", "/v1/admin/api-keys/{id}")] = "Revoke an API key",
+        [("POST", "/demo/bootstrap")] = "Provision the demo tenant and a fresh key"
+    };
+
+    private static HashSet<OpenApiTag> Tags =>
+    [
+        new() { Name = "Notifications", Description = "Send notifications and read delivery back. The core of the platform." },
+        new() { Name = "Events", Description = "Ingest domain events for the platform to act on." },
+        new() { Name = "Consent", Description = "Per-recipient consent records." },
+        new() { Name = "Blocks", Description = "Suppression list: recipients that must not be contacted." },
+        new() { Name = "Templates", Description = "Versioned, per-tenant message templates." },
+        new() { Name = "Push", Description = "Web push subscriptions and the VAPID public key." },
+        new() { Name = "Webhooks", Description = "Delivery status callbacks, signed with X-Hiram-Signature." },
+        new() { Name = "Admin (provisional)", Description = "Operator provisioning guarded by X-Admin-Key. Temporary until the Portal." },
+        new() { Name = "Demo (development only)", Description = "Dev-only helper that provisions a demo tenant and key for the console." }
+    ];
+
+    // Full theme aligned to the design system: brand fonts and both the vault (dark) and stone (light)
+    // palettes derived from docs/design/tokens.json.
     public const string ScalarCss = """
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+        .scalar-app {
+          --scalar-font: 'IBM Plex Sans', system-ui, sans-serif;
+          --scalar-font-code: 'IBM Plex Mono', ui-monospace, monospace;
+          --scalar-radius: 6px;
+          --scalar-radius-lg: 10px;
+        }
+
         .dark-mode {
           --scalar-background-1: #0A1428;
+          --scalar-background-2: #0F1B30;
+          --scalar-background-3: #142440;
+          --scalar-color-1: #E8ECF4;
+          --scalar-color-2: #94A3BD;
+          --scalar-color-3: #6B7A99;
           --scalar-color-accent: #C9A227;
+          --scalar-background-accent: rgba(201, 162, 39, .12);
+          --scalar-border-color: rgba(179, 200, 231, .14);
+        }
+
+        .light-mode {
+          --scalar-background-1: #F8F7F4;
+          --scalar-background-2: #FFFFFF;
+          --scalar-background-3: #F0EEE8;
+          --scalar-color-1: #1C2433;
+          --scalar-color-2: #6B675D;
+          --scalar-color-3: #8A867A;
+          --scalar-color-accent: #1B3A6B;
+          --scalar-background-accent: rgba(27, 58, 107, .08);
+          --scalar-border-color: #E2DFD6;
         }
         """;
 

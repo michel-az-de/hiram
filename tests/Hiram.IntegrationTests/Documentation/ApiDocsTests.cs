@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using Hiram.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -87,5 +88,37 @@ public class ApiDocsTests : IAsyncLifetime
         var response = await client.GetAsync("/learn/index.html");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task OpenApiDocument_EnrichesTagsSummariesAndPerOperationSecurity()
+    {
+        var client = _factory!.CreateClient();
+
+        await using var stream = await client.GetStreamAsync("/openapi/v1.json");
+        using var document = await JsonDocument.ParseAsync(stream);
+        var root = document.RootElement;
+
+        var notifications = root.GetProperty("tags").EnumerateArray()
+            .First(tag => tag.GetProperty("name").GetString() == "Notifications");
+        Assert.False(string.IsNullOrWhiteSpace(notifications.GetProperty("description").GetString()));
+
+        var submit = root.GetProperty("paths").GetProperty("/v1/notifications").GetProperty("post");
+        Assert.Equal("Send a notification", submit.GetProperty("summary").GetString());
+        Assert.Contains("ApiKey", SecuritySchemes(submit));
+
+        var createTenant = root.GetProperty("paths").GetProperty("/v1/admin/tenants").GetProperty("post");
+        Assert.Contains("AdminKey", SecuritySchemes(createTenant));
+    }
+
+    private static IEnumerable<string> SecuritySchemes(JsonElement operation)
+    {
+        if (!operation.TryGetProperty("security", out var security))
+            return [];
+
+        return security.EnumerateArray()
+            .SelectMany(requirement => requirement.EnumerateObject())
+            .Select(scheme => scheme.Name)
+            .ToList();
     }
 }
