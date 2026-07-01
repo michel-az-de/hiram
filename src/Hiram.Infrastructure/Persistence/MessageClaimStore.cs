@@ -1,3 +1,4 @@
+using Hiram.Application.Abstractions;
 using Hiram.Application.Messaging;
 using Hiram.Domain.Messaging;
 using Microsoft.EntityFrameworkCore;
@@ -10,15 +11,17 @@ public sealed class MessageClaimStore : IMessageClaimStore
     private const string ClaimIndex = "ux_message_claims_tenant_key";
 
     private readonly HiramDbContext _context;
+    private readonly IClock _clock;
 
-    public MessageClaimStore(HiramDbContext context)
+    public MessageClaimStore(HiramDbContext context, IClock clock)
     {
         _context = context;
+        _clock = clock;
     }
 
     public async Task<bool> TryClaimAsync(Guid tenantId, string messageKey, CancellationToken cancellationToken)
     {
-        _context.MessageClaims.Add(new MessageClaim(Guid.NewGuid(), tenantId, messageKey, DateTimeOffset.UtcNow));
+        _context.MessageClaims.Add(new MessageClaim(Guid.NewGuid(), tenantId, messageKey, _clock.UtcNow));
 
         try
         {

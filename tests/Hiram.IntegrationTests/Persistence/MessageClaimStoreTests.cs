@@ -1,3 +1,4 @@
+using Hiram.Application.Abstractions;
 using Hiram.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
@@ -25,7 +26,24 @@ public class MessageClaimStoreTests : IAsyncLifetime
     [Fact]
     public async Task TryClaim_SucceedsOnce_ThenRejectsTheSameKey()
     {
-        Assert.True(await new MessageClaimStore(NewContext()).TryClaimAsync(Tenant, "msg-key", CancellationToken.None));
-        Assert.False(await new MessageClaimStore(NewContext()).TryClaimAsync(Tenant, "msg-key", CancellationToken.None));
+        Assert.True(await new MessageClaimStore(NewContext(), new FixedClock(DateTimeOffset.UtcNow)).TryClaimAsync(Tenant, "msg-key", CancellationToken.None));
+        Assert.False(await new MessageClaimStore(NewContext(), new FixedClock(DateTimeOffset.UtcNow)).TryClaimAsync(Tenant, "msg-key", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Claim_UsesInjectedClock()
+    {
+        var claimedAt = new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero);
+
+        await new MessageClaimStore(NewContext(), new FixedClock(claimedAt)).TryClaimAsync(Tenant, "clock-key", CancellationToken.None);
+
+        await using var context = NewContext();
+        var claim = await context.MessageClaims.SingleAsync(c => c.TenantId == Tenant && c.MessageKey == "clock-key");
+        Assert.Equal(claimedAt, claim.ClaimedAtUtc);
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : IClock
+    {
+        public DateTimeOffset UtcNow { get; } = now;
     }
 }
