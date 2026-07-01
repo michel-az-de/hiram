@@ -158,12 +158,20 @@
         <div class="console-body">
           <form class="console-form" id="console-form">
             <div class="field">
+              <label class="lapidar" for="c-key">Chave de API (demo)</label>
+              <input id="c-key" name="key" type="password" autocomplete="off" spellcheck="false" placeholder="hk_live_… do bootstrap, só no modo ao vivo">
+            </div>
+            <div class="field">
               <label class="lapidar" for="c-recipient">Destinatário</label>
               <input id="c-recipient" name="recipient" type="email" value="loja@tenant.dev" autocomplete="off" spellcheck="false">
             </div>
             <div class="field">
               <label class="lapidar" for="c-subject">Assunto</label>
               <input id="c-subject" name="subject" type="text" value="Pedido confirmado" autocomplete="off">
+            </div>
+            <div class="field">
+              <label class="lapidar" for="c-body">Mensagem</label>
+              <input id="c-body" name="body" type="text" value="Seu pedido foi confirmado." autocomplete="off">
             </div>
             <div class="console-actions">
               <button type="button" id="console-send" class="btn btn-primary">Enviar notificação</button>
@@ -180,7 +188,7 @@
   -H <span class="c1">"X-Api-Key: hk_live_demo&#8230;"</span> \
   -H <span class="c1">"Idempotency-Key: palco-4207"</span> \
   -d <span class="c1">'{"channel":"email","recipient":"loja@tenant.dev",
-       "subject":"Pedido confirmado"}'</span></pre>
+       "subject":"Pedido confirmado","body":"Seu pedido foi confirmado."}'</span></pre>
             </div>
             <div class="terminal">
               <div class="terminal-bar">
@@ -192,7 +200,7 @@
             </div>
           </div>
           <div class="console-flow" id="console-flow" aria-live="polite" aria-label="Estado da entrega"></div>
-          <p class="console-note">O modo palco usa fixtures determinísticas, à prova de rede. O modo ao vivo, que dispara contra a API local na mesma origem, chega no próximo passo.</p>
+          <p class="console-note">O modo palco usa fixtures determinísticas, à prova de rede. O modo ao vivo dispara contra a API local na mesma origem, com a demo key emitida pelo bootstrap. A chave fica só no seu navegador.</p>
         </div>
       </div>
     </div>
