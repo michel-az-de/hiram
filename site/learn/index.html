@@ -77,23 +77,23 @@
         <p class="lead">Uma requisição percorre a plataforma inteira. O que sustenta tudo é a segunda etapa: request e outbox gravados na mesma transação.</p>
       </div>
       <ol class="flow">
-        <li class="flow-step">
+        <li class="flow-node">
           <h3>Aceitar <span class="flow-where">Hiram.Api · 202</span></h3>
           <p>POST /v1/notifications valida e responde na hora com 202 Accepted. Um Idempotency-Key torna o retry seguro.</p>
         </li>
-        <li class="flow-step flow-commit">
+        <li class="flow-node flow-commit">
           <h3>Persistir <span class="flow-where">PostgreSQL · uma transação</span></h3>
           <p>O request e a linha de outbox são gravados juntos, ou nada é gravado. Se o commit passou, a mensagem não se perde.</p>
         </li>
-        <li class="flow-step">
+        <li class="flow-node">
           <h3>Publicar <span class="flow-where">OutboxRelay → RabbitMQ</span></h3>
           <p>O relé lê o outbox já comprometido e publica a mensagem para o dispatcher, sem perder nada no caminho.</p>
         </li>
-        <li class="flow-step">
+        <li class="flow-node">
           <h3>Entregar <span class="flow-where">Dispatcher → SMTP / Resend</span></h3>
           <p>Um pipeline resiliente resolve o provider do tenant, tenta de novo em falha transitória e registra cada tentativa.</p>
         </li>
-        <li class="flow-step">
+        <li class="flow-node">
           <h3>Auditar <span class="flow-where">GET /v1/notifications</span></h3>
           <p>Leia de volta o status e a latência de cada tentativa, por paginação de cursor.</p>
         </li>
@@ -190,7 +190,7 @@
           </div>
         </div>
         <div class="console-body">
-          <form class="console-form" id="console-form">
+          <form class="console-form" id="console-form" novalidate>
             <div class="field">
               <label class="lapidar" for="c-key">Chave de API (demo)</label>
               <input id="c-key" name="key" type="password" autocomplete="off" spellcheck="false" placeholder="hk_live_… do bootstrap, só no modo ao vivo">

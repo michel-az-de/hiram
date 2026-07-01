@@ -10,10 +10,12 @@ if (form) {
   const flowEl = document.getElementById('console-flow');
   const hintEl = document.getElementById('console-hint');
   const keyInput = document.getElementById('c-key');
+  const sendButton = document.getElementById('console-send');
   const modeButtons = Array.from(document.querySelectorAll('.console-mode'));
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const stages = ['accepted', 'queued', 'sending', 'sent'];
+  const reasons = { 200: 'OK', 202: 'Accepted', 400: 'Bad Request', 401: 'Unauthorized', 404: 'Not Found', 409: 'Conflict', 422: 'Unprocessable Entity', 500: 'Internal Server Error' };
   const keyStorage = 'hiram-demo-key';
   const stageHint = 'Modo palco: resposta determinística, sem rede.';
 
@@ -36,7 +38,7 @@ if (form) {
   }
 
   function escape(value) {
-    return value.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    return String(value).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   }
 
   function maskedKey() {
@@ -66,11 +68,12 @@ if (form) {
     flowEl.innerHTML = stages
       .map((stage, i) => {
         let cls = '';
+        let current = '';
         if (complete || i < activeIndex) cls = 'done';
-        else if (i === activeIndex) cls = 'active';
-        return '<span class="flow-step ' + cls + '">' + stage + '</span>';
+        else if (i === activeIndex) { cls = 'active'; current = ' aria-current="step"'; }
+        return '<span class="flow-step ' + cls + '"' + current + '>' + stage + '</span>';
       })
-      .join('<span class="flow-arr">→</span>');
+      .join('<span class="flow-arr" aria-hidden="true">→</span>');
   }
 
   function runStage(f) {
@@ -106,10 +109,10 @@ if (form) {
     renderRequest(f, window.location.origin, maskedKey(), idempotency);
     responseEl.textContent = '… enviando';
     flowEl.innerHTML = '';
+    if (sendButton) sendButton.disabled = true;
 
-    let response;
     try {
-      response = await fetch('/v1/notifications', {
+      const response = await fetch('/v1/notifications', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -118,29 +121,31 @@ if (form) {
         },
         body: JSON.stringify({ channel: 'email', recipient: f.recipient, subject: f.subject, body: f.body })
       });
+
+      const raw = await response.text();
+      let parsed = null;
+      try { parsed = JSON.parse(raw); } catch (e) { /* not json, keep the raw text */ }
+      renderLiveResponse(response.status, response.statusText, parsed, raw);
+
+      if (response.status === 202) {
+        renderFlow(0);
+        hintEl.textContent = 'Aceito de verdade. A entrega segue assíncrona.';
+      } else {
+        hintEl.textContent = 'A API respondeu ' + response.status + '. Confira a chave e os campos.';
+      }
     } catch (error) {
       responseEl.innerHTML = '<span class="c1">// a API local não respondeu. Rode a Hiram.Api ou volte ao palco.</span>';
       hintEl.textContent = 'API local indisponível; o palco continua funcionando.';
-      return;
-    }
-
-    const raw = await response.text();
-    let parsed = null;
-    try { parsed = JSON.parse(raw); } catch (e) { /* not json, keep the raw text */ }
-    renderLiveResponse(response.status, response.statusText, parsed, raw);
-
-    if (response.status === 202) {
-      renderFlow(0);
-      hintEl.textContent = 'Aceito de verdade. A entrega segue assíncrona.';
-    } else {
-      hintEl.textContent = 'A API respondeu ' + response.status + '. Confira a chave e os campos.';
+    } finally {
+      if (sendButton) sendButton.disabled = false;
     }
   }
 
   function renderLiveResponse(status, statusText, parsed, raw) {
     const ok = status >= 200 && status < 300;
+    const reason = statusText || reasons[status] || '';
     const head = '<span class="c3">HTTP/1.1</span> <span class="' + (ok ? 'c4' : 'c1') + '">'
-      + status + ' ' + escape(statusText || '') + '</span>';
+      + status + ' ' + escape(reason) + '</span>';
     const body = parsed ? JSON.stringify(parsed, null, 2) : (raw || '');
     responseEl.innerHTML = head + '\n' + escape(body);
   }
@@ -151,7 +156,6 @@ if (form) {
     else runStage(f);
   }
 
-  const sendButton = document.getElementById('console-send');
   if (sendButton) sendButton.addEventListener('click', submit);
   form.addEventListener('submit', (event) => { event.preventDefault(); submit(); });
   keyInput.addEventListener('change', rememberKey);
