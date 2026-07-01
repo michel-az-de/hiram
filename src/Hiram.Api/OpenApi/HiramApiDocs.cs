@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 
@@ -54,6 +55,13 @@ internal static class HiramApiDocs
                     var key = (operation.Key.ToString()!.ToUpperInvariant(), path.Key);
                     if (Summaries.TryGetValue(key, out var summary))
                         operation.Value.Summary = summary;
+
+                    if (key == ("POST", "/v1/notifications")
+                        && operation.Value.RequestBody?.Content is { } content
+                        && content.TryGetValue("application/json", out var media))
+                    {
+                        media.Example = SubmitExample();
+                    }
                 }
             }
 
@@ -81,6 +89,9 @@ internal static class HiramApiDocs
         [("DELETE", "/v1/admin/api-keys/{id}")] = "Revoke an API key",
         [("POST", "/demo/bootstrap")] = "Provision the demo tenant and a fresh key"
     };
+
+    private static JsonNode? SubmitExample() => JsonNode.Parse(
+        """{"channel":"email","recipient":"ops@example.com","subject":"Order confirmed","body":"Your order is on the way."}""");
 
     private static HashSet<OpenApiTag> Tags =>
     [

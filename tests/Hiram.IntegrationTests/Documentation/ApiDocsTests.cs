@@ -107,6 +107,10 @@ public class ApiDocsTests : IAsyncLifetime
         Assert.Equal("Send a notification", submit.GetProperty("summary").GetString());
         Assert.Contains("ApiKey", SecuritySchemes(submit));
 
+        var example = submit.GetProperty("requestBody").GetProperty("content")
+            .GetProperty("application/json").GetProperty("example");
+        Assert.Equal("ops@example.com", example.GetProperty("recipient").GetString());
+
         var createTenant = root.GetProperty("paths").GetProperty("/v1/admin/tenants").GetProperty("post");
         Assert.Contains("AdminKey", SecuritySchemes(createTenant));
     }
