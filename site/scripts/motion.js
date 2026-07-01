@@ -8,7 +8,7 @@
   if (!('IntersectionObserver' in window)) return;
 
   var targets = document.querySelectorAll(
-    '.section-head, .split, .steps, .statemachine, .feature-cols, .grid, .timeline, .faq, .cta-final'
+    '.section-head, .split, .steps, .statemachine, .feature-cols, .grid, .flow, .timeline, .faq, .cta-final'
   );
   if (!targets.length) return;
 

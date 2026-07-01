@@ -43,6 +43,7 @@
       <span class="wordmark">Hiram&#8756;</span>
     </a>
     <nav class="nav-links" aria-label="Primária">
+      <a href="#fluxo">Fluxo</a>
       <a href="#conceitos">Conceitos</a>
       <a href="#console">Console</a>
       <a href="/scalar">Referência da API</a>
@@ -64,7 +65,40 @@
       <span class="lapidar eyebrow">Aprender e demonstrar</span>
       <h1 id="hero-title">A plataforma Hiram, <em>ao vivo</em>.</h1>
       <p class="tagline">A palavra não se perde.</p>
-      <p class="lead">Este hub reúne os conceitos que tornam o Hiram uma plataforma multi-tenant de notificações confiável, cada um com um painel para experimentar contra a API de verdade. O conteúdo completo e o console interativo chegam nos próximos passos, guiados pelo ADR-021.</p>
+      <p class="lead">Este hub reúne os conceitos que tornam o Hiram uma plataforma multi-tenant de notificações confiável. Abaixo, o caminho ponta a ponta, os dez conceitos e um console para disparar contra a API de verdade, em palco ou ao vivo.</p>
+    </div>
+  </section>
+
+  <section id="fluxo" aria-labelledby="fluxo-title">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="lapidar eyebrow">Ponta a ponta</span>
+        <h2 id="fluxo-title">Do POST à entrega, com uma garantia no meio</h2>
+        <p class="lead">Uma requisição percorre a plataforma inteira. O que sustenta tudo é a segunda etapa: request e outbox gravados na mesma transação.</p>
+      </div>
+      <ol class="flow">
+        <li class="flow-step">
+          <h3>Aceitar <span class="flow-where">Hiram.Api · 202</span></h3>
+          <p>POST /v1/notifications valida e responde na hora com 202 Accepted. Um Idempotency-Key torna o retry seguro.</p>
+        </li>
+        <li class="flow-step flow-commit">
+          <h3>Persistir <span class="flow-where">PostgreSQL · uma transação</span></h3>
+          <p>O request e a linha de outbox são gravados juntos, ou nada é gravado. Se o commit passou, a mensagem não se perde.</p>
+        </li>
+        <li class="flow-step">
+          <h3>Publicar <span class="flow-where">OutboxRelay → RabbitMQ</span></h3>
+          <p>O relé lê o outbox já comprometido e publica a mensagem para o dispatcher, sem perder nada no caminho.</p>
+        </li>
+        <li class="flow-step">
+          <h3>Entregar <span class="flow-where">Dispatcher → SMTP / Resend</span></h3>
+          <p>Um pipeline resiliente resolve o provider do tenant, tenta de novo em falha transitória e registra cada tentativa.</p>
+        </li>
+        <li class="flow-step">
+          <h3>Auditar <span class="flow-where">GET /v1/notifications</span></h3>
+          <p>Leia de volta o status e a latência de cada tentativa, por paginação de cursor.</p>
+        </li>
+      </ol>
+      <p class="flow-trace">Um único trace do OpenTelemetry cobre aceitar, publicar, consumir e enviar.</p>
     </div>
   </section>
 
