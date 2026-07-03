@@ -69,12 +69,13 @@ if (builder.Configuration.GetValue<bool>("Hiram:MigrateOnStartup"))
     await HiramSchema.ApplyAsync(database);
 }
 
-// In development the api also serves the static learn hub and demo console from site/, on the same
-// origin as /scalar so the browser console can reach /v1 without CORS. The same gate exposes
-// POST /demo/bootstrap so the console can mint a demo tenant and key. The gate keeps this surface out
-// of production, and mounting site/ at the root mirrors the eventual static publish so the pages
-// resolve ../styles.css exactly as they will when hosted standalone.
-if (app.Environment.IsDevelopment())
+// In development and in the public demo environment (ADR-022) the api also serves the static learn
+// hub and demo console from site/, on the same origin as /scalar so the browser console can reach
+// /v1 without CORS. The same gate exposes POST /demo/bootstrap, still behind X-Admin-Key, so the
+// operator can mint the demo tenant and key. The gate keeps this surface out of production, and
+// mounting site/ at the root mirrors the eventual static publish so the pages resolve ../styles.css
+// exactly as they will when hosted standalone.
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Demo"))
 {
     var siteRoot = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", "..", "site"));
     if (Directory.Exists(siteRoot))

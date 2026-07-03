@@ -5,9 +5,10 @@ using Hiram.Domain.Tenants;
 
 namespace Hiram.Api.Demo;
 
-// Dev-only helper so a presenter can provision a demo tenant and a fresh api key without touching the
-// operator X-Admin-Key on stage. The tenant is idempotent under a well known id and lives in shadow
-// mode, so the whole pipeline runs without sending real email. Mapped only inside the development gate.
+// Helper so a presenter can provision a demo tenant and a fresh api key without touching the operator
+// X-Admin-Key on stage. The tenant is idempotent under a well known id and lives in shadow mode, so
+// the whole pipeline runs without sending real email. Mapped only inside the development and demo
+// environment gate (ADR-022), always behind X-Admin-Key.
 internal static class DemoEndpoints
 {
     private static readonly Guid DemoTenantId = new("0de70000-0000-0000-0000-000000000001");
@@ -17,7 +18,7 @@ internal static class DemoEndpoints
     public static IEndpointRouteBuilder MapDemoBootstrapEndpoint(this IEndpointRouteBuilder app)
     {
         app.MapPost("/demo/bootstrap", BootstrapAsync)
-            .WithTags("Demo (development only)")
+            .WithTags("Demo (development and demo environments only)")
             .AddEndpointFilter(AdminKeyFilter.Require);
 
         return app;

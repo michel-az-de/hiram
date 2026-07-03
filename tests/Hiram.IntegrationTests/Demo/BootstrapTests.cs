@@ -78,6 +78,30 @@ public class BootstrapTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Bootstrap_IsServedInDemoEnvironment()
+    {
+        await using var demo = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.UseEnvironment("Demo"));
+        var client = demo.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Admin-Key", AdminKey);
+
+        var response = await client.PostAsync("/demo/bootstrap", content: null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Bootstrap_InDemoEnvironment_StillRequiresAdminKey()
+    {
+        await using var demo = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.UseEnvironment("Demo"));
+
+        var response = await demo.CreateClient().PostAsync("/demo/bootstrap", content: null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Bootstrap_IsNotServedInProduction()
     {
         await using var production = new WebApplicationFactory<Program>()
