@@ -24,7 +24,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: dispatcher
-          image: hiram-dispatcher:latest
+          # The deploy step (issue #8) pins the commit sha tag at apply time; latest is the fallback.
+          image: ghcr.io/michel-az-de/hiram-dispatcher:latest
           envFrom:
             - configMapRef:
                 name: hiram-config

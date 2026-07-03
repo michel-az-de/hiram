@@ -9,12 +9,20 @@ shadow e tenant live entregando no Mailpit. Nada aqui é produção; produção 
 ```bash
 cd /opt/hiram && git pull
 
-docker build -f src/Hiram.Api/Dockerfile -t hiram-api:demo .
-docker build -f src/Hiram.Dispatcher/Dockerfile -t hiram-dispatcher:demo .
-
 cd deploy/demo
 cp .env.demo.example .env   # preencher senhas, admin key e VAPID
+docker compose -f docker-compose.demo.yml pull
 docker compose -f docker-compose.demo.yml up -d
+```
+
+As imagens vêm do GHCR, publicadas pelo CI a cada push no main com tag do SHA do commit e `latest`.
+Para fixar um commit específico, defina `HIRAM_IMAGE_TAG=<sha>` no `.env`. Para testar uma alteração
+que ainda não está no main, o build local continua possível:
+
+```bash
+docker build -f src/Hiram.Api/Dockerfile -t ghcr.io/michel-az-de/hiram-api:local .
+docker build -f src/Hiram.Dispatcher/Dockerfile -t ghcr.io/michel-az-de/hiram-dispatcher:local .
+# HIRAM_IMAGE_TAG=local no .env
 ```
 
 O serviço `migrate` aplica o schema uma vez e sai; a Api só sobe depois dele. O NSG da VM precisa de
@@ -34,5 +42,5 @@ curl -X POST https://$DEMO_HOST/v1/admin/tenants -H "X-Admin-Key: $HIRAM_ADMIN_K
 
 ## Atualização da demo
 
-`git pull`, rebuild das duas imagens e `docker compose up -d` de novo. O volume `pgdata` preserva os
+`git pull`, `docker compose pull` e `docker compose up -d` de novo. O volume `pgdata` preserva os
 dados entre atualizações; para zerar a demo, `docker compose down -v`.

@@ -64,7 +64,7 @@ services:
     restart: "no"
 
   migrate:
-    image: hiram-api:demo
+    image: ghcr.io/michel-az-de/hiram-api:${HIRAM_IMAGE_TAG:-latest}
     command: ["--migrate-only"]
     environment:
       ConnectionStrings__Hiram: "Host=postgres;Port=5432;Database=hiram;Username=hiram;Password=${POSTGRES_PASSWORD}"
@@ -76,7 +76,7 @@ services:
     restart: "no"
 
   api:
-    image: hiram-api:demo
+    image: ghcr.io/michel-az-de/hiram-api:${HIRAM_IMAGE_TAG:-latest}
     environment:
       ASPNETCORE_ENVIRONMENT: "Demo"
       ConnectionStrings__Hiram: "Host=postgres;Port=5432;Database=hiram;Username=hiram;Password=${POSTGRES_PASSWORD}"
@@ -103,7 +103,7 @@ services:
     restart: unless-stopped
 
   dispatcher:
-    image: hiram-dispatcher:demo
+    image: ghcr.io/michel-az-de/hiram-dispatcher:${HIRAM_IMAGE_TAG:-latest}
     environment:
       ConnectionStrings__Hiram: "Host=postgres;Port=5432;Database=hiram;Username=hiram;Password=${POSTGRES_PASSWORD}"
       ConnectionStrings__RabbitMq: "amqp://hiram:${RABBITMQ_PASSWORD}@rabbitmq:5672/"
