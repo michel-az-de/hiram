@@ -80,8 +80,12 @@ public class BootstrapTests : IAsyncLifetime
     [Fact]
     public async Task Bootstrap_IsServedInDemoEnvironment()
     {
+        // The demo host applies the schema itself: unlike the shared Development factory, nothing
+        // else guarantees migrations ran before this test touches the database.
         await using var demo = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder => builder.UseEnvironment("Demo"));
+            .WithWebHostBuilder(builder => builder
+                .UseEnvironment("Demo")
+                .UseSetting("Hiram:MigrateOnStartup", "true"));
         var client = demo.CreateClient();
         client.DefaultRequestHeaders.Add("X-Admin-Key", AdminKey);
 
