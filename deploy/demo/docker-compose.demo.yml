@@ -110,9 +110,11 @@ services:
       ConnectionStrings__Redis: "redis:6379,abortConnect=false"
       DataProtection__KeysPath: "/var/hiram/dataprotection-keys"
       Hiram__Email__Platform__Provider: "smtp"
-      Hiram__Email__Platform__Settings__Host: "mailpit"
-      Hiram__Email__Platform__Settings__Port: "1025"
-      Hiram__Email__Platform__Settings__From: ${DEMO_MAIL_FROM}
+      # The smtp provider reads lowercase setting keys and the dictionary is case sensitive.
+      Hiram__Email__Platform__Settings__host: "mailpit"
+      Hiram__Email__Platform__Settings__port: "1025"
+      Hiram__Email__Platform__Settings__from: ${DEMO_MAIL_FROM}
+      Hiram__Email__Platform__Settings__security: "none"
       Hiram__Push__Vapid__Subject: ${VAPID_SUBJECT}
       Hiram__Push__Vapid__PublicKey: ${VAPID_PUBLIC_KEY}
       Hiram__Push__Vapid__PrivateKey: ${VAPID_PRIVATE_KEY}
