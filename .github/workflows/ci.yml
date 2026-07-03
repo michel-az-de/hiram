@@ -41,19 +41,43 @@ jobs:
 
   docker-images:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Builds prove the Dockerfiles publish cleanly; the build stage runs the same Release publish
-      # (warnings as errors) the test job does.
+      # Pull requests stop at the build (the Dockerfiles must publish cleanly, warnings as errors);
+      # pushes to main also publish to GHCR tagged with the commit sha, so every deploy is traceable
+      # to the exact commit, plus a moving latest.
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build api image
-        run: docker build -f src/Hiram.Api/Dockerfile -t hiram-api:ci .
+        run: >
+          docker build -f src/Hiram.Api/Dockerfile
+          -t ghcr.io/${{ github.repository }}-api:${{ github.sha }}
+          -t ghcr.io/${{ github.repository }}-api:latest .
 
       - name: Build dispatcher image
-        run: docker build -f src/Hiram.Dispatcher/Dockerfile -t hiram-dispatcher:ci .
+        run: >
+          docker build -f src/Hiram.Dispatcher/Dockerfile
+          -t ghcr.io/${{ github.repository }}-dispatcher:${{ github.sha }}
+          -t ghcr.io/${{ github.repository }}-dispatcher:latest .
+
+      - name: Push images
+        if: github.event_name == 'push'
+        run: |
+          docker push --all-tags ghcr.io/${{ github.repository }}-api
+          docker push --all-tags ghcr.io/${{ github.repository }}-dispatcher
 
   deploy-manifests:
     runs-on: ubuntu-latest
