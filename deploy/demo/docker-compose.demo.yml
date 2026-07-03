@@ -1,0 +1,152 @@
+# Public demo stack (ADR-022): the production images behind Caddy with automatic TLS on a sslip.io
+# host. Postgres, Redis and RabbitMQ stay unpublished; only Caddy (80/443) and the NSG-restricted
+# Mailpit and RabbitMQ management UIs reach the host. Copy .env.demo.example to .env and fill it in.
+name: hiram-demo
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: hiram
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: hiram
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hiram -d hiram"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    environment:
+      RABBITMQ_DEFAULT_USER: hiram
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set in .env}
+    ports:
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # The visible inbox of the demo: the platform SMTP provider delivers here and Caddy serves the UI
+  # under /mailpit on the public host. Demo content only, nothing leaves the box.
+  mailpit:
+    image: axllent/mailpit:latest
+    environment:
+      MP_WEBROOT: /mailpit
+    ports:
+      - "8025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+    restart: unless-stopped
+
+  # The aspnet images run as the non-root app user (uid 1654); a named volume starts root-owned, so
+  # this one-shot hands the key ring over before api and dispatcher mount it.
+  keyring-init:
+    image: busybox:1.37
+    command: ["chown", "-R", "1654:1654", "/keys"]
+    volumes:
+      - keyring:/keys
+    restart: "no"
+
+  migrate:
+    image: hiram-api:demo
+    command: ["--migrate-only"]
+    environment:
+      ConnectionStrings__Hiram: "Host=postgres;Port=5432;Database=hiram;Username=hiram;Password=${POSTGRES_PASSWORD}"
+      ConnectionStrings__Redis: "redis:6379,abortConnect=false"
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: hiram-api:demo
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Demo"
+      ConnectionStrings__Hiram: "Host=postgres;Port=5432;Database=hiram;Username=hiram;Password=${POSTGRES_PASSWORD}"
+      ConnectionStrings__Redis: "redis:6379,abortConnect=false"
+      Hiram__AdminKey: ${HIRAM_ADMIN_KEY:?set in .env}
+      Hiram__MigrateOnStartup: "false"
+      DataProtection__KeysPath: "/var/hiram/dataprotection-keys"
+      Hiram__Push__Vapid__Subject: ${VAPID_SUBJECT}
+      Hiram__Push__Vapid__PublicKey: ${VAPID_PUBLIC_KEY}
+      Hiram__Push__Vapid__PrivateKey: ${VAPID_PRIVATE_KEY}
+      Hiram__Metering__DefaultBase: "1"
+      Hiram__Metering__PerKilobyte: "1"
+      OTEL_SDK_DISABLED: "true"
+    volumes:
+      - ../../site:/site:ro
+      - keyring:/var/hiram/dataprotection-keys
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      keyring-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  dispatcher:
+    image: hiram-dispatcher:demo
+    environment:
+      ConnectionStrings__Hiram: "Host=postgres;Port=5432;Database=hiram;Username=hiram;Password=${POSTGRES_PASSWORD}"
+      ConnectionStrings__RabbitMq: "amqp://hiram:${RABBITMQ_PASSWORD}@rabbitmq:5672/"
+      ConnectionStrings__Redis: "redis:6379,abortConnect=false"
+      DataProtection__KeysPath: "/var/hiram/dataprotection-keys"
+      Hiram__Email__Platform__Provider: "smtp"
+      Hiram__Email__Platform__Settings__Host: "mailpit"
+      Hiram__Email__Platform__Settings__Port: "1025"
+      Hiram__Email__Platform__Settings__From: ${DEMO_MAIL_FROM}
+      Hiram__Push__Vapid__Subject: ${VAPID_SUBJECT}
+      Hiram__Push__Vapid__PublicKey: ${VAPID_PUBLIC_KEY}
+      Hiram__Push__Vapid__PrivateKey: ${VAPID_PRIVATE_KEY}
+      OTEL_SDK_DISABLED: "true"
+    volumes:
+      - keyring:/var/hiram/dataprotection-keys
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      keyring-init:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DEMO_HOST: ${DEMO_HOST:?set in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+      - mailpit
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  keyring:
+  caddy-data:
+  caddy-config:

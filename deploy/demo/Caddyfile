@@ -1,0 +1,15 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$DEMO_HOST} {
+	encode gzip
+
+	handle /mailpit* {
+		reverse_proxy mailpit:8025
+	}
+
+	handle {
+		reverse_proxy api:8080
+	}
+}
