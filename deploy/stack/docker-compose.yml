@@ -1,0 +1,267 @@
+# Joint VM stack: Levante (blog, .NET + MongoDB + Next) and Hiram (notifications, .NET + Postgres)
+# running together, with Levante emitting events to Hiram over POST /v1/events and Hiram delivering
+# email to Mailpit. Unified observability via a single OTLP collector (grafana/otel-lgtm).
+#
+# Only Caddy (80/443) is public; management UIs bind to 127.0.0.1 (reach them over an SSH tunnel).
+# Copy .env.example to .env and fill it in. Images come from GHCR (published by each repo's CI); a
+# commented build section per Levante image is the local-build escape hatch.
+name: levante-hiram
+
+services:
+  # --- Data stores ---
+
+  # Single node replica set: Levante's transactional outbox needs transactions, which require a
+  # replica set. GravadorDeAgregadoMongo only takes the transactional path when hello reports setName.
+  mongo:
+    image: mongo:7
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # One shot: initiate the replica set once (idempotent) and block until this node is PRIMARY, so
+  # levante-api never starts writing against a standalone that would silently degrade to non atomic.
+  mongo-rs-init:
+    image: mongo:7
+    depends_on:
+      mongo:
+        condition: service_healthy
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -e
+        mongosh --host mongo:27017 --quiet --eval '
+          try { rs.status() } catch (e) { rs.initiate({_id: "rs0", members: [{_id: 0, host: "mongo:27017"}]}) }
+        '
+        for i in $(seq 1 30); do
+          state=$(mongosh --host mongo:27017 --quiet --eval "try { rs.status().myState } catch(e) { 0 }")
+          if [ "$state" = "1" ]; then echo "replica set PRIMARY"; exit 0; fi
+          sleep 1
+        done
+        echo "replica set did not reach PRIMARY" >&2; exit 1
+    restart: "no"
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: hiram
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: hiram
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hiram -d hiram"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    environment:
+      RABBITMQ_DEFAULT_USER: hiram
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set in .env}
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    ports:
+      - "127.0.0.1:15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:latest
+    environment:
+      MP_WEBROOT: /mailpit
+    ports:
+      - "127.0.0.1:8025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+    restart: unless-stopped
+
+  # --- Observability: one OTLP collector for both apps (traces, metrics, logs) ---
+  lgtm:
+    image: grafana/otel-lgtm:latest
+    ports:
+      - "127.0.0.1:3000:3000"   # Grafana (tunnel only)
+    volumes:
+      - lgtmdata:/data
+    restart: unless-stopped
+
+  # --- Hiram (notifications) ---
+  keyring-init:
+    image: busybox:1.37
+    command: ["chown", "-R", "1654:1654", "/keys"]
+    volumes:
+      - keyring:/keys
+    restart: "no"
+
+  hiram-migrate:
+    image: ghcr.io/michel-az-de/hiram-api:${HIRAM_IMAGE_TAG:-latest}
+    command: ["--migrate-only"]
+    environment:
+      ConnectionStrings__Hiram: "Host=postgres;Port=5432;Database=hiram;Username=hiram;Password=${POSTGRES_PASSWORD}"
+      ConnectionStrings__Redis: "redis:6379,abortConnect=false"
+      OTEL_SDK_DISABLED: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  hiram-api:
+    image: ghcr.io/michel-az-de/hiram-api:${HIRAM_IMAGE_TAG:-latest}
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ConnectionStrings__Hiram: "Host=postgres;Port=5432;Database=hiram;Username=hiram;Password=${POSTGRES_PASSWORD}"
+      ConnectionStrings__Redis: "redis:6379,abortConnect=false"
+      Hiram__AdminKey: ${HIRAM_ADMIN_KEY:?set in .env}
+      Hiram__MigrateOnStartup: "false"
+      DataProtection__KeysPath: "/var/hiram/dataprotection-keys"
+      Hiram__Push__Vapid__Subject: ${VAPID_SUBJECT:-mailto:ops@example.com}
+      Hiram__Push__Vapid__PublicKey: ${VAPID_PUBLIC_KEY:-}
+      Hiram__Push__Vapid__PrivateKey: ${VAPID_PRIVATE_KEY:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://lgtm:4317"
+      OTEL_SERVICE_NAME: "hiram-api"
+    # Bound to loopback only: Caddy never proxies Hiram to the public edge (the browser talks to
+    # levante-web, which reaches Hiram in-network). Admin and provisioning run over an SSH tunnel to
+    # this port, so /v1/admin (X-Admin-Key) is never publicly reachable.
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - keyring:/var/hiram/dataprotection-keys
+    depends_on:
+      hiram-migrate:
+        condition: service_completed_successfully
+      keyring-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      lgtm:
+        condition: service_started
+    restart: unless-stopped
+
+  hiram-dispatcher:
+    image: ghcr.io/michel-az-de/hiram-dispatcher:${HIRAM_IMAGE_TAG:-latest}
+    environment:
+      ConnectionStrings__Hiram: "Host=postgres;Port=5432;Database=hiram;Username=hiram;Password=${POSTGRES_PASSWORD}"
+      ConnectionStrings__RabbitMq: "amqp://hiram:${RABBITMQ_PASSWORD}@rabbitmq:5672/"
+      ConnectionStrings__Redis: "redis:6379,abortConnect=false"
+      DataProtection__KeysPath: "/var/hiram/dataprotection-keys"
+      Hiram__Email__Platform__Provider: "smtp"
+      # The smtp provider reads lowercase setting keys and the dictionary is case sensitive.
+      Hiram__Email__Platform__Settings__host: "mailpit"
+      Hiram__Email__Platform__Settings__port: "1025"
+      Hiram__Email__Platform__Settings__from: ${MAIL_FROM:-no-reply@levante.local}
+      Hiram__Email__Platform__Settings__security: "none"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://lgtm:4317"
+      OTEL_SERVICE_NAME: "hiram-dispatcher"
+    volumes:
+      - keyring:/var/hiram/dataprotection-keys
+    depends_on:
+      hiram-migrate:
+        condition: service_completed_successfully
+      keyring-init:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      lgtm:
+        condition: service_started
+    restart: unless-stopped
+
+  # --- Levante (blog + emitter) ---
+  levante-api:
+    image: ghcr.io/michel-az-de/levante-api:${LEVANTE_IMAGE_TAG:-latest}
+    # Local-build escape hatch (set LEVANTE_IMAGE_TAG=local and uncomment):
+    # build:
+    #   context: ../../../levante
+    #   dockerfile: src/api/host/Levante.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      Kestrel__Endpoints__Http__Url: "http://+:8080"
+      Mongo__ConnectionString: "mongodb://mongo:27017/levante?replicaSet=rs0"
+      Mongo__DatabaseName: "levante"
+      Outbox__RelayHabilitado: "true"
+      Hiram__BaseUrl: "http://hiram-api:8080"
+      Hiram__ApiKey: ${HIRAM_LEVANTE_API_KEY:?run provision-levante.sh, then set in .env}
+      Levante__Notificacoes__AdminEmail: ${LEVANTE_ADMIN_NOTIFICACOES_EMAIL:-moderacao@levante.local}
+      Levante__Notificacoes__SiteUrl: ${SITE_URL:?set in .env}
+      Jwt__SecretKey: ${LEVANTE_JWT_SECRET:?set in .env}
+      Admin__Email: ${LEVANTE_ADMIN_EMAIL:?set in .env}
+      Admin__SenhaInicial: ${LEVANTE_ADMIN_SENHA:?set in .env}
+      Engajamento__OrigemHashSecret: ${LEVANTE_ORIGEM_HASH_SECRET:?set in .env}
+      Cors__Origens__0: ${SITE_URL}
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://lgtm:4317"
+      OTEL_SERVICE_NAME: "levante-api"
+    # Single replica: the outbox relay has no lease; Hiram's eventId idempotency makes a concurrent
+    # POST safe, but scaling past 1 would need a lease first (see docs/adr/0002).
+    deploy:
+      replicas: 1
+    depends_on:
+      mongo-rs-init:
+        condition: service_completed_successfully
+      hiram-api:
+        condition: service_started
+      lgtm:
+        condition: service_started
+    restart: unless-stopped
+
+  levante-web:
+    image: ghcr.io/michel-az-de/levante-web:${LEVANTE_IMAGE_TAG:-latest}
+    # Local-build escape hatch (set LEVANTE_IMAGE_TAG=local and uncomment):
+    # build:
+    #   context: ../../../levante/src/web
+    #   dockerfile: Dockerfile
+    environment:
+      NODE_ENV: "production"
+      PORT: "3000"
+      API_BASE_URL: "http://levante-api:8080"
+    depends_on:
+      levante-api:
+        condition: service_started
+    restart: unless-stopped
+
+  # --- Edge ---
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_HOST: ${SITE_HOST:?set in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - levante-web
+      - mailpit
+    restart: unless-stopped
+
+volumes:
+  mongodata:
+  pgdata:
+  rabbitmqdata:
+  keyring:
+  lgtmdata:
+  caddy-data:
+  caddy-config:

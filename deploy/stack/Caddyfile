@@ -1,0 +1,19 @@
+# Public edge. Only the Levante site is served to the internet; Hiram is a backend reached
+# in-network by levante-api and is never proxied here (its admin surface stays off the public edge).
+{
+	email {$ACME_EMAIL}
+}
+
+{$SITE_HOST} {
+	encode gzip
+
+	# Evidence inbox. Restrict this in production (basic_auth or an IP allowlist / NSG); it exposes
+	# captured emails. Kept open here only for the evidence run on an isolated host.
+	handle /mailpit* {
+		reverse_proxy mailpit:8025
+	}
+
+	handle {
+		reverse_proxy levante-web:3000
+	}
+}
