@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationStore, NotificationStore>();
         services.AddScoped<IEventStore, EventStore>();
         services.AddScoped<IRoutineCatalog, RoutineCatalog>();
+        services.AddScoped<IRoutineStore, RoutineStore>();
         services.AddScoped<ITemplateApprovalLookup, TemplateApprovalLookup>();
         services.AddScoped<RoutineResolver>();
         services.AddScoped<IConsentStore, ConsentStore>();

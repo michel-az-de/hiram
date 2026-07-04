@@ -272,6 +272,117 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
         Assert.Contains(inbox, message => message.Subject == expectedSubject);
     }
 
+    [Fact]
+    public async Task LevanteConfirmation_ViaAdminRoutinesEndpoint_DeliversToMailpit()
+    {
+        var (tenantId, client) = await NewTenantClient("live");
+        var token = Guid.NewGuid().ToString("N");
+        var templateName = $"newsletter-confirmacao-{token}";
+        var subject = $"Confirme {token}";
+
+        await CreateApprovedEmailTemplate(
+            client, templateName, subject, "Para confirmar acesse: {{ confirmUrlBase }}?token={{ token }}");
+
+        var routine = await CreateRoutineViaAdmin(tenantId, "assinatura_solicitada", templateName);
+        Assert.Equal(HttpStatusCode.Created, routine.StatusCode);
+
+        var response = await client.PostAsJsonAsync("/v1/events", new
+        {
+            eventType = "assinatura_solicitada",
+            eventId = $"evt-{token}",
+            emissionSeq = 1L,
+            recipient = new { email = "prospect@example.com" },
+            data = new { token, confirmUrlBase = "https://levante.test/newsletter/confirmar" }
+        });
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+
+        var inbox = await WaitForMailpit(subject);
+        Assert.Contains(inbox, message => message.Subject == subject);
+    }
+
+    [Fact]
+    public async Task AdminRoutines_SecondCreate_IsIdempotent()
+    {
+        var (tenantId, client) = await NewTenantClient("live");
+        var token = Guid.NewGuid().ToString("N");
+        var templateName = $"welcome-{token}";
+        await CreateApprovedEmailTemplate(client, templateName, "Bem vindo", "Corpo");
+
+        var first = await CreateRoutineViaAdmin(tenantId, "assinante_confirmado", templateName);
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+
+        var second = await CreateRoutineViaAdmin(tenantId, "assinante_confirmado", templateName);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+
+        await using var db = NewDb();
+        var count = await db.Routines.CountAsync(
+            r => r.TenantId == tenantId && r.EventType == "assinante_confirmado" && r.Active);
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task Replay_SameLevanteEventId_IngestsOnce_DeliversOnce()
+    {
+        var (tenantId, client) = await NewTenantClient("live");
+        var token = Guid.NewGuid().ToString("N");
+        var templateName = $"replay-{token}";
+        var subject = $"Replay {token}";
+        await SeedApprovedEmailRoutine(tenantId, "assinatura_solicitada", templateName, subject, "Corpo");
+
+        var eventId = $"evt-{token}";
+        object body = new
+        {
+            eventType = "assinatura_solicitada",
+            eventId,
+            emissionSeq = 1L,
+            recipient = new { email = "prospect@example.com" },
+            data = new { token, confirmUrlBase = "https://levante.test/newsletter/confirmar" }
+        };
+
+        var first = await client.PostAsJsonAsync("/v1/events", body);
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+
+        var second = await client.PostAsJsonAsync("/v1/events", body);
+        Assert.Equal(HttpStatusCode.Accepted, second.StatusCode);
+        Assert.True(second.Headers.Contains("Idempotency-Replayed"));
+
+        // Primary, deterministic assertion: the unique index collapses the replay to one event.
+        await using var db = NewDb();
+        var events = await db.Events.CountAsync(e => e.TenantId == tenantId && e.EventId == eventId);
+        Assert.Equal(1, events);
+
+        // Secondary: a single email reaches the inbox.
+        var inbox = await WaitForMailpit(subject);
+        Assert.Single(inbox, message => message.Subject == subject);
+    }
+
+    private HttpClient AdminClient()
+    {
+        var admin = _factory!.CreateClient();
+        admin.DefaultRequestHeaders.Add("X-Admin-Key", AdminKey);
+        return admin;
+    }
+
+    private async Task CreateApprovedEmailTemplate(HttpClient client, string name, string subject, string body)
+    {
+        var create = await client.PostAsJsonAsync("/v1/templates", new { channel = "email", name, subject, body });
+        create.EnsureSuccessStatusCode();
+        var template = await create.Content.ReadFromJsonAsync<TemplateCreatedDto>();
+        var approve = await client.PostAsync($"/v1/templates/{template!.Id}/approve", null);
+        approve.EnsureSuccessStatusCode();
+    }
+
+    private async Task<HttpResponseMessage> CreateRoutineViaAdmin(Guid tenantId, string eventType, string templateName) =>
+        await AdminClient().PostAsJsonAsync("/v1/admin/routines", new
+        {
+            tenantId,
+            eventType,
+            templateName,
+            channels = new[] { "email" },
+            category = "transactional",
+            active = true
+        });
+
     private async Task SeedApprovedEmailRoutine(Guid tenantId, string eventType, string templateName, string subject, string body)
     {
         await using var db = NewDb();
@@ -418,6 +529,8 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
     }
 
     private sealed record TenantCreatedDto(Guid Id, string Name, string DeliveryMode);
+
+    private sealed record TemplateCreatedDto(Guid Id);
 
     private sealed record ApiKeyCreatedDto(Guid Id, Guid TenantId, string Name, string Key, string Prefix);
 
