@@ -8,6 +8,8 @@ using Hiram.Contracts;
 using Hiram.Dispatcher;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Outbox;
+using Hiram.Domain.Routines;
+using Hiram.Domain.Templates;
 using Hiram.Domain.Tenants;
 using Hiram.Infrastructure;
 using Hiram.Infrastructure.Messaging;
@@ -71,6 +73,7 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
                 services.AddHiramMessaging(rabbitConnection);
                 services.AddHostedService<OutboxRelayWorker>();
                 services.AddHostedService<EmailConsumerWorker>();
+                services.AddHostedService<EventConsumerWorker>();
                 services.AddHostedService<PushConsumerWorker>();
             });
         });
@@ -241,6 +244,47 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
         var expectedSubject = $"Hi Ada {token}";
         var inbox = await WaitForMailpit(expectedSubject);
         Assert.Contains(inbox, message => message.Subject == expectedSubject);
+    }
+
+    [Fact]
+    public async Task EventEmail_Ingested_ResolvesRoutine_Renders_DeliversToMailpit()
+    {
+        var (tenantId, client) = await NewTenantClient("live");
+        var token = Guid.NewGuid().ToString("N");
+        var templateName = $"order-{token}";
+
+        // The routine engine resolves the event to this approved email template, renders it with the event
+        // data and hands the message to the same email path the direct notifications use.
+        await SeedApprovedEmailRoutine(tenantId, "produto_vencendo", templateName, $"Order {{{{ name }}}} {token}", "Body {{ name }}");
+
+        var response = await client.PostAsJsonAsync("/v1/events", new
+        {
+            eventType = "produto_vencendo",
+            eventId = $"evt-{token}",
+            emissionSeq = 1L,
+            recipient = new { email = "ops@example.com" },
+            data = new { name = "Ada" }
+        });
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+
+        var expectedSubject = $"Order Ada {token}";
+        var inbox = await WaitForMailpit(expectedSubject);
+        Assert.Contains(inbox, message => message.Subject == expectedSubject);
+    }
+
+    private async Task SeedApprovedEmailRoutine(Guid tenantId, string eventType, string templateName, string subject, string body)
+    {
+        await using var db = NewDb();
+
+        var template = new Template(Guid.NewGuid(), tenantId, NotificationChannel.Email, templateName, subject, body, DateTimeOffset.UtcNow);
+        template.Approve();
+        db.Set<Template>().Add(template);
+
+        db.Routines.Add(new Routine(
+            Guid.NewGuid(), tenantId, eventType, templateName,
+            new[] { NotificationChannel.Email }, NotificationCategory.Transactional, active: true));
+
+        await db.SaveChangesAsync();
     }
 
     [Fact]
