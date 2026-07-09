@@ -1,0 +1,37 @@
+{
+  "_comment": "Policy v4.0 - allow-list de PROJECT scope (por repo). Escopa as permissoes do fluxo /tarefa-* a este repo, sem alargar toda a maquina. O janitor usa --setting-sources user e NAO carrega este arquivo (isolamento). Copiar para <repo>/.claude/settings.json.",
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git switch:*)",
+      "Bash(git branch:*)",
+      "Bash(git worktree:*)",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(git merge:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git for-each-ref:*)",
+      "Bash(git symbolic-ref:*)",
+      "Bash(git ls-remote:*)",
+      "Bash(git restore:*)",
+      "Bash(gh issue create:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue comment:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh pr comment:*)",
+      "Bash(gh pr edit:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh repo view:*)"
+    ]
+  }
+}
