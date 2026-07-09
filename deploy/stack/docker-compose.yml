@@ -8,44 +8,13 @@
 name: levante-hiram
 
 services:
+  # Limites de memoria abaixo sao PLACEHOLDERS de OOM (evitar que um pico do Levante mate os data
+  # stores do Hiram). TODO(infra): ajustar a RAM real da VM. Ver Levante docs/adr/0003.
+
   # --- Data stores ---
-
-  # Single node replica set: Levante's transactional outbox needs transactions, which require a
-  # replica set. GravadorDeAgregadoMongo only takes the transactional path when hello reports setName.
-  mongo:
-    image: mongo:7
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
-    volumes:
-      - mongodata:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
-  # One shot: initiate the replica set once (idempotent) and block until this node is PRIMARY, so
-  # levante-api never starts writing against a standalone that would silently degrade to non atomic.
-  mongo-rs-init:
-    image: mongo:7
-    depends_on:
-      mongo:
-        condition: service_healthy
-    entrypoint:
-      - bash
-      - -c
-      - |
-        set -e
-        mongosh --host mongo:27017 --quiet --eval '
-          try { rs.status() } catch (e) { rs.initiate({_id: "rs0", members: [{_id: 0, host: "mongo:27017"}]}) }
-        '
-        for i in $(seq 1 30); do
-          state=$(mongosh --host mongo:27017 --quiet --eval "try { rs.status().myState } catch(e) { 0 }")
-          if [ "$state" = "1" ]; then echo "replica set PRIMARY"; exit 0; fi
-          sleep 1
-        done
-        echo "replica set did not reach PRIMARY" >&2; exit 1
-    restart: "no"
+  # Mongo do Levante NAO roda aqui: e externo (Atlas, replica set, usuario de privilegio minimo).
+  # O IP publico da VM entra no allowlist do Atlas. O outbox transacional exige replica set (Atlas
+  # entrega); GravadorDeAgregadoMongo so usa a transacao quando hello reporta setName.
 
   postgres:
     image: postgres:17
@@ -60,6 +29,10 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     restart: unless-stopped
 
   rabbitmq:
@@ -76,6 +49,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     restart: unless-stopped
 
   redis:
@@ -86,6 +63,10 @@ services:
       interval: 10s
       timeout: 3s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     restart: unless-stopped
 
   mailpit:
@@ -99,12 +80,19 @@ services:
     restart: unless-stopped
 
   # --- Observability: one OTLP collector for both apps (traces, metrics, logs) ---
+  # Backend unico de observabilidade (Levante ADR 0003: mantido no lugar de App Insights). Agrega
+  # Grafana+Tempo+Loki+Prometheus, o maior consumidor de RAM da VM. O limite e PLACEHOLDER: subir se
+  # der OOM (o backend nao pode morrer sob carga). TODO(infra): ajustar a RAM real da VM.
   lgtm:
     image: grafana/otel-lgtm:latest
     ports:
       - "127.0.0.1:3000:3000"   # Grafana (tunnel only)
     volumes:
       - lgtmdata:/data
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
     restart: unless-stopped
 
   # --- Hiram (notifications) ---
@@ -197,7 +185,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: "Production"
       Kestrel__Endpoints__Http__Url: "http://+:8080"
-      Mongo__ConnectionString: "mongodb://mongo:27017/levante?replicaSet=rs0"
+      Mongo__ConnectionString: ${MONGO_CONNECTION_STRING:?set in .env (Atlas srv URI, usuario de privilegio minimo)}
       Mongo__DatabaseName: "levante"
       Outbox__RelayHabilitado: "true"
       Hiram__BaseUrl: "http://hiram-api:8080"
@@ -207,6 +195,8 @@ services:
       Jwt__SecretKey: ${LEVANTE_JWT_SECRET:?set in .env}
       Admin__Email: ${LEVANTE_ADMIN_EMAIL:?set in .env}
       Admin__SenhaInicial: ${LEVANTE_ADMIN_SENHA:?set in .env}
+      # Cria o primeiro admin no boot a partir do .env (o codigo do Levante exige este opt-in em Producao).
+      Admin__PermitirSeedEmProducao: "true"
       Engajamento__OrigemHashSecret: ${LEVANTE_ORIGEM_HASH_SECRET:?set in .env}
       Cors__Origens__0: ${SITE_URL}
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://lgtm:4317"
@@ -215,9 +205,10 @@ services:
     # POST safe, but scaling past 1 would need a lease first (see docs/adr/0002).
     deploy:
       replicas: 1
+      resources:
+        limits:
+          memory: 512M
     depends_on:
-      mongo-rs-init:
-        condition: service_completed_successfully
       hiram-api:
         condition: service_started
       lgtm:
@@ -234,6 +225,18 @@ services:
       NODE_ENV: "production"
       PORT: "3000"
       API_BASE_URL: "http://levante-api:8080"
+      # Sem SITE_URL o container falha no boot (fail-fast em instrumentation.ts): alimenta
+      # canonical/sitemap/RSS/OG/JSON-LD. Nao deixar cair em localhost.
+      SITE_URL: ${SITE_URL:?set in .env}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     depends_on:
       levante-api:
         condition: service_started
@@ -254,11 +257,9 @@ services:
       - caddy-config:/config
     depends_on:
       - levante-web
-      - mailpit
     restart: unless-stopped
 
 volumes:
-  mongodata:
   pgdata:
   rabbitmqdata:
   keyring:

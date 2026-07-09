@@ -7,11 +7,8 @@
 {$SITE_HOST} {
 	encode gzip
 
-	# Evidence inbox. Restrict this in production (basic_auth or an IP allowlist / NSG); it exposes
-	# captured emails. Kept open here only for the evidence run on an isolated host.
-	handle /mailpit* {
-		reverse_proxy mailpit:8025
-	}
+	# Mailpit NAO e exposto no edge publico (contem e-mails capturados): acesso so pela porta
+	# loopback 127.0.0.1:8025 via tunel SSH, como as demais UIs de gestao (rabbit, grafana).
 
 	handle {
 		reverse_proxy levante-web:3000
