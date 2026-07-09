@@ -80,12 +80,19 @@ services:
     restart: unless-stopped
 
   # --- Observability: one OTLP collector for both apps (traces, metrics, logs) ---
+  # Backend unico de observabilidade (Levante ADR 0003: mantido no lugar de App Insights). Agrega
+  # Grafana+Tempo+Loki+Prometheus, o maior consumidor de RAM da VM. O limite e PLACEHOLDER: subir se
+  # der OOM (o backend nao pode morrer sob carga). TODO(infra): ajustar a RAM real da VM.
   lgtm:
     image: grafana/otel-lgtm:latest
     ports:
       - "127.0.0.1:3000:3000"   # Grafana (tunnel only)
     volumes:
       - lgtmdata:/data
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
     restart: unless-stopped
 
   # --- Hiram (notifications) ---
