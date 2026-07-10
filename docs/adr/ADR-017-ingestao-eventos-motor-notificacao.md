@@ -92,3 +92,52 @@ ou enforcement de quota.
 2. [ ] Motor de rotinas, consentimento, bloqueio, fallback, adiamento (passos 1.2 a 1.7).
 3. [ ] Idempotência de mensagem no fan-out e claim antes do provider (passo 1.8).
 4. [ ] Outbox de emissão com `emission_seq` no EasyStok (passo 1.9).
+
+## Adendo (2026-07-10): claim de entrega, liberação e recuperação de Sending
+
+A decisão de borda 3 cravou o claim antes do provider, mas o item de ação 3 nunca foi implementado:
+nenhum dos processors chama o claim. Os componentes existem e têm teste unit (`MessageDispatchGuard`,
+`MessageClaimStore`), mas sem call-site no caminho de entrega. Ligar o claim agora, com tenant em modo
+Live, expõe uma borda que a decisão 3 não cobriu: a falha antes do provider.
+
+Um claim tomado e não liberado, seguido de nack com requeue (`RabbitConsumerWorker` faz
+`BasicNackAsync(requeue: true)` em falha transitória), faz a redelivery encontrar o claim e pular: a
+mensagem nunca é enviada nem vira dead-letter. O claim ingênuo troca duplicação por perda muda, que é
+pior de detectar. Este adendo estende a decisão 3, não a substitui.
+
+### Decisões de borda adicionais
+
+10. **Fronteira pré/pós-provider.** A pergunta que decide a liberação é "o provider foi chamado?".
+    Falha antes do provider (montagem da mensagem, dependência indisponível, exceção controlada) libera
+    o claim, porque nada foi enviado e a redelivery deve reenviar. Falha depois do provider (resultado
+    incerto) não libera: a linha fica em `Sending` e é tratada pela recuperação. Isso revisa a leitura
+    literal da decisão 3 ("na mesma transação do DeliveryAttempt"): o claim é commitado antes do
+    provider, em transação própria; o DeliveryAttempt de resultado, por ser pós-provider, é uma segunda
+    transação.
+11. **Chave do claim de entrega.** O claim usa o `notification_id`, único por mensagem tanto no caminho
+    direto quanto no fan-out por evento. É o segundo nível da idempotência de dois níveis da decisão 2:
+    o primeiro impede refazer o fan-out, o segundo impede chamar o provider duas vezes para a mesma
+    mensagem.
+12. **Liberação no dead-letter.** Quando a mensagem vira dead-letter, o claim é liberado. Sem isso, o
+    replay (o `DeadLetterReplay` gera nova outbox row para o mesmo `notification_id`) encontraria o
+    claim preexistente e seria pulado em silêncio. Liberar no dead-letter mantém o replay funcional.
+13. **Recuperação de `Sending` órfão, fail-safe.** Uma linha presa em `Sending` além de um limiar
+    (crash depois do provider, ou crash entre o claim e o provider sem chance de liberar) é recuperada
+    por um job. Como a única autoridade sobre "o provider entregou?" é o callback do provider (ADR-019,
+    ainda inexistente), a recuperação nunca reenvia às cegas: manda para dead-letter com alerta humano.
+    Reenviar reintroduziria a duplicata que o claim existe para evitar. Quando o ADR-019 aterrissar, a
+    recuperação pode consultar o status real e decidir reenvio seguro.
+14. **Extensão do port.** `IMessageClaimStore` hoje só expõe `TryClaimAsync`. A liberação exige estender
+    o port, com todos os call-sites no mesmo commit. A recuperação exige uma consulta de linhas
+    `Sending` vencidas.
+
+### Itens de ação do adendo
+
+5. [ ] Estender `IMessageClaimStore` com liberação (issue #34).
+6. [ ] Claim antes do provider nos 3 processors, com liberação pré-provider (issue #34).
+7. [ ] Job de recuperação de `Sending` órfão, fail-safe com dead-letter e alerta (issue #35).
+
+### Gatilho de revisão do adendo
+
+Chegada do ADR-019 (callbacks de provider), que permite à recuperação decidir reenvio seguro em vez de
+apenas alertar.
