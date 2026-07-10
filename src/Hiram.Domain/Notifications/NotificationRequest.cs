@@ -83,6 +83,17 @@ public sealed class NotificationRequest
         Status = NotificationStatus.DeadLettered;
     }
 
+    public void MarkSuppressed()
+    {
+        // Suppression is a decision not to send, taken before delivery. A message that already reached
+        // the provider or settled cannot be un-sent, so those states are not suppressible.
+        if (Status is NotificationStatus.Sent or NotificationStatus.DeadLettered)
+            throw new InvalidOperationException(
+                $"A notification that already reached {Status} cannot be suppressed.");
+
+        Status = NotificationStatus.Suppressed;
+    }
+
     public void RequeueForReplay()
     {
         if (Status != NotificationStatus.DeadLettered)

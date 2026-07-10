@@ -174,4 +174,33 @@ public class NotificationRequestTests
 
         Assert.Throws<InvalidOperationException>(request.RequeueForReplay);
     }
+
+    [Fact]
+    public void MarkSuppressed_TransitionsFromAccepted()
+    {
+        var request = CreateValid();
+
+        request.MarkSuppressed();
+
+        Assert.Equal(NotificationStatus.Suppressed, request.Status);
+    }
+
+    [Fact]
+    public void MarkSuppressed_RejectsAlreadySentNotification()
+    {
+        var request = CreateValid();
+        request.MarkSent();
+
+        Assert.Throws<InvalidOperationException>(request.MarkSuppressed);
+    }
+
+    [Fact]
+    public void MarkSuppressed_RejectsDeadLettered()
+    {
+        var request = CreateValid();
+        request.MarkSending();
+        request.MarkDeadLettered();
+
+        Assert.Throws<InvalidOperationException>(request.MarkSuppressed);
+    }
 }
