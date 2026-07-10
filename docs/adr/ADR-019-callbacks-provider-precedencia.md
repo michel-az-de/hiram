@@ -1,6 +1,6 @@
 # ADR-019: Callbacks de provider, máquina de estados de entrega idempotente por precedência
 
-**Status:** Proposto
+**Status:** Aceito
 **Data:** 2026-07-10
 **Decisores:** Felipe (arquiteto)
 
