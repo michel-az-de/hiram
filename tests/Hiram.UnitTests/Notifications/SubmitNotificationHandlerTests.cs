@@ -159,7 +159,9 @@ public class SubmitNotificationHandlerTests
     public async Task Submit_WithKnownIdempotencyKey_DoesNotCharge()
     {
         var harness = Build();
-        harness.Idempotency.ClaimResult = Guid.NewGuid();
+        var original = Guid.NewGuid();
+        harness.Idempotency.ClaimResult = original;
+        harness.Reader.ExistingId = original;
 
         await harness.Handler.SubmitAsync(ValidCommand("evt-1"), CancellationToken.None);
 
@@ -219,12 +221,27 @@ public class SubmitNotificationHandlerTests
         var harness = Build();
         var original = Guid.NewGuid();
         harness.Idempotency.ClaimResult = original;
+        harness.Reader.ExistingId = original;
 
         var result = await harness.Handler.SubmitAsync(ValidCommand("evt-1"), CancellationToken.None);
 
         Assert.True(result.Replayed);
         Assert.Equal(original, result.NotificationId);
         Assert.Equal(0, harness.Store.SaveCalls);
+    }
+
+    [Fact]
+    public async Task Submit_WhenClaimHasNoPersistedRow_SubmitsFreshInsteadOfReplaying()
+    {
+        var harness = Build();
+        harness.Idempotency.ClaimResult = Guid.NewGuid(); // Redis points at a claim...
+        harness.Reader.ExistingId = null;                 // ...whose owner never committed a row.
+
+        var result = await harness.Handler.SubmitAsync(ValidCommand("evt-1"), CancellationToken.None);
+
+        Assert.False(result.Replayed);
+        Assert.Equal(1, harness.Store.SaveCalls);
+        Assert.NotEqual(Guid.Empty, result.NotificationId);
     }
 
     [Fact]
