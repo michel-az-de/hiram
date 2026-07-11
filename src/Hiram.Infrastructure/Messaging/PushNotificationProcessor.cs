@@ -74,8 +74,21 @@ public sealed class PushNotificationProcessor
         if (notification.Status is NotificationStatus.Sent or NotificationStatus.Failed or NotificationStatus.DeadLettered)
             return;
 
+        // Claim the send atomically before touching the provider: only one consumer moves the row out of the
+        // pre-send state, so concurrent redelivery (prefetch or multiple replicas) cannot both reach the
+        // provider. Postgres is the authority for "already claimed", the same guarded transition used by the
+        // dead-letter replay. Recovering a row stranded in Sending stays out of scope here (ADR-017 #35).
+        var claimed = await _context.NotificationRequests
+            .Where(x => x.Id == notification.Id
+                && (x.Status == NotificationStatus.Accepted || x.Status == NotificationStatus.Queued))
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.Status, NotificationStatus.Sending), cancellationToken);
+
+        if (claimed == 0)
+            return;
+
+        // The atomic update bypasses the change tracker, so sync the loaded entity to Sending, otherwise the
+        // downstream guard in MarkDeadLettered would reject a settled outcome.
         notification.MarkSending();
-        await _context.SaveChangesAsync(cancellationToken);
 
         if (await IsShadowAsync(notification.TenantId, cancellationToken))
         {
