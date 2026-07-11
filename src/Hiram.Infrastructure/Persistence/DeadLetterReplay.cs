@@ -46,7 +46,7 @@ public sealed class DeadLetterReplay : IDeadLetterReplay
         }
 
         var deadLetter = await _context.DeadLetterMessages
-            .FirstOrDefaultAsync(d => d.NotificationId == notificationId && d.ReplayedAtUtc == null, cancellationToken);
+            .FirstOrDefaultAsync(d => d.TenantId == tenantId && d.NotificationId == notificationId && d.ReplayedAtUtc == null, cancellationToken);
         if (deadLetter is null)
         {
             await transaction.RollbackAsync(cancellationToken);
