@@ -203,4 +203,22 @@ public class NotificationRequestTests
 
         Assert.Throws<InvalidOperationException>(request.MarkSuppressed);
     }
+
+    [Fact]
+    public void MarkSuppressed_RejectsSending()
+    {
+        var request = CreateValid();
+        request.MarkSending();
+
+        Assert.Throws<InvalidOperationException>(request.MarkSuppressed);
+    }
+
+    [Fact]
+    public void MarkSuppressed_RejectsFailed()
+    {
+        var request = CreateValid();
+        request.MarkFailed();
+
+        Assert.Throws<InvalidOperationException>(request.MarkSuppressed);
+    }
 }
