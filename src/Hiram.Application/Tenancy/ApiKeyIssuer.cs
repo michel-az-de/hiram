@@ -20,7 +20,7 @@ public static class ApiKeyIssuer
             tenantId,
             name,
             ApiKeyHasher.Hash(clearKey),
-            clearKey[..8],
+            clearKey[..16],
             now);
 
         return new IssuedApiKey(apiKey, clearKey);
