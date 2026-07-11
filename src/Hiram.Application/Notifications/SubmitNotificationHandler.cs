@@ -39,8 +39,15 @@ public sealed class SubmitNotificationHandler : ISubmitNotification
         if (key is not null)
         {
             var claimed = await _idempotency.TryClaimAsync(command.TenantId, key, notificationId, cancellationToken);
-            if (claimed is Guid replayId)
-                return Replay(replayId);
+            if (claimed is Guid)
+            {
+                // Redis only accelerates the happy path; a claim can outlive an owner that never committed
+                // (crash between claim and persist), so confirm the durable row before replaying. When it is
+                // absent the claim is a ghost: fall through and let the unique index arbitrate a fresh submit.
+                var persistedId = await _reader.FindIdByIdempotencyKeyAsync(command.TenantId, key, cancellationToken);
+                if (persistedId is Guid replayId)
+                    return Replay(replayId);
+            }
         }
 
         var now = _clock.UtcNow;

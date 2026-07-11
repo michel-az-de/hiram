@@ -47,6 +47,20 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         }
     }
 
+    private sealed class CountingProvider : IEmailProvider
+    {
+        private int _calls;
+
+        public string Name => "fake";
+        public int Calls => Volatile.Read(ref _calls);
+
+        public Task<SendOutcome> SendAsync(EmailMessage message, EmailProviderSettings settings, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _calls);
+            return Task.FromResult<SendOutcome>(new SendOutcome.Sent());
+        }
+    }
+
     private sealed class NoTenantConfig : ITenantProviderConfigStore
     {
         public Task<TenantProviderConfig?> FindAsync(Guid tenantId, NotificationChannel channel, CancellationToken cancellationToken) =>
@@ -282,5 +296,24 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
 
         await using var verify = NewContext();
         Assert.Empty(await verify.OutboxMessages.Where(o => o.TenantId == tenantId && o.Type == "webhook").ToListAsync());
+    }
+
+    [Fact]
+    public async Task Process_ClaimsBeforeDelivery_SoConcurrentRedeliveryReachesTheProviderOnce()
+    {
+        var (tenantId, notificationId) = await Seed(DeliveryMode.Live);
+        var provider = new CountingProvider();
+
+        await using var contextA = NewContext();
+        await using var contextB = NewContext();
+
+        // Two consumers race the same message (prefetch or two replicas). Only the claim winner sends.
+        await Task.WhenAll(
+            BuildProcessor(contextA, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None),
+            BuildProcessor(contextB, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None));
+
+        Assert.Equal(1, provider.Calls);
+        Assert.Equal(NotificationStatus.Sent, await StatusOf(notificationId));
+        Assert.Single(await AttemptsFor(notificationId));
     }
 }

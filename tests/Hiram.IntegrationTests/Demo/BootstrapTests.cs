@@ -53,7 +53,7 @@ public class BootstrapTests : IAsyncLifetime
         Assert.Equal("hiram-demo", result.TenantName);
         Assert.Equal("shadow", result.DeliveryMode);
         Assert.StartsWith("hk_live_", result.ApiKey);
-        Assert.Equal("hk_live_", result.ApiKeyPrefix);
+        Assert.Equal(result.ApiKey[..16], result.ApiKeyPrefix);
     }
 
     [Fact]
