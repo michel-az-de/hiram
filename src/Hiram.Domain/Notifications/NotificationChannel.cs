@@ -3,5 +3,6 @@ namespace Hiram.Domain.Notifications;
 public enum NotificationChannel
 {
     Email = 1,
-    Push = 2
+    Push = 2,
+    WhatsApp = 3
 }

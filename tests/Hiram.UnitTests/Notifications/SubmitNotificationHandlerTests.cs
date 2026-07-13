@@ -273,4 +273,20 @@ public class SubmitNotificationHandlerTests
 
         Assert.Equal(1, harness.Idempotency.ReleaseCalls);
     }
+
+    // Until the whatsapp pipeline is wired (F7 steps 6 and 7), an accepted whatsapp submit has no routing
+    // key and must fail loudly rather than route nowhere.
+    [Fact]
+    public async Task Submit_ThrowsForWhatsApp_UntilTheChannelIsWired()
+    {
+        var harness = Build();
+        var command = new SubmitNotificationCommand(
+            DevTenant, NotificationChannel.WhatsApp, "+5511999990000", "hello", "body", null);
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            harness.Handler.SubmitAsync(command, CancellationToken.None));
+
+        // Fail loudly means route nowhere: nothing was persisted for the unwired channel.
+        Assert.Equal(0, harness.Store.SaveCalls);
+    }
 }
