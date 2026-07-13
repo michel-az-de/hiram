@@ -39,6 +39,47 @@ public class ConsentTests
         Assert.False(allowed);
     }
 
+    [Theory]
+    [InlineData(NotificationCategory.Transactional)]
+    [InlineData(NotificationCategory.Operational)]
+    [InlineData(NotificationCategory.Marketing)]
+    public async Task WhatsApp_WithoutConsentRecord_IsDeniedInEveryCategory(NotificationCategory category)
+    {
+        var policy = new ConsentPolicy(new FakeConsentStore { Current = null });
+
+        var allowed = await policy.IsAllowedAsync(Tenant, User, NotificationChannel.WhatsApp, category, CancellationToken.None);
+
+        Assert.False(allowed);
+    }
+
+    [Fact]
+    public async Task WhatsApp_WithOptInRecord_IsAllowed()
+    {
+        var store = new FakeConsentStore
+        {
+            Current = new Consent(Guid.NewGuid(), Tenant, User, NotificationChannel.WhatsApp, NotificationCategory.Transactional, optIn: true, DateTimeOffset.UtcNow)
+        };
+        var policy = new ConsentPolicy(store);
+
+        var allowed = await policy.IsAllowedAsync(Tenant, User, NotificationChannel.WhatsApp, NotificationCategory.Transactional, CancellationToken.None);
+
+        Assert.True(allowed);
+    }
+
+    // Regression guard: the whatsapp deny-by-default must not change email's legitimate-interest default.
+    [Theory]
+    [InlineData(NotificationCategory.Transactional, true)]
+    [InlineData(NotificationCategory.Operational, true)]
+    [InlineData(NotificationCategory.Marketing, false)]
+    public async Task Email_WithoutConsentRecord_KeepsLegitimateInterestDefault(NotificationCategory category, bool expected)
+    {
+        var policy = new ConsentPolicy(new FakeConsentStore { Current = null });
+
+        var allowed = await policy.IsAllowedAsync(Tenant, User, NotificationChannel.Email, category, CancellationToken.None);
+
+        Assert.Equal(expected, allowed);
+    }
+
     [Fact]
     public async Task ConsentDualWrite_ReconcilesDrift()
     {

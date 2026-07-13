@@ -19,8 +19,13 @@ public sealed class ConsentPolicy
         if (consent is not null)
             return consent.OptIn;
 
-        // No explicit record: transactional and operational are allowed by legitimate interest; marketing
-        // requires an explicit opt-in.
+        // WhatsApp has no legitimate-interest default: Meta's policy requires an explicit opt-in for every
+        // category, so an absent record denies.
+        if (channel == NotificationChannel.WhatsApp)
+            return false;
+
+        // For the other channels an absent record allows transactional and operational by legitimate
+        // interest; only marketing requires an explicit opt-in.
         return category != NotificationCategory.Marketing;
     }
 }
