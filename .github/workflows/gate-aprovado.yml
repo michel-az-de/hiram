@@ -1,0 +1,22 @@
+name: gate-aprovado
+
+# Human merge gate for high tier PRs (Politica v4.0): a required check that only
+# passes when the 'aprovado' label is on the PR. Branch protection cannot require a
+# label directly, and a solo author cannot approve their own PR, so the label drives
+# this check instead. Re-runs on label changes so applying 'aprovado' turns it green.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  aprovado:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the 'aprovado' label
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'aprovado') }}
+        run: |
+          echo "::error::This PR needs the 'aprovado' label before it can merge (Politica v4.0, tier alto)."
+          exit 1
