@@ -128,3 +128,23 @@ jobs:
           docker compose --env-file prod.env -f deploy/stack/docker-compose.yml config -q
           rm -f dev.env prod.env
           echo "joint stack compose renders for the dev and prod env shapes"
+
+      # The opt-in self-hosted MTA (ADR-026) is a standalone compose that escapes the joint-stack render
+      # above, so validate its profile explicitly with dummy env, or a broken var would only surface on
+      # the deploy host.
+      - name: Validate the self-hosted MTA compose renders (mta profile)
+        run: |
+          set -euo pipefail
+          cat > deploy/mta/mta.ci.env <<'EOF'
+          STALWART_TAG=latest
+          MTA_HOSTNAME=mta.ci.example
+          MTA_SENDING_DOMAIN=ci.example
+          MTA_DKIM_SELECTOR=hiram
+          MTA_SUBMISSION_SECRET=ci-dummy
+          MTA_RELAY_HOST=relay.ci.example
+          MTA_RELAY_USERNAME=ci-dummy
+          MTA_RELAY_PASSWORD=ci-dummy
+          EOF
+          docker compose --env-file deploy/mta/mta.ci.env -f deploy/mta/docker-compose.mta.yml --profile mta config -q
+          rm -f deploy/mta/mta.ci.env
+          echo "mta compose renders for the mta profile"

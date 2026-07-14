@@ -427,3 +427,7 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Self-hosted MTA (ADR-026): DKIM private keys never get committed; the real .env is covered by *.env
+deploy/mta/**/*.key
+deploy/mta/**/*.pem
