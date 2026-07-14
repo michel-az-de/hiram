@@ -1,4 +1,5 @@
 using Hiram.Application.Delivery;
+using Hiram.Infrastructure.Telemetry;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
@@ -7,6 +8,13 @@ namespace Hiram.Infrastructure.Delivery;
 
 public sealed class SmtpEmailProvider : IEmailProvider
 {
+    private readonly ISmtpDestinationPolicy _destinations;
+
+    public SmtpEmailProvider(ISmtpDestinationPolicy destinations)
+    {
+        _destinations = destinations;
+    }
+
     public string Name => "smtp";
 
     public async Task<SendOutcome> SendAsync(EmailMessage message, EmailProviderSettings settings, CancellationToken cancellationToken)
@@ -19,6 +27,25 @@ public sealed class SmtpEmailProvider : IEmailProvider
             return new SendOutcome.PermanentFailure("SMTP provider requires host, port and from.");
         }
 
+        var security = ParseSecurity(settings.Values.GetValueOrDefault("security"));
+
+        if (settings.Origin == ProviderConfigOrigin.Tenant)
+        {
+            // A tenant may point this host anywhere, so it must be encrypted and must not resolve to our
+            // own network. The platform default is the operator's and is trusted to reach an internal MTA.
+            if (security is not (SecureSocketOptions.StartTls or SecureSocketOptions.SslOnConnect))
+                return new SendOutcome.PermanentFailure("Tenant SMTP requires TLS (starttls or ssl).");
+
+            switch (await _destinations.InspectAsync(host, cancellationToken))
+            {
+                case SmtpDestinationVerdict.Blocked:
+                    HiramDiagnostics.SmtpDestinationRejected.Add(1);
+                    return new SendOutcome.PermanentFailure("SMTP destination is not allowed.");
+                case SmtpDestinationVerdict.Unresolved:
+                    return new SendOutcome.TransientFailure("SMTP host did not resolve.");
+            }
+        }
+
         MimeMessage mime;
         try
         {
@@ -29,7 +56,6 @@ public sealed class SmtpEmailProvider : IEmailProvider
             return new SendOutcome.PermanentFailure($"Invalid email address: {ex.Message}");
         }
 
-        var security = ParseSecurity(settings.Values.GetValueOrDefault("security"));
         var username = settings.Values.GetValueOrDefault("username");
 
         using var client = new SmtpClient();
@@ -55,6 +81,11 @@ public sealed class SmtpEmailProvider : IEmailProvider
         catch (AuthenticationException ex)
         {
             return new SendOutcome.PermanentFailure($"SMTP authentication failed: {ex.Message}");
+        }
+        catch (SslHandshakeException ex)
+        {
+            // An untrusted or mismatched TLS certificate will not fix itself on retry: permanent.
+            return new SendOutcome.PermanentFailure($"SMTP TLS handshake failed: {ex.Message}");
         }
         catch (SmtpCommandException ex)
         {

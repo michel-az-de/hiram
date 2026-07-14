@@ -34,7 +34,7 @@ public class ResendEmailProviderTests
     }
 
     private static EmailProviderSettings Settings() =>
-        new(new Dictionary<string, string> { ["from"] = "no-reply@hiram.dev" }, Secret: "re_123");
+        new(new Dictionary<string, string> { ["from"] = "no-reply@hiram.dev" }, Secret: "re_123", ProviderConfigOrigin.Platform);
 
     private static EmailMessage Message() => new("ops@example.com", "hello", "f1 body");
 
@@ -138,7 +138,7 @@ public class ResendEmailProviderTests
 
         var outcome = await provider.SendAsync(
             Message(),
-            new EmailProviderSettings(new Dictionary<string, string>(), Secret: null),
+            new EmailProviderSettings(new Dictionary<string, string>(), Secret: null, ProviderConfigOrigin.Platform),
             CancellationToken.None);
 
         Assert.IsType<SendOutcome.PermanentFailure>(outcome);

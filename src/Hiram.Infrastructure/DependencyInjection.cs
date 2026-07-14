@@ -61,6 +61,7 @@ public static class DependencyInjection
         services.AddScoped<IApiKeyStore, ApiKeyStore>();
         services.AddScoped<ITenantProviderConfigStore, TenantProviderConfigStore>();
         services.AddSingleton<IClock, SystemClock>();
+        services.AddSingleton<ISmtpDestinationPolicy, SmtpDestinationPolicy>();
         services.AddSingleton<IEmailProvider, SmtpEmailProvider>();
         services.AddHttpClient<IEmailProvider, ResendEmailProvider>(client =>
             client.BaseAddress = new Uri("https://api.resend.com/"));

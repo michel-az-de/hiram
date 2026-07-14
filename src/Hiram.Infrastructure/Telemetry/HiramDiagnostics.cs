@@ -23,5 +23,6 @@ public static class HiramDiagnostics
     public static readonly Counter<long> WebhooksDelivered = Meter.CreateCounter<long>("hiram.webhooks.delivered");
     public static readonly Counter<long> WebhooksFailed = Meter.CreateCounter<long>("hiram.webhooks.failed");
     public static readonly Counter<long> IdempotencyReplays = Meter.CreateCounter<long>("hiram.idempotency.replays");
+    public static readonly Counter<long> SmtpDestinationRejected = Meter.CreateCounter<long>("hiram.smtp.destination_rejected");
     public static readonly Histogram<double> SendDuration = Meter.CreateHistogram<double>("hiram.send.duration", unit: "ms");
 }

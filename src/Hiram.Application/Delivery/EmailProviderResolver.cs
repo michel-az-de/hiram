@@ -29,12 +29,12 @@ public sealed class EmailProviderResolver
         if (config is null)
             return new ResolvedEmailProvider(
                 ProviderNamed(_platform.Provider),
-                new EmailProviderSettings(_platform.Settings, _platform.Secret));
+                new EmailProviderSettings(_platform.Settings, _platform.Secret, ProviderConfigOrigin.Platform));
 
         var secret = config.SecretProtected is null ? null : _protector.Unprotect(config.SecretProtected);
         return new ResolvedEmailProvider(
             ProviderNamed(config.Provider),
-            new EmailProviderSettings(ParseSettings(config.Settings), secret));
+            new EmailProviderSettings(ParseSettings(config.Settings), secret, ProviderConfigOrigin.Tenant));
     }
 
     private IEmailProvider ProviderNamed(string name)
