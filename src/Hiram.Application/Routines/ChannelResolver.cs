@@ -20,7 +20,7 @@ public sealed class ChannelResolver
 
     public async Task<IReadOnlyList<NotificationChannel>> ResolveAsync(
         Guid tenantId,
-        Guid userId,
+        Guid? userId,
         NotificationCategory category,
         IReadOnlyList<NotificationChannel> ordered,
         DateTimeOffset now,
