@@ -21,6 +21,9 @@ public class EmailProviderResolverTests
     {
         public Task<TenantProviderConfig?> FindAsync(Guid tenantId, NotificationChannel channel, CancellationToken cancellationToken) =>
             Task.FromResult(config);
+
+        public Task UpsertAsync(TenantProviderConfig config, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
     }
 
     private sealed class FakeProtector : ISecretProtector
