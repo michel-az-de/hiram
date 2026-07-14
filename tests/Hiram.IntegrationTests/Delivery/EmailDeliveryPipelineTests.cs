@@ -1,8 +1,10 @@
 using System.Text.Json;
 using Hiram.Application.Abstractions;
+using Hiram.Application.Blocks;
 using Hiram.Application.Delivery;
 using Hiram.Application.Notifications;
 using Hiram.Application.Tenancy;
+using Hiram.Domain.Blocks;
 using Hiram.Domain.DeadLetters;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Tenants;
@@ -90,7 +92,7 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
             })
             .Build();
 
-    private EmailNotificationProcessor BuildProcessor(HiramDbContext context, IEmailProvider provider)
+    private EmailNotificationProcessor BuildProcessor(HiramDbContext context, IEmailProvider provider, IBlockStore? blocks = null)
     {
         var resolver = new EmailProviderResolver(
             new NoTenantConfig(),
@@ -98,7 +100,31 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
             new PlatformEmailDefaults("fake", null, new Dictionary<string, string>()),
             [provider]);
 
-        return new EmailNotificationProcessor(context, resolver, FastPipeline(), new TestClock(), NullLogger<EmailNotificationProcessor>.Instance);
+        return new EmailNotificationProcessor(
+            context, resolver, new BlockGate(blocks ?? new NoBlocks()), FastPipeline(), new TestClock(),
+            NullLogger<EmailNotificationProcessor>.Instance);
+    }
+
+    private sealed class NoBlocks : IBlockStore
+    {
+        public Task<IReadOnlyList<Block>> ActiveBlocksAsync(Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Block>>([]);
+
+        public Task AddAsync(Block block, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<bool> RemoveAsync(Guid tenantId, Guid id, DateTimeOffset removedAtUtc, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+    }
+
+    private sealed class ChannelBlocked(NotificationChannel channel) : IBlockStore
+    {
+        public Task<IReadOnlyList<Block>> ActiveBlocksAsync(Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Block>>([new Block(Guid.NewGuid(), tenantId, channel, "incident", now, expiresAtUtc: null)]);
+
+        public Task AddAsync(Block block, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<bool> RemoveAsync(Guid tenantId, Guid id, DateTimeOffset removedAtUtc, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
     }
 
     private async Task<(Guid TenantId, Guid NotificationId)> Seed(DeliveryMode deliveryMode)
@@ -171,6 +197,35 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         Assert.Single(attempts);
         Assert.Equal(DeliveryOutcome.Sent, attempts[0].Outcome);
         Assert.Equal("re_abc123", attempts[0].ProviderMessageId);
+    }
+
+    [Fact]
+    public async Task Process_Suppresses_WithoutCallingProvider_WhenChannelBlocked()
+    {
+        var (tenantId, notificationId) = await Seed(DeliveryMode.Live);
+        var provider = new CountingProvider();
+
+        await using (var context = NewContext())
+            await BuildProcessor(context, provider, new ChannelBlocked(NotificationChannel.Email))
+                .ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None);
+
+        Assert.Equal(NotificationStatus.Suppressed, await StatusOf(notificationId));
+        Assert.Equal(0, provider.Calls);
+        Assert.Empty(await AttemptsFor(notificationId));
+    }
+
+    [Fact]
+    public async Task Process_Delivers_Unchanged_WhenNoBlockActive()
+    {
+        // ADR-024 regression guard: with no active block the send path is exactly what it was.
+        var (tenantId, notificationId) = await Seed(DeliveryMode.Live);
+        var provider = new CountingProvider();
+
+        await using (var context = NewContext())
+            await BuildProcessor(context, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None);
+
+        Assert.Equal(NotificationStatus.Sent, await StatusOf(notificationId));
+        Assert.Equal(1, provider.Calls);
     }
 
     [Fact]

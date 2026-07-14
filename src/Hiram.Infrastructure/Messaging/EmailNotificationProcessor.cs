@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Hiram.Application.Abstractions;
+using Hiram.Application.Blocks;
 using Hiram.Application.Delivery;
 using Hiram.Application.Notifications;
 using Hiram.Domain.DeadLetters;
@@ -22,6 +23,7 @@ public sealed class EmailNotificationProcessor
 
     private readonly HiramDbContext _context;
     private readonly EmailProviderResolver _resolver;
+    private readonly BlockGate _blocks;
     private readonly ResiliencePipeline<SendOutcome> _pipeline;
     private readonly IClock _clock;
     private readonly ILogger<EmailNotificationProcessor> _logger;
@@ -29,12 +31,14 @@ public sealed class EmailNotificationProcessor
     public EmailNotificationProcessor(
         HiramDbContext context,
         EmailProviderResolver resolver,
+        BlockGate blocks,
         ResiliencePipeline<SendOutcome> pipeline,
         IClock clock,
         ILogger<EmailNotificationProcessor> logger)
     {
         _context = context;
         _resolver = resolver;
+        _blocks = blocks;
         _pipeline = pipeline;
         _clock = clock;
         _logger = logger;
@@ -71,10 +75,23 @@ public sealed class EmailNotificationProcessor
             ["notification_id"] = notification.Id
         });
 
-        if (notification.Status is NotificationStatus.Sent or NotificationStatus.Failed or NotificationStatus.DeadLettered)
+        if (notification.Status is NotificationStatus.Sent or NotificationStatus.Failed or NotificationStatus.DeadLettered or NotificationStatus.Suppressed)
         {
             // At-least-once redelivery of an already settled notification: nothing to send, let the worker ack.
             // Failed is kept here only to inert historical F1 rows; the live path now settles as dead lettered.
+            return;
+        }
+
+        // Kill-switch (ADR-024): an active channel block suppresses the send, covering the direct
+        // POST /v1/notifications path that never passed through the fan-out. Checked before the claim, while
+        // the status is still a suppressible pre-send state. Without an active block, delivery is unchanged.
+        if (notification.Status is NotificationStatus.Accepted or NotificationStatus.Queued
+            && await _blocks.IsBlockedAsync(notification.TenantId, notification.Channel, _clock.UtcNow, cancellationToken))
+        {
+            notification.MarkSuppressed();
+            await _context.SaveChangesAsync(cancellationToken);
+            HiramDiagnostics.NotificationsSuppressed.Add(1, new KeyValuePair<string, object?>("hiram.reason", "block"));
+            _logger.LogInformation("Email suppressed by an active channel block");
             return;
         }
 
