@@ -29,9 +29,10 @@ public class SmtpDeliveryTests : IAsyncLifetime
                 ["from"] = "no-reply@hiram.dev",
                 ["security"] = "none"
             },
-            Secret: null);
+            Secret: null,
+            ProviderConfigOrigin.Platform);
 
-        var provider = new SmtpEmailProvider();
+        var provider = new SmtpEmailProvider(new SmtpDestinationPolicy());
         var outcome = await provider.SendAsync(
             new EmailMessage("ops@example.com", "hello from hiram", "f1 body"), settings, CancellationToken.None);
 
