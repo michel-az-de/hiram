@@ -11,6 +11,7 @@ using Hiram.Application.Templates;
 using Hiram.Domain.Metering;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Outbox;
+using Hiram.Infrastructure.Telemetry;
 using Microsoft.Extensions.Logging;
 
 namespace Hiram.Infrastructure.Messaging;
@@ -23,6 +24,7 @@ public sealed class EventFanout
     private static readonly IReadOnlyDictionary<string, object?> EmptyData = new Dictionary<string, object?>();
 
     private readonly RoutineResolver _routines;
+    private readonly ChannelResolver _channels;
     private readonly ITemplateStore _templates;
     private readonly ITemplateRenderer _renderer;
     private readonly INotificationStore _store;
@@ -32,6 +34,7 @@ public sealed class EventFanout
 
     public EventFanout(
         RoutineResolver routines,
+        ChannelResolver channels,
         ITemplateStore templates,
         ITemplateRenderer renderer,
         INotificationStore store,
@@ -40,6 +43,7 @@ public sealed class EventFanout
         ILogger<EventFanout> logger)
     {
         _routines = routines;
+        _channels = channels;
         _templates = templates;
         _renderer = renderer;
         _store = store;
@@ -64,8 +68,29 @@ public sealed class EventFanout
             _logger.LogInformation(
                 "Event {EventId} suppressed on channel {Channel}: {Reason}", @event.EventId, item.Channel, item.Reason);
 
+        // The contact's user id decides consent; a missing RecipientUserId falls open for transactional and
+        // operational and closed for marketing (ADR-024).
+        var recipientUserId = Guid.TryParse(@event.Payload.RecipientUserId, out var parsed) ? parsed : (Guid?)null;
+        var now = _clock.UtcNow;
+
         foreach (var item in decision.Fanout)
         {
+            var allowed = await _channels.ResolveAsync(
+                @event.TenantId, recipientUserId, item.Routine.Category, [item.Channel], now, cancellationToken);
+
+            if (allowed.Count == 0)
+            {
+                // Consent (or an active kill-switch) denies this channel: no request is written, so the send
+                // never happens. Recorded for the shadow suppression rate, never a silent drop.
+                _logger.LogInformation(
+                    "Event {EventId} suppressed on channel {Channel} by consent", @event.EventId, item.Channel);
+                HiramDiagnostics.NotificationsSuppressed.Add(
+                    1,
+                    new KeyValuePair<string, object?>("hiram.reason", "consent"),
+                    new KeyValuePair<string, object?>("hiram.channel", item.Channel.ToString().ToLowerInvariant()));
+                continue;
+            }
+
             // Only email is wired in this slice; the other channels fan out in their own waves.
             if (item.Channel == NotificationChannel.Email)
                 await FanOutEmailAsync(@event, item, cancellationToken);

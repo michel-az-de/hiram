@@ -62,4 +62,21 @@ public class ChannelResolverTests
 
         Assert.Empty(result);
     }
+
+    [Fact]
+    public async Task ChannelResolver_WithoutUserId_AllowsOperational_SuppressesMarketing()
+    {
+        // No user id means consent cannot be looked up, so the category default decides.
+        var resolver = Resolver(new FakeConsentStore([]), new FakeBlockStore());
+
+        var operational = await resolver.ResolveAsync(
+            Tenant, userId: null, NotificationCategory.Operational,
+            new[] { NotificationChannel.Email }, Now, CancellationToken.None);
+        Assert.Equal(new[] { NotificationChannel.Email }, operational);
+
+        var marketing = await resolver.ResolveAsync(
+            Tenant, userId: null, NotificationCategory.Marketing,
+            new[] { NotificationChannel.Email }, Now, CancellationToken.None);
+        Assert.Empty(marketing);
+    }
 }

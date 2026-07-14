@@ -80,6 +80,23 @@ public class ConsentTests
         Assert.Equal(expected, allowed);
     }
 
+    // ADR-024: an event without a RecipientUserId cannot be looked up, so email falls open for transactional
+    // and operational and closed for marketing; WhatsApp always denies.
+    [Theory]
+    [InlineData(NotificationChannel.Email, NotificationCategory.Transactional, true)]
+    [InlineData(NotificationChannel.Email, NotificationCategory.Operational, true)]
+    [InlineData(NotificationChannel.Email, NotificationCategory.Marketing, false)]
+    [InlineData(NotificationChannel.WhatsApp, NotificationCategory.Transactional, false)]
+    public async Task WithoutUserId_FallsOpenForLegitimateInterest_ClosedForMarketing(
+        NotificationChannel channel, NotificationCategory category, bool expected)
+    {
+        var policy = new ConsentPolicy(new FakeConsentStore { Current = null });
+
+        var allowed = await policy.IsAllowedAsync(Tenant, userId: null, channel, category, CancellationToken.None);
+
+        Assert.Equal(expected, allowed);
+    }
+
     [Fact]
     public async Task ConsentDualWrite_ReconcilesDrift()
     {
