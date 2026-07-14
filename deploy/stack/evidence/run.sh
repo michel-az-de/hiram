@@ -34,10 +34,21 @@ docker compose exec -T postgres psql -U hiram -d hiram -c \
   "select channel, outcome, created_at_utc from notifications.delivery_attempts order by created_at_utc desc limit 5;" \
   > "$OUT/06-hiram-delivery-attempt.txt" 2>&1 || true
 
-echo "A7: Levante emission marked Enviada (status 1 = Enviada)"
-docker compose exec -T mongo mongosh levante --quiet --eval \
-  "db.outbox.find({'dados.email':'$EMAIL'},{tipo:1,status:1,emissionSeq:1,enviadoEm:1,_id:0}).pretty()" \
-  > "$OUT/07-levante-emission.txt" 2>&1 || true
+echo "A7: Levante emission marked Enviada (outbox in Atlas; status 1 = Enviada)"
+# Mongo is external (Atlas): there is no local 'mongo' service to exec into. Query Atlas with a
+# throwaway mongosh container using the connection string from the environment or from .env.
+MONGO_URI="${MONGO_CONNECTION_STRING:-}"
+if [ -z "$MONGO_URI" ] && [ -f .env ]; then
+  MONGO_URI="$(grep -E '^MONGO_CONNECTION_STRING=' .env | head -n1 | cut -d= -f2- || true)"
+fi
+if [ -n "$MONGO_URI" ]; then
+  docker run --rm mongo:7 mongosh "$MONGO_URI" --quiet --eval \
+    "db.getSiblingDB('levante').outbox.find({'dados.email':'$EMAIL'},{tipo:1,status:1,emissionSeq:1,enviadoEm:1,_id:0}).forEach(printjson)" \
+    > "$OUT/07-levante-emission.txt" 2>&1 || echo "mongosh query against Atlas failed" > "$OUT/07-levante-emission.txt"
+else
+  echo "skipped: set MONGO_CONNECTION_STRING (or fill it in .env) to query the Atlas outbox; Mongo is external, there is no local mongo service" \
+    > "$OUT/07-levante-emission.txt"
+fi
 
 cat > "$OUT/README.md" <<MD
 # Evidence $STAMP (signup: $EMAIL)

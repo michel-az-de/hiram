@@ -154,12 +154,18 @@ services:
       ConnectionStrings__RabbitMq: "amqp://hiram:${RABBITMQ_PASSWORD}@rabbitmq:5672/"
       ConnectionStrings__Redis: "redis:6379,abortConnect=false"
       DataProtection__KeysPath: "/var/hiram/dataprotection-keys"
-      Hiram__Email__Platform__Provider: "smtp"
+      # Email provider is env driven with safe defaults: dev and the interim host stay on
+      # smtp -> mailpit (captures, no external delivery). For real delivery set
+      # HIRAM_EMAIL_PROVIDER=resend + HIRAM_EMAIL_SECRET (the Resend API key) + MAIL_FROM
+      # (a verified sender domain). The resend provider reads Settings__from and Secret;
+      # the smtp Settings below are ignored when the provider is resend.
+      Hiram__Email__Platform__Provider: ${HIRAM_EMAIL_PROVIDER:-smtp}
+      Hiram__Email__Platform__Secret: ${HIRAM_EMAIL_SECRET:-}
       # The smtp provider reads lowercase setting keys and the dictionary is case sensitive.
-      Hiram__Email__Platform__Settings__host: "mailpit"
-      Hiram__Email__Platform__Settings__port: "1025"
+      Hiram__Email__Platform__Settings__host: ${HIRAM_EMAIL_SMTP_HOST:-mailpit}
+      Hiram__Email__Platform__Settings__port: ${HIRAM_EMAIL_SMTP_PORT:-1025}
       Hiram__Email__Platform__Settings__from: ${MAIL_FROM:-no-reply@levante.local}
-      Hiram__Email__Platform__Settings__security: "none"
+      Hiram__Email__Platform__Settings__security: ${HIRAM_EMAIL_SMTP_SECURITY:-none}
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://lgtm:4317"
       OTEL_SERVICE_NAME: "hiram-dispatcher"
     volumes:
