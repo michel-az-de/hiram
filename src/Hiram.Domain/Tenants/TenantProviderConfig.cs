@@ -47,4 +47,19 @@ public sealed class TenantProviderConfig
         SecretProtected = secretProtected;
         UpdatedAtUtc = updatedAtUtc;
     }
+
+    // Replaces the provider choice and its settings while keeping the (tenant, channel) identity, so an
+    // upsert reuses the existing row instead of a delete and insert that would churn the primary key.
+    public void Reconfigure(string provider, string settings, string? secretProtected, DateTimeOffset updatedAtUtc)
+    {
+        if (string.IsNullOrWhiteSpace(provider))
+            throw new ArgumentException("Provider is required.", nameof(provider));
+        if (string.IsNullOrWhiteSpace(settings))
+            throw new ArgumentException("Provider settings are required.", nameof(settings));
+
+        Provider = provider;
+        Settings = settings;
+        SecretProtected = secretProtected;
+        UpdatedAtUtc = updatedAtUtc;
+    }
 }

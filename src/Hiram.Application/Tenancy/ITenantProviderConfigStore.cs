@@ -6,4 +6,6 @@ namespace Hiram.Application.Tenancy;
 public interface ITenantProviderConfigStore
 {
     Task<TenantProviderConfig?> FindAsync(Guid tenantId, NotificationChannel channel, CancellationToken cancellationToken);
+
+    Task UpsertAsync(TenantProviderConfig config, CancellationToken cancellationToken);
 }
