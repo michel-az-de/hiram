@@ -18,6 +18,10 @@ public sealed class DeliveryAttempt
     // Hash of the message that would have been sent, kept for shadow parity audits without storing the body.
     public string? PayloadHash { get; private set; }
 
+    // The provider's id for the accepted message (Resend's id, later WhatsApp's wamid). Present only on a
+    // successful send, and only when the provider returns one; it is what a status callback matches back on.
+    public string? ProviderMessageId { get; private set; }
+
     // Parameterless ctor exists so EF Core can materialize rows without re-running creation invariants.
     private DeliveryAttempt()
     {
@@ -35,7 +39,8 @@ public sealed class DeliveryAttempt
         TimeSpan duration,
         DateTimeOffset createdAtUtc,
         bool shadowed = false,
-        string? payloadHash = null)
+        string? payloadHash = null,
+        string? providerMessageId = null)
     {
         if (id == Guid.Empty)
             throw new ArgumentException("Delivery attempt id is required.", nameof(id));
@@ -63,5 +68,6 @@ public sealed class DeliveryAttempt
         CreatedAtUtc = createdAtUtc;
         Shadowed = shadowed;
         PayloadHash = payloadHash;
+        ProviderMessageId = providerMessageId;
     }
 }
