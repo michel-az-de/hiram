@@ -159,6 +159,21 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Process_PersistsProviderMessageId_OnSuccessfulSend()
+    {
+        var (tenantId, notificationId) = await Seed(DeliveryMode.Live);
+        var provider = new ScriptedProvider("fake", [new SendOutcome.Sent("re_abc123")]);
+
+        await using (var context = NewContext())
+            await BuildProcessor(context, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None);
+
+        var attempts = await AttemptsFor(notificationId);
+        Assert.Single(attempts);
+        Assert.Equal(DeliveryOutcome.Sent, attempts[0].Outcome);
+        Assert.Equal("re_abc123", attempts[0].ProviderMessageId);
+    }
+
+    [Fact]
     public async Task Process_DeadLettersWithoutRetry_WhenPermanent()
     {
         var (tenantId, notificationId) = await Seed(DeliveryMode.Live);

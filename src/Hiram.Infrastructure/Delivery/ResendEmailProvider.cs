@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Hiram.Application.Delivery;
 
@@ -33,7 +34,7 @@ public sealed class ResendEmailProvider : IEmailProvider
         try
         {
             using var response = await _http.SendAsync(request, cancellationToken);
-            return Classify(response.StatusCode);
+            return await ClassifyAsync(response, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -46,16 +47,35 @@ public sealed class ResendEmailProvider : IEmailProvider
         }
     }
 
-    private static SendOutcome Classify(HttpStatusCode status)
+    private static async Task<SendOutcome> ClassifyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        var code = (int)status;
+        var code = (int)response.StatusCode;
         if (code is >= 200 and < 300)
-            return new SendOutcome.Sent();
+            return new SendOutcome.Sent(await ReadMessageIdAsync(response, cancellationToken));
 
-        if (status == HttpStatusCode.TooManyRequests || code >= 500)
+        if (response.StatusCode == HttpStatusCode.TooManyRequests || code >= 500)
             return new SendOutcome.TransientFailure($"Resend returned {code}.");
 
         return new SendOutcome.PermanentFailure($"Resend rejected the request with {code}.");
+    }
+
+    // Resend returns the accepted message id in the body, the handle a delivery callback correlates on. A 2xx
+    // without a parseable id is still a send, so a missing id degrades to null rather than failing the attempt.
+    private static async Task<string?> ReadMessageIdAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(body))
+            return null;
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<ResendSendResponse>(body);
+            return string.IsNullOrWhiteSpace(parsed?.Id) ? null : parsed.Id;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private sealed record ResendSendRequest(
@@ -63,4 +83,7 @@ public sealed class ResendEmailProvider : IEmailProvider
         [property: JsonPropertyName("to")] string[] To,
         [property: JsonPropertyName("subject")] string Subject,
         [property: JsonPropertyName("text")] string Text);
+
+    private sealed record ResendSendResponse(
+        [property: JsonPropertyName("id")] string? Id);
 }

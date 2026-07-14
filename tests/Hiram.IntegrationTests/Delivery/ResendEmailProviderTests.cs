@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using Hiram.Application.Delivery;
 using Hiram.Infrastructure.Delivery;
 
@@ -53,6 +54,35 @@ public class ResendEmailProviderTests
         var outcome = await provider.SendAsync(Message(), Settings(), CancellationToken.None);
 
         Assert.IsType<SendOutcome.Sent>(outcome);
+    }
+
+    [Fact]
+    public async Task Send_CapturesProviderMessageId_FromResponseBody()
+    {
+        var provider = Provider(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"id":"re_abc123"}""", Encoding.UTF8, "application/json")
+        }));
+
+        var outcome = await provider.SendAsync(Message(), Settings(), CancellationToken.None);
+
+        var sent = Assert.IsType<SendOutcome.Sent>(outcome);
+        Assert.Equal("re_abc123", sent.ProviderMessageId);
+    }
+
+    [Fact]
+    public async Task Send_ReturnsSentWithoutId_WhenBodyHasNone()
+    {
+        // A 2xx with no parseable id is still a send: the correlation handle degrades to null, it does not fail.
+        var provider = Provider(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("", Encoding.UTF8, "application/json")
+        }));
+
+        var outcome = await provider.SendAsync(Message(), Settings(), CancellationToken.None);
+
+        var sent = Assert.IsType<SendOutcome.Sent>(outcome);
+        Assert.Null(sent.ProviderMessageId);
     }
 
     [Theory]

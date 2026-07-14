@@ -222,11 +222,15 @@ public sealed class EmailNotificationProcessor
             deliveryOutcome,
             error,
             duration,
-            createdAtUtc);
+            createdAtUtc,
+            providerMessageId: ProviderMessageId(outcome));
 
         _context.DeliveryAttempts.Add(attempt);
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    private static string? ProviderMessageId(SendOutcome outcome) =>
+        outcome is SendOutcome.Sent sent ? sent.ProviderMessageId : null;
 
     private static (DeliveryOutcome Outcome, string? Error) Map(SendOutcome outcome) => outcome switch
     {
