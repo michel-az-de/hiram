@@ -15,7 +15,6 @@ public class DependencyInjectionOrphanTests
     // Registered but not yet wired, each with the issue that will wire it and remove the entry.
     private static readonly HashSet<string> Allowlisted = new()
     {
-        "Hiram.Application.Routines.ChannelResolver",       // #37 wires consent into the fan-out
         "Hiram.Application.Messaging.MessageDispatchGuard", // #34 wires the delivery claim
         "Hiram.Application.Scheduling.WindowScheduler",     // #40 models the window and passes dispatch_at
         "Hiram.Application.Scheduling.DailyLimitPolicy",    // #40 daily limit, needs a counter store

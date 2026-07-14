@@ -273,6 +273,36 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task EventEmail_Marketing_WithoutConsent_IsSuppressed_NotDelivered()
+    {
+        var (tenantId, client) = await NewTenantClient("live");
+        var token = Guid.NewGuid().ToString("N");
+        var marketingSubject = $"Promo {token}";
+        var barrierSubject = $"Aviso {token}";
+
+        // Marketing has no legitimate-interest default, so an event without a RecipientUserId is suppressed.
+        // A transactional routine on a second event is the barrier: once its email arrives, the event consumer
+        // has already processed the marketing event, so the marketing email's absence is conclusive.
+        await SeedApprovedEmailRoutine(tenantId, "promo_evento", $"promo-{token}", marketingSubject, "Corpo", NotificationCategory.Marketing);
+        await SeedApprovedEmailRoutine(tenantId, "aviso_evento", $"aviso-{token}", barrierSubject, "Corpo");
+
+        await client.PostAsJsonAsync("/v1/events", new
+        {
+            eventType = "promo_evento", eventId = $"promo-{token}", emissionSeq = 1L,
+            recipient = new { email = "ops@example.com" }, data = new { }
+        });
+        await client.PostAsJsonAsync("/v1/events", new
+        {
+            eventType = "aviso_evento", eventId = $"aviso-{token}", emissionSeq = 1L,
+            recipient = new { email = "ops@example.com" }, data = new { }
+        });
+
+        var inbox = await WaitForMailpit(barrierSubject);
+        Assert.Contains(inbox, message => message.Subject == barrierSubject);
+        Assert.DoesNotContain(inbox, message => message.Subject == marketingSubject);
+    }
+
+    [Fact]
     public async Task LevanteConfirmation_ViaAdminRoutinesEndpoint_DeliversToMailpit()
     {
         var (tenantId, client) = await NewTenantClient("live");
@@ -383,7 +413,9 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
             active = true
         });
 
-    private async Task SeedApprovedEmailRoutine(Guid tenantId, string eventType, string templateName, string subject, string body)
+    private async Task SeedApprovedEmailRoutine(
+        Guid tenantId, string eventType, string templateName, string subject, string body,
+        NotificationCategory category = NotificationCategory.Transactional)
     {
         await using var db = NewDb();
 
@@ -393,7 +425,7 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
 
         db.Routines.Add(new Routine(
             Guid.NewGuid(), tenantId, eventType, templateName,
-            new[] { NotificationChannel.Email }, NotificationCategory.Transactional, active: true));
+            new[] { NotificationChannel.Email }, category, active: true));
 
         await db.SaveChangesAsync();
     }
