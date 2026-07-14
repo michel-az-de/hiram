@@ -1,0 +1,2 @@
+# The DKIM private key (hiram.key) is generated here at setup and is git-ignored. This file only keeps
+# the directory present so the docker compose read-only mount has a target. See ../../README.md.
