@@ -65,6 +65,9 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
     {
         public Task<TenantProviderConfig?> FindAsync(Guid tenantId, NotificationChannel channel, CancellationToken cancellationToken) =>
             Task.FromResult<TenantProviderConfig?>(null);
+
+        public Task UpsertAsync(TenantProviderConfig config, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
     }
 
     private sealed class NoopProtector : ISecretProtector
