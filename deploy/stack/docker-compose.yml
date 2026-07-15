@@ -234,6 +234,10 @@ services:
       # Sem SITE_URL o container falha no boot (fail-fast em instrumentation.ts): alimenta
       # canonical/sitemap/RSS/OG/JSON-LD. Nao deixar cair em localhost.
       SITE_URL: ${SITE_URL:?set in .env}
+      # Flags de cutover D0 lidas em runtime pelo web (src/web/src/lib/flags.ts). Default off: o host
+      # provisorio nao indexa e a newsletter espera o dominio Resend verificado. Ligar no D0 e recriar.
+      SITE_INDEXABLE: ${SITE_INDEXABLE:-false}
+      NEWSLETTER_ENABLED: ${NEWSLETTER_ENABLED:-false}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
       interval: 10s
