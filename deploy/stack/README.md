@@ -12,8 +12,9 @@ com trace único Levante → Hiram → provider. Só o Caddy (80/443) é públic
    publicadas pelos CIs (o do Levante passou a publicar `levante-api`+`levante-web`, ver Levante
    ADR 0003). Escape hatch de build local continua disponível (descomente o bloco `build:` de
    `levante-*` e rode com `LEVANTE_IMAGE_TAG=local`).
-2. **Domínio + TLS**: `SITE_HOST`/`SITE_URL`/`ACME_EMAIL` no `.env`. GAP-A ainda aberto: até o
-   domínio final, um host `sslip.io` funciona.
+2. **Domínio + TLS**: `SITE_HOST`/`SITE_URL`/`ACME_EMAIL` no `.env`. Domínio decidido:
+   `felipemichel.com` (apex canônico, `www` -> apex 301; ver Levante ADR 0007). O Caddy emite
+   Let's Encrypt para o apex e o `www`.
 3. **MongoDB Atlas**: `MONGO_CONNECTION_STRING` no `.env` (usuário de **privilégio mínimo**); o IP
    público da VM no allowlist do Atlas. O Mongo não roda mais como container aqui.
 4. **`.env`**: `cp .env.example .env`, preencher, `chmod 600 .env`.

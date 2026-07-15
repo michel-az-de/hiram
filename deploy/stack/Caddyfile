@@ -14,3 +14,8 @@
 		reverse_proxy levante-web:3000
 	}
 }
+
+# www -> apex 301 (dominio felipemichel.com: o apex e canonico; ver Levante ADR 0007).
+www.{$SITE_HOST} {
+	redir https://{$SITE_HOST}{uri} permanent
+}
