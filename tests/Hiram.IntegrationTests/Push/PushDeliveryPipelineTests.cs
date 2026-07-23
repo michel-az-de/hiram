@@ -1,8 +1,10 @@
 using System.Text.Json;
 using Hiram.Application.Abstractions;
+using Hiram.Application.Blocks;
 using Hiram.Application.Delivery;
 using Hiram.Application.Notifications;
 using Hiram.Application.Push;
+using Hiram.Domain.Blocks;
 using Hiram.Domain.DeadLetters;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Push;
@@ -45,6 +47,28 @@ public class PushDeliveryPipelineTests : IAsyncLifetime
         }
     }
 
+    private sealed class NoBlocks : IBlockStore
+    {
+        public Task<IReadOnlyList<Block>> ActiveBlocksAsync(Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Block>>([]);
+
+        public Task AddAsync(Block block, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<bool> RemoveAsync(Guid tenantId, Guid id, DateTimeOffset removedAtUtc, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+    }
+
+    private sealed class ChannelBlocked(NotificationChannel channel) : IBlockStore
+    {
+        public Task<IReadOnlyList<Block>> ActiveBlocksAsync(Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Block>>([new Block(Guid.NewGuid(), tenantId, channel, "incident", now, expiresAtUtc: null)]);
+
+        public Task AddAsync(Block block, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<bool> RemoveAsync(Guid tenantId, Guid id, DateTimeOffset removedAtUtc, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+    }
+
     private sealed class TestClock : IClock
     {
         public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
@@ -62,8 +86,9 @@ public class PushDeliveryPipelineTests : IAsyncLifetime
             })
             .Build();
 
-    private PushNotificationProcessor BuildProcessor(HiramDbContext context, IPushSender sender) =>
-        new(context, sender, FastPipeline(), new TestClock(), NullLogger<PushNotificationProcessor>.Instance);
+    private PushNotificationProcessor BuildProcessor(HiramDbContext context, IPushSender sender, IBlockStore? blocks = null) =>
+        new(context, sender, new BlockGate(blocks ?? new NoBlocks()), FastPipeline(), new TestClock(),
+            NullLogger<PushNotificationProcessor>.Instance);
 
     private async Task<(Guid TenantId, Guid NotificationId, Guid SubscriptionId)> Seed(DeliveryMode mode, bool withSubscription = true)
     {
@@ -103,6 +128,35 @@ public class PushDeliveryPipelineTests : IAsyncLifetime
     [Fact]
     public async Task Process_Sends_WhenSubscriptionResolves()
     {
+        var (tenantId, notificationId, subscriptionId) = await Seed(DeliveryMode.Live);
+        var sender = new ScriptedPushSender([new SendOutcome.Sent()]);
+
+        await using (var context = NewContext())
+            await BuildProcessor(context, sender).ProcessAsync(PayloadFor(notificationId, tenantId, subscriptionId), CancellationToken.None);
+
+        Assert.Equal(NotificationStatus.Sent, await StatusOf(notificationId));
+        Assert.Equal(1, sender.Calls);
+    }
+
+    [Fact]
+    public async Task Process_Suppresses_WithoutCallingSender_WhenChannelBlocked()
+    {
+        var (tenantId, notificationId, subscriptionId) = await Seed(DeliveryMode.Live);
+        // Scripted to a hard failure: if the sender were ever called, the assertions below would catch it.
+        var sender = new ScriptedPushSender([new SendOutcome.PermanentFailure("must not be called")]);
+
+        await using (var context = NewContext())
+            await BuildProcessor(context, sender, new ChannelBlocked(NotificationChannel.Push))
+                .ProcessAsync(PayloadFor(notificationId, tenantId, subscriptionId), CancellationToken.None);
+
+        Assert.Equal(NotificationStatus.Suppressed, await StatusOf(notificationId));
+        Assert.Equal(0, sender.Calls);
+    }
+
+    [Fact]
+    public async Task Process_Delivers_Unchanged_WhenNoBlockActive()
+    {
+        // ADR-024 regression guard: with no active block the push path is exactly what it was.
         var (tenantId, notificationId, subscriptionId) = await Seed(DeliveryMode.Live);
         var sender = new ScriptedPushSender([new SendOutcome.Sent()]);
 
