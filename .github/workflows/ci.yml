@@ -53,6 +53,9 @@ jobs:
       - name: Validate reference Compose
         run: docker compose -f docker-compose.dev.yml config
 
+      - name: Verify backup and restore
+        run: bash deploy/dr/verify-backup.sh
+
       # Pull requests stop at the build (the Dockerfile must publish cleanly, warnings as errors);
       # pushes to main also publish to GHCR tagged with the commit sha, so every deploy is traceable
       # to the exact commit, plus a moving latest.

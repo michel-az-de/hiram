@@ -6,7 +6,7 @@ REPO="${2:?usage: ./github-setup.sh <owner> <repo>}"
 
 echo "==> About, merge policy e features"
 gh repo edit "$OWNER/$REPO" \
-  --description "Multi-tenant notification platform. Email, push, SMS and WhatsApp behind one API, with outbox-guaranteed delivery, credit metering, configurable AI autonomy and end-to-end OpenTelemetry. The word is never lost." \
+  --description "Internal multi-tenant notification gateway for .NET products and selected clients, with PostgreSQL outbox, retries, audit and replay." \
   --enable-issues \
   --enable-wiki=false \
   --enable-projects=false \
@@ -18,12 +18,13 @@ gh repo edit "$OWNER/$REPO" \
 
 echo "==> Topics"
 gh repo edit "$OWNER/$REPO" \
+  --remove-topic keda --remove-topic kubernetes --remove-topic saas \
   --add-topic dotnet --add-topic csharp --add-topic aspnet-core \
   --add-topic notifications --add-topic multi-tenant --add-topic outbox-pattern \
-  --add-topic postgresql \
-  --add-topic opentelemetry --add-topic keda --add-topic kubernetes \
+  --add-topic postgresql --add-topic transactional-email \
+  --add-topic opentelemetry --add-topic internal-tools \
   --add-topic clean-architecture --add-topic modular-monolith \
-  --add-topic webhooks --add-topic saas
+  --add-topic webhooks
 
 echo "==> Dependabot"
 gh api -X PUT "repos/$OWNER/$REPO/vulnerability-alerts"

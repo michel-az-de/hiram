@@ -108,7 +108,7 @@ diretamente por leases recuperáveis.
 | C2 | idempotência PostgreSQL-only | concorrência e replay verdes |
 | C3 | outbox com lease e dispatch PostgreSQL | retry, crash e dead-letter verdes |
 | C4 | host único e imagem `hiram` | concluído na issue #97 |
-| C5 | Compose, backup, restore e runbook | instalação e operação comprovadas |
+| C5 | Compose, backup, restore e runbook | concluído na issue #99 |
 | C6 | uso real | 30 dias sem perda silenciosa |
 
 Uma etapa só fecha com build Release, suíte completa, CI e aceite da issue verdes.
@@ -151,5 +151,5 @@ Métricas mínimas:
 
 - decisão arquitetural: `docs/adr/ADR-027-hiram-core.md`;
 - execução: `plans/hiram-core.md`;
-- operação: runbook a ser entregue na etapa C5;
+- operação: `docs/operations-runbook.md`;
 - histórico: `CHANGELOG.md` e issues/PRs.

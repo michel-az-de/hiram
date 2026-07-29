@@ -102,7 +102,7 @@ internal static class HiramApiDocs
         new() { Name = "Templates", Description = "Versioned, per-tenant message templates." },
         new() { Name = "Push", Description = "Web push subscriptions and the VAPID public key." },
         new() { Name = "Webhooks", Description = "Delivery status callbacks, signed with X-Hiram-Signature." },
-        new() { Name = "Admin (provisional)", Description = "Operator provisioning guarded by X-Admin-Key. Temporary until the Portal." },
+        new() { Name = "Admin", Description = "Operator provisioning guarded by X-Admin-Key." },
         new() { Name = "Demo (development only)", Description = "Dev-only helper that provisions a demo tenant and key for the console." }
     ];
 
@@ -146,14 +146,14 @@ internal static class HiramApiDocs
     private const string Overview = """
         # Hiram API
 
-        Multi-tenant notification platform. Phase F1 delivers the email channel end to end: hashed
-        API keys, idempotent ingestion, two interchangeable providers, a resilient send pipeline and
-        shadow mode.
+        Internal multi-tenant notification gateway for our products and selected clients. The
+        maintained core delivers email end to end with hashed API keys, durable idempotency,
+        interchangeable providers, PostgreSQL outbox leases, retries, audit and replay.
 
         ## Handshake
 
         Calls to `/v1/notifications` authenticate with a tenant API key in the `X-Api-Key` header.
-        Keys are issued through the provisional admin endpoints, themselves guarded by the operator
+        Keys are issued through the operator admin endpoints, themselves guarded by the operator
         key `X-Admin-Key` (configured as `Hiram:AdminKey`).
 
         1. Create a tenant:
@@ -191,8 +191,9 @@ internal static class HiramApiDocs
         and its outbox row are committed in one transaction. The send runs in the background and is
         recorded as one delivery attempt per try (`sent`, `transient_failure`, `permanent_failure`,
         or `shadow_would_send` for shadow tenants). A provider rejection, such as a Resend 422, is a
-        `permanent_failure` and the notification ends in `failed`; it is not surfaced as a synchronous
-        HTTP status. Inspect the outcome with `GET /v1/notifications/{id}`, which returns the attempts.
+        `permanent_failure`; after retries are exhausted, the notification ends in `dead_lettered`.
+        This is not surfaced as a synchronous HTTP status. Inspect the outcome with
+        `GET /v1/notifications/{id}`, which returns the attempts.
 
         ## Error catalog
 
@@ -205,9 +206,9 @@ internal static class HiramApiDocs
         | 404 | Notification not found for the authenticated tenant. |
         | 409 | An idempotency key conflict that could not be resolved to the original notification. |
 
-        ## Admin endpoints (provisional)
+        ## Admin endpoints
 
-        The `/v1/admin/*` routes exist only until the Portal (F5). They are guarded by the shared
+        The `/v1/admin/*` routes are the operator surface. They are guarded by the shared
         `X-Admin-Key` rather than tenant keys and must not be exposed publicly.
         """;
 }

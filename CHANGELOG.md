@@ -9,6 +9,7 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 - ADR-027 e plano executavel para a migracao incremental ao Hiram Core.
 - Primitiva de fila PostgreSQL com claim atomico, lease renovavel, retry agendado e recuperacao de
   leases vencidos.
+- Runbook operacional e prova descartavel de backup e restore do PostgreSQL e do key ring no CI.
 
 ### Changed
 - Adota o Protocolo Operacional v4.0 (PR-first, issue-driven, auto-merge por tier). Ver ADR de adocao e CLAUDE.md.
@@ -16,6 +17,7 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
   alvo, providers externos na ultima milha e extensoes somente com consumidor ativo.
 - Torna o dispatcher PostgreSQL o unico transporte do outbox.
 - Consolida API e workers PostgreSQL no mesmo host e publica uma unica imagem `hiram`.
+- Alinha configuracao, observabilidade, site e metadados ao posicionamento interno do Hiram Core.
 
 ### Removed
 - Remove metering, creditos e o ledger do caminho de submissao e fan-out. A migration historica

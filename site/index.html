@@ -57,7 +57,7 @@
       "name": "Hiram",
       "url": "https://hiram.dev/",
       "logo": "https://hiram.dev/assets/icon-512.png",
-      "description": "Multi-tenant notification delivery platform.",
+      "description": "Internal multi-tenant notification gateway.",
       "sameAs": ["https://github.com/michel-az-de/hiram"]
     },
     {
@@ -82,12 +82,12 @@
       "@type": "FAQPage",
       "@id": "https://hiram.dev/#faq",
       "mainEntity": [
-        { "@type": "Question", "name": "What is Hiram?", "acceptedAnswer": { "@type": "Answer", "text": "Hiram is a multi-tenant notification platform. You send a notification through one REST API and Hiram owns delivery: persistence, provider routing, retries and audit." } },
-        { "@type": "Question", "name": "Which channels are available today?", "acceptedAnswer": { "@type": "Answer", "text": "Transactional email is live in production, through SMTP or Resend per tenant. Push, SMS and WhatsApp are on the roadmap, behind the same request contract." } },
+        { "@type": "Question", "name": "What is Hiram?", "acceptedAnswer": { "@type": "Answer", "text": "Hiram is an internal multi-tenant notification gateway for our products and selected clients. One REST API owns persistence, provider routing, retries and audit." } },
+        { "@type": "Question", "name": "Which channels are supported?", "acceptedAnswer": { "@type": "Answer", "text": "Transactional email through SMTP or Resend is the maintained core. Compatibility extensions remain only while an active project consumes them." } },
         { "@type": "Question", "name": "How does Hiram guarantee delivery?", "acceptedAnswer": { "@type": "Answer", "text": "The notification request and its outbox row are written in a single PostgreSQL transaction. Once that commit succeeds the message cannot be lost, and a leased worker drives it to delivery with retries." } },
         { "@type": "Question", "name": "Is Hiram multi-tenant?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Every domain table carries a tenant from the first migration, and each tenant has isolated API keys, providers and delivery mode." } },
         { "@type": "Question", "name": "How do I authenticate and send?", "acceptedAnswer": { "@type": "Answer", "text": "Authenticate at the Handshake with a per-tenant API key, then POST to /v1/notifications. An Idempotency-Key makes the call safe to retry, and you can read delivery back with cursor pagination." } },
-        { "@type": "Question", "name": "Is it production ready?", "acceptedAnswer": { "@type": "Answer", "text": "Email is production ready as of phase F1, with real providers, idempotency, shadow mode and full delivery audit. Later phases add channels, metering and a portal." } }
+        { "@type": "Question", "name": "Is it a SaaS product?", "acceptedAnswer": { "@type": "Answer", "text": "No. Hiram is maintained as internal infrastructure for our products and selected clients. Billing, AI, a portal and speculative channels are outside its scope." } }
       ]
     }
   ]
@@ -129,7 +129,7 @@
   <section class="hero mosaic" aria-labelledby="hero-title">
     <div class="wrap hero-grid">
       <div class="hero-copy">
-        <span class="lapidar eyebrow">Multi-tenant notification delivery</span>
+        <span class="lapidar eyebrow">Internal notification infrastructure</span>
         <h1 id="hero-title">Reliable notification delivery, guaranteed by an <em>outbox</em>.</h1>
         <p class="tagline">The word is never lost.</p>
         <p class="lead">Hiram accepts a notification, writes it with its outbox row in a single transaction, and owns delivery from there: per-tenant providers, retries, idempotency and end-to-end tracing. If the database confirmed it, it will be delivered.</p>
@@ -137,7 +137,7 @@
           <a class="btn btn-primary" href="https://github.com/michel-az-de/hiram#quick-start">Read the docs</a>
           <a class="btn btn-secondary" href="https://github.com/michel-az-de/hiram">View on GitHub</a>
         </div>
-        <p class="fineprint">Email is live today. Push, SMS and WhatsApp are on the roadmap, behind the same API.</p>
+        <p class="fineprint">Maintained for our products and selected clients. Transactional email is the core channel.</p>
       </div>
       <div class="hero-trace">
         <svg class="trace" viewBox="0 0 320 470" role="img" aria-label="Delivery path: accept, persist in one transaction, claim, then deliver.">
@@ -251,7 +251,7 @@
       </div>
       <p class="statemachine">
         <b>accepted</b><span class="arr">&rarr;</span><b>queued</b><span class="arr">&rarr;</span><b>sending</b><span class="arr">&rarr;</span><b>sent</b>
-        <span class="arr">&middot;</span> with <b>failed</b> and <b>suppressed</b> as terminal outcomes
+        <span class="arr">&middot;</span> with <b>dead-lettered</b> and <b>suppressed</b> as terminal outcomes
       </p>
     </div>
   </section>
@@ -261,7 +261,7 @@
       <div class="section-head">
         <span class="lapidar eyebrow">What ships today</span>
         <h2 id="features-title">Honest about what is built</h2>
-        <p class="lead">Email runs end to end in production. The rest of the platform is on a public roadmap, not in the marketing copy.</p>
+        <p class="lead">Email runs end to end in production. Everything else must justify its maintenance with an active consumer.</p>
       </div>
       <div class="feature-cols">
         <div>
@@ -272,19 +272,19 @@
             <li class="col"><span class="name">Per-tenant API keys</span><span class="desc"><code>hk_live_</code> keys, stored only as a SHA-256 hash and revocable.</span></li>
             <li class="col"><span class="name">Live and shadow modes</span><span class="desc">Shadow tenants exercise the full path and log a would-send without delivering.</span></li>
             <li class="col"><span class="name">Delivery audit</span><span class="desc">Cursor-paginated queries with every attempt, outcome and latency.</span></li>
-            <li class="col"><span class="name">End-to-end tracing</span><span class="desc">One OpenTelemetry trace spans accept, publish, consume and send.</span></li>
+            <li class="col"><span class="name">End-to-end tracing</span><span class="desc">One OpenTelemetry trace spans accept, outbox claim and send.</span></li>
             <li class="col"><span class="name">Multi-tenant isolation</span><span class="desc">Every domain table carries a tenant from the first migration.</span></li>
           </ul>
         </div>
         <div>
-          <h3>Coming capabilities <span class="badge badge-soon">On the roadmap</span></h3>
+          <h3>Deliberate boundaries <span class="badge badge-soon">Out of scope</span></h3>
           <ul class="feature-list">
-            <li class="col"><span class="name">Push, SMS and WhatsApp</span><span class="desc">More channels behind the same request contract.</span></li>
-            <li class="col"><span class="name">Templates</span><span class="desc">Versioned, per-tenant message templates with variables.</span></li>
-            <li class="col"><span class="name">Signed status webhooks</span><span class="desc">Delivery callbacks verified with <code>X-Hiram-Signature</code>.</span></li>
-            <li class="col"><span class="name">Metering and credits</span><span class="desc">An append-only credit ledger with per-tenant quotas.</span></li>
-            <li class="col"><span class="name">Configurable AI autonomy</span><span class="desc">Three autonomy levels with a decision log and budget.</span></li>
-            <li class="col"><span class="name">Admin and dev portal</span><span class="desc">Tenant self-service, keys, dashboards and the Trestleboard changelog.</span></li>
+            <li class="col"><span class="name">No horizontal SaaS</span><span class="desc">Hiram serves our products and selected clients, not a public self-service market.</span></li>
+            <li class="col"><span class="name">No billing layer</span><span class="desc">Credits, quotas and metering do not belong in the delivery path.</span></li>
+            <li class="col"><span class="name">No speculative channels</span><span class="desc">A channel or compatibility extension stays only with an active consumer.</span></li>
+            <li class="col"><span class="name">No broker or cache</span><span class="desc">PostgreSQL owns durable idempotency, queueing, leases and replay.</span></li>
+            <li class="col"><span class="name">No AI or portal</span><span class="desc">Operations use explicit APIs, metrics and runbooks.</span></li>
+            <li class="col"><span class="name">No self-hosted mail server</span><span class="desc">External SMTP or HTTP providers own the last mile.</span></li>
           </ul>
         </div>
       </div>
@@ -314,7 +314,7 @@
         <div class="card">
           <h3>Built on a sober stack</h3>
           <p>.NET 10 and ASP.NET Core at the edge, EF Core and leased outbox work on PostgreSQL, with OpenTelemetry across all of it.</p>
-          <p style="margin-top:14px">Run the whole thing locally with Docker and a single <code>dotnet run</code> per host. The API listens on port <code>3357</code>.</p>
+          <p style="margin-top:14px">Run the whole stack with one <code>docker compose up</code>. One Hiram host and PostgreSQL are the supported runtime; the API listens on port <code>3357</code>.</p>
           <p style="margin-top:18px"><a href="https://github.com/michel-az-de/hiram#quick-start">Read the quick start on GitHub &rarr;</a></p>
         </div>
       </div>
@@ -324,38 +324,22 @@
   <section id="roadmap" aria-labelledby="roadmap-title">
     <div class="wrap">
       <div class="section-head">
-        <span class="lapidar eyebrow">Roadmap</span>
-        <h2 id="roadmap-title">Built in phases, in the open</h2>
-        <p class="lead">Reliability first. Each phase ships a working slice before the next one opens.</p>
+        <span class="lapidar eyebrow">Hiram Core</span>
+        <h2 id="roadmap-title">A smaller system with a firm boundary</h2>
+        <p class="lead">The current direction is operational depth, not feature breadth.</p>
       </div>
       <div class="timeline">
         <div class="phase">
-          <span class="ph-id">F0 <span class="done">done</span></span>
-          <div><h3>Walking skeleton</h3><p>Outbox, lease, process and one trace from end to end.</p></div>
+          <span class="ph-id">Core <span class="done">done</span></span>
+          <div><h3>Reliable delivery</h3><p>Transactional outbox, leases, retries, audit, dead letter and replay on PostgreSQL.</p></div>
         </div>
         <div class="phase">
-          <span class="ph-id">F1 <span class="done">done</span></span>
-          <div><h3>Email in production</h3><p>Real providers, idempotency, shadow mode, API keys and delivery audit.</p></div>
+          <span class="ph-id">Deploy <span class="done">done</span></span>
+          <div><h3>One supported runtime</h3><p>One Hiram image and PostgreSQL, with providers at the last mile.</p></div>
         </div>
         <div class="phase">
-          <span class="ph-id">F2 next</span>
-          <div><h3>Push, templates, webhooks</h3><p>Channels beyond email, signed status webhooks and a dead-letter queue.</p></div>
-        </div>
-        <div class="phase">
-          <span class="ph-id">F3</span>
-          <div><h3>Metering and quotas</h3><p>A credit ledger and per-tenant rate limits.</p></div>
-        </div>
-        <div class="phase">
-          <span class="ph-id">F4</span>
-          <div><h3>Intelligence</h3><p>Configurable AI autonomy with a decision log and a budget.</p></div>
-        </div>
-        <div class="phase">
-          <span class="ph-id">F5</span>
-          <div><h3>Portal</h3><p>Admin and dev portal, tenant self-service and the Trestleboard changelog.</p></div>
-        </div>
-        <div class="phase">
-          <span class="ph-id">F6</span>
-          <div><h3>Production hardening</h3><p>k3s and KEDA, load tests and runbooks.</p></div>
+          <span class="ph-id">Now</span>
+          <div><h3>Operate what exists</h3><p>Backup, restore, observability and real usage before any new scope.</p></div>
         </div>
       </div>
     </div>
@@ -370,11 +354,11 @@
       <div class="faq">
         <div class="faq-item">
           <h3>What is Hiram?</h3>
-          <p>Hiram is a multi-tenant notification platform. You send a notification through one REST API and Hiram owns delivery: persistence, provider routing, retries and audit.</p>
+          <p>Hiram is an internal multi-tenant notification gateway. Our products and selected clients send through one REST API; Hiram owns persistence, provider routing, retries and audit.</p>
         </div>
         <div class="faq-item">
-          <h3>Which channels are available today?</h3>
-          <p>Transactional email is live in production, through SMTP or Resend per tenant. Push, SMS and WhatsApp are on the roadmap, behind the same request contract.</p>
+          <h3>Which channels are supported?</h3>
+          <p>Transactional email through SMTP or Resend is the maintained core. Compatibility extensions remain only while an active project consumes them.</p>
         </div>
         <div class="faq-item">
           <h3>How does Hiram guarantee delivery?</h3>
@@ -389,8 +373,8 @@
           <p>Authenticate at the Handshake with a per-tenant API key, then POST to /v1/notifications. An Idempotency-Key makes the call safe to retry, and you can read delivery back with cursor pagination.</p>
         </div>
         <div class="faq-item">
-          <h3>Is it production ready?</h3>
-          <p>Email is production ready as of phase F1, with real providers, idempotency, shadow mode and full delivery audit. Later phases add channels, metering and a portal.</p>
+          <h3>Is it a SaaS product?</h3>
+          <p>No. Hiram is maintained as internal infrastructure for our products and selected clients. Billing, AI, a portal and speculative channels are outside its scope.</p>
         </div>
       </div>
     </div>
@@ -406,7 +390,7 @@
           <a class="btn btn-primary" href="https://github.com/michel-az-de/hiram#quick-start">Read the quick start</a>
           <a class="btn btn-secondary" href="https://github.com/michel-az-de/hiram">View on GitHub</a>
         </div>
-        <p class="keyline">POST /v1/notifications &middot; 202 Accepted &middot; X-Hiram-Signature on webhooks (F2)</p>
+        <p class="keyline">POST /v1/notifications &middot; 202 Accepted &middot; PostgreSQL outbox &middot; auditable replay</p>
       </div>
     </div>
   </section>
@@ -431,7 +415,7 @@
           <span class="lapidar">Product</span>
           <a href="#why">Why Hiram</a>
           <a href="#how">How it works</a>
-          <a href="#roadmap">Roadmap</a>
+          <a href="#roadmap">Scope</a>
           <a href="#faq">FAQ</a>
         </div>
         <div class="col">

@@ -104,6 +104,9 @@ Gate:
 
 ## Passo 6: fechar operação
 
+**Status:** backup, restore e runbook concluídos na issue #99. A observação de 30 dias permanece
+aberta como gate temporal antes de novo escopo.
+
 - Executar backup e restore em ambiente descartável.
 - Documentar onboarding de tenant e rotação de API key.
 - Definir métricas mínimas: aceitas, enviadas, falhas, dead-letter, lease vencido e duração.
@@ -128,6 +131,6 @@ dispatch: somente um worker pode deter o lease de cada item.
 - [x] API `/v1` compatível para recursos mantidos.
 - [x] Build Release e suíte completa verdes.
 - [x] Uma imagem e um Compose suportados.
-- [ ] Backup e restore comprovados.
-- [ ] Runbook publicado.
+- [x] Backup e restore comprovados.
+- [x] Runbook publicado.
 - [ ] 30 dias de operação real sem perda silenciosa.

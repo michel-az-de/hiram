@@ -8,13 +8,12 @@ using Hiram.Domain.Tenants;
 
 namespace Hiram.Api.Admin;
 
-// Provisional operator surface until the Portal (F5). Guarded by a single shared X-Admin-Key from
-// configuration, not by tenant API keys.
+// Operator surface guarded by a shared X-Admin-Key from configuration, not by tenant API keys.
 internal static class AdminEndpoints
 {
     public static IEndpointRouteBuilder MapAdminEndpoints(this IEndpointRouteBuilder app)
     {
-        var admin = app.MapGroup("/v1/admin").WithTags("Admin (provisional)").AddEndpointFilter(AdminKeyFilter.Require);
+        var admin = app.MapGroup("/v1/admin").WithTags("Admin").AddEndpointFilter(AdminKeyFilter.Require);
         admin.MapPost("/tenants", CreateTenantAsync);
         admin.MapPost("/api-keys", CreateApiKeyAsync);
         admin.MapDelete("/api-keys/{id:guid}", RevokeApiKeyAsync);
