@@ -15,6 +15,7 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 - Redefine o Hiram como infraestrutura interna de notificacoes: um host e PostgreSQL no runtime
   alvo, providers externos na ultima milha e extensoes somente com consumidor ativo.
 - Torna o dispatcher PostgreSQL o unico transporte do outbox.
+- Consolida API e workers PostgreSQL no mesmo host e publica uma unica imagem `hiram`.
 
 ### Removed
 - Remove metering, creditos e o ledger do caminho de submissao e fan-out. A migration historica
@@ -26,3 +27,4 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 - Remove Redis do runtime. Idempotencia e throttle de uso de API key passam a usar apenas PostgreSQL.
 - Remove RabbitMQ, o relay intermediario, consumers AMQP e o Testcontainer do broker. Processadores
   reivindicam o outbox diretamente no PostgreSQL.
+- Remove o projeto, processo e imagem Hiram.Dispatcher.

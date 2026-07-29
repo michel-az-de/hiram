@@ -31,8 +31,8 @@ services:
       test: ["CMD", "/mailpit", "readyz"]
     restart: unless-stopped
 
-  # The aspnet images run as the non-root app user (uid 1654); a named volume starts root-owned, so
-  # this one-shot hands the key ring over before api and dispatcher mount it.
+  # The aspnet image runs as the non-root app user (uid 1654); a named volume starts root-owned, so
+  # this one-shot hands the key ring over before Hiram mounts it.
   keyring-init:
     image: busybox:1.37
     command: ["chown", "-R", "1654:1654", "/keys"]
@@ -41,7 +41,7 @@ services:
     restart: "no"
 
   migrate:
-    image: ghcr.io/michel-az-de/hiram-api:${HIRAM_IMAGE_TAG:-latest}
+    image: ghcr.io/michel-az-de/hiram:${HIRAM_IMAGE_TAG:-latest}
     command: ["--migrate-only"]
     environment:
       ConnectionStrings__Hiram: "Host=postgres;Port=5432;Database=hiram;Username=hiram;Password=${POSTGRES_PASSWORD}"
@@ -51,32 +51,14 @@ services:
         condition: service_healthy
     restart: "no"
 
-  api:
-    image: ghcr.io/michel-az-de/hiram-api:${HIRAM_IMAGE_TAG:-latest}
+  hiram:
+    image: ghcr.io/michel-az-de/hiram:${HIRAM_IMAGE_TAG:-latest}
     environment:
       ASPNETCORE_ENVIRONMENT: "Demo"
       ConnectionStrings__Hiram: "Host=postgres;Port=5432;Database=hiram;Username=hiram;Password=${POSTGRES_PASSWORD}"
       Hiram__AdminKey: ${HIRAM_ADMIN_KEY:?set in .env}
       Hiram__MigrateOnStartup: "false"
-      DataProtection__KeysPath: "/var/hiram/dataprotection-keys"
-      Hiram__Push__Vapid__Subject: ${VAPID_SUBJECT}
-      Hiram__Push__Vapid__PublicKey: ${VAPID_PUBLIC_KEY}
-      Hiram__Push__Vapid__PrivateKey: ${VAPID_PRIVATE_KEY}
-      OTEL_SDK_DISABLED: "true"
-    volumes:
-      - ../../site:/site:ro
-      - keyring:/var/hiram/dataprotection-keys
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      keyring-init:
-        condition: service_completed_successfully
-    restart: unless-stopped
-
-  dispatcher:
-    image: ghcr.io/michel-az-de/hiram-dispatcher:${HIRAM_IMAGE_TAG:-latest}
-    environment:
-      ConnectionStrings__Hiram: "Host=postgres;Port=5432;Database=hiram;Username=hiram;Password=${POSTGRES_PASSWORD}"
+      Hiram__Workers__Enabled: "true"
       DataProtection__KeysPath: "/var/hiram/dataprotection-keys"
       Hiram__Email__Platform__Provider: "smtp"
       # The smtp provider reads lowercase setting keys and the dictionary is case sensitive.
@@ -89,12 +71,15 @@ services:
       Hiram__Push__Vapid__PrivateKey: ${VAPID_PRIVATE_KEY}
       OTEL_SDK_DISABLED: "true"
     volumes:
+      - ../../site:/site:ro
       - keyring:/var/hiram/dataprotection-keys
     depends_on:
       migrate:
         condition: service_completed_successfully
       keyring-init:
         condition: service_completed_successfully
+      mailpit:
+        condition: service_healthy
     restart: unless-stopped
 
   caddy:
@@ -110,7 +95,7 @@ services:
       - caddy-data:/data
       - caddy-config:/config
     depends_on:
-      - api
+      - hiram
       - mailpit
     restart: unless-stopped
 

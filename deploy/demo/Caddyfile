@@ -10,6 +10,6 @@
 	}
 
 	handle {
-		reverse_proxy api:8080
+		reverse_proxy hiram:8080
 	}
 }

@@ -42,20 +42,17 @@ Falas:
 - Sobre o `idempotency`: "duas chamadas com a mesma Idempotency-Key, o mesmo id volta nas duas e
   só existe um email. Retry de rede do seu lado nunca vira email duplicado para o seu cliente."
 
-## Minuto 3 a 5, ato 2: pare o dispatcher, nada se perde
+## Minuto 3 a 5, ato 2: um host, uma fila durável
 
 ```bash
-./demo.sh dispatcher-down
-./demo.sh submit Bruno Enterprise      # 202 accepted com o worker PARADO
-./demo.sh status <id>                  # "accepted"
-./demo.sh dispatcher-up                # o status vira "sent" sozinho
+docker compose -f docker-compose.demo.yml ps
+./demo.sh submit Bruno Enterprise
+./demo.sh status <id>                  # "sent", com a tentativa registrada
 ```
 
-Fala: "Acabei de parar o worker. A API continua aceitando com 202, porque request e outbox gravam
-na mesma transação PostgreSQL. Religuei, e o worker retomou a fila sem nenhuma intervenção. É esse
-o seguro contra o incidente que originou o projeto. Nenhuma notificação aceita se perde."
-
-Enquanto espera o worker voltar, mostre o `status`: a transição acontece na frente do prospect.
+Fala: "A API e o worker vivem no mesmo host; o PostgreSQL é a única dependência stateful. Request e
+outbox gravam na mesma transação, e o worker reivindica a linha com lease. Menos peças, com a mesma
+evidência de entrega."
 
 ## Minuto 5 a 8, ato 3: falha real, DLQ com razão, replay
 
@@ -79,25 +76,23 @@ Falas:
 Nota de palco: o Mailpit da demo é efêmero, a caixa zera quando o provider reinicia. Isso ajuda:
 o único email na caixa é exatamente o do replay.
 
-## Minuto 8 a 9, ato 4: a conta fecha
+## Minuto 8 a 9, ato 4: operação explícita
 
 ```bash
-./demo.sh ledger
+./demo.sh urls
+curl -s "https://$DEMO_HOST/health/ready"
 ```
 
-Fala: "Cada aceite debitou créditos num ledger append-only, na mesma transação do aceite. Quatro
-notificações, dois créditos cada, oito debitados. Repare que o retry idempotente do ato 1 não
-cobrou duas vezes. A fatura no fim do mês bate com o uso porque é a mesma linha de verdade."
+Fala: "Health, referência da API, inbox de desenvolvimento e consulta de tentativas ficam no mesmo
+ponto operacional. Não há broker, cache ou segundo processo para vigiar."
 
 ## Minuto 9 a 10, fechamento
 
 Aba `/scalar`.
 
-Fala: "Documentação viva, gerada do código que vocês acabaram de ver rodar. Push web, webhooks
-assinados e templates já estão no produto; SMS e WhatsApp plugam na mesma arquitetura. E para
-migrar sem fé: shadow mode, o Hiram roda em paralelo registrando tudo sem enviar, vocês comparam,
-e cortam quando os números provarem. Próximo passo que eu sugiro: um tenant shadow com eventos
-reais de vocês por uma semana."
+Fala: "Documentação viva, gerada do código que vocês acabaram de ver rodar. O núcleo é
+deliberadamente pequeno: aceite durável, entrega, auditoria e replay. Extensões só permanecem
+quando um projeto real paga sua manutenção."
 
 ## Plano B, sem rede
 
@@ -111,7 +106,7 @@ projetor tem internet, a demo inteira roda no celular, a URL é pública.
 |---|---|
 | fixtures do zero | ~8s |
 | ato 1 (submit + idempotência + inbox) | ~10s |
-| ato 2 (dispatcher down/up até sent) | ~20s |
+| ato 2 (host único e auditoria) | ~10s |
 | ato 3 (retries + DLQ + replay até sent) | ~45s |
-| ato 4 (ledger) | ~2s |
-| total | 134s |
+| ato 4 (health e operação) | ~2s |
+| total | ~85s |

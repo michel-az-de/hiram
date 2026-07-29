@@ -78,7 +78,7 @@
       </div>
       <ol class="flow">
         <li class="flow-node">
-          <h3>Aceitar <span class="flow-where">Hiram.Api · 202</span></h3>
+          <h3>Aceitar <span class="flow-where">Hiram · 202</span></h3>
           <p>POST /v1/notifications valida e responde na hora com 202 Accepted. Um Idempotency-Key torna o retry seguro.</p>
         </li>
         <li class="flow-node flow-commit">
@@ -87,10 +87,10 @@
         </li>
         <li class="flow-node">
           <h3>Reivindicar <span class="flow-where">PostgreSQL · lease atômico</span></h3>
-          <p>O dispatcher reivindica a linha disponível com lease, sem duplicar trabalho entre workers concorrentes.</p>
+          <p>O worker interno reivindica a linha disponível com lease, sem duplicar trabalho entre instâncias concorrentes.</p>
         </li>
         <li class="flow-node">
-          <h3>Entregar <span class="flow-where">Dispatcher → SMTP / Resend</span></h3>
+          <h3>Entregar <span class="flow-where">Worker → SMTP / Resend</span></h3>
           <p>Um pipeline resiliente resolve o provider do tenant, tenta de novo em falha transitória e registra cada tentativa.</p>
         </li>
         <li class="flow-node">

@@ -31,30 +31,29 @@ while an active project uses them.
 
 ## Current status
 
-The existing runtime is implemented and covered by CI. It currently runs as two hosts backed by:
+The Hiram Core runtime is implemented and covered by CI. It runs as:
 
-- Hiram.Api;
-- Hiram.Dispatcher;
+- one Hiram host for HTTP and background delivery;
 - PostgreSQL.
 
-[ADR-027](docs/adr/ADR-027-hiram-core.md) approved a smaller target: one Hiram host and PostgreSQL,
-with providers external to the runtime. The incremental migration is specified in
-[plans/hiram-core.md](plans/hiram-core.md). Until those steps merge, the quick start below describes
-the current runtime rather than the target.
+[ADR-027](docs/adr/ADR-027-hiram-core.md) defines this smaller target, with providers external to
+the runtime. The remaining operational work is tracked in [plans/hiram-core.md](plans/hiram-core.md).
 
 ## Current architecture
 
 ```mermaid
 flowchart LR
-  client[Tenant app] -->|API key| api[Hiram.Api]
-  api -->|request plus outbox in one transaction| pg[(PostgreSQL)]
-  pg -->|lease claim| dispatcher[Channel processor]
-  dispatcher --> provider[SMTP or Resend]
-  dispatcher --> attempts[(Delivery attempts)]
+  client[Tenant app] -->|API key| hiram[Hiram]
+  hiram -->|request plus outbox in one transaction| pg[(PostgreSQL)]
+  pg -->|lease claim| hiram
+  hiram --> provider[SMTP or Resend]
+  hiram --> attempts[(Delivery attempts)]
 ```
 
 PostgreSQL is the durable authority for notifications, idempotency and the leased outbox queue.
 Channel processors claim outbox rows directly with bounded leases and recover expired work.
+Workers are enabled by default. `Hiram:Workers:Enabled=false` is reserved for migrations and
+diagnostics; it is not a second deployment topology.
 
 ## Core guarantees
 
@@ -75,24 +74,14 @@ recovery rather than silently resending.
 
 ## Quick start
 
-The current development infrastructure requires Docker:
+Start Hiram, PostgreSQL and the local development tools with Docker:
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml up -d --build
 ```
 
-Set the provisional admin key:
-
-```bash
-dotnet user-secrets set "Hiram:AdminKey" "admin-dev-local" --project src/Hiram.Api
-```
-
-Start the current hosts in separate terminals:
-
-```bash
-dotnet run --project src/Hiram.Api
-dotnet run --project src/Hiram.Dispatcher
-```
+The reference Compose uses `admin-dev-local` as its development-only admin key. Set
+`HIRAM_ADMIN_KEY` before starting it to override that value.
 
 Create a tenant and API key:
 

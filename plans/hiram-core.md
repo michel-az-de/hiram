@@ -86,6 +86,8 @@ Gate:
 
 ## Passo 5: consolidar host e deploy
 
+**Status:** concluído na issue #97.
+
 - Hospedar workers no processo ASP.NET Core.
 - Permitir desligar workers apenas para migração e diagnóstico, não como segunda topologia permanente.
 - Remover o projeto e a imagem do Dispatcher.
@@ -110,8 +112,8 @@ Gate:
 
 ## Extensões em quarentena
 
-Templates, eventos, rotinas e Web Push permanecem durante a migração. Antes do Passo 4, cada uma deve
-ter evidência de consumidor ativo. Sem evidência, a extensão recebe issue própria de remoção.
+Templates, eventos, rotinas e Web Push permanecem em quarentena. Cada uma deve ter evidência de
+consumidor ativo; sem evidência, a extensão recebe issue própria de remoção.
 
 ## Rollback
 
@@ -120,12 +122,12 @@ dispatch: somente um worker pode deter o lease de cada item.
 
 ## Definition of Done
 
-- [ ] Um host e um PostgreSQL são suficientes para produção.
+- [x] Um host e um PostgreSQL são suficientes para produção.
 - [x] Redis e RabbitMQ não fazem parte do runtime, CI ou documentação ativa.
-- [ ] Escopos de SaaS foram removidos.
-- [ ] API `/v1` compatível para recursos mantidos.
-- [ ] Build Release e suíte completa verdes.
-- [ ] Uma imagem e um Compose suportados.
+- [x] Escopos de SaaS foram removidos.
+- [x] API `/v1` compatível para recursos mantidos.
+- [x] Build Release e suíte completa verdes.
+- [x] Uma imagem e um Compose suportados.
 - [ ] Backup e restore comprovados.
 - [ ] Runbook publicado.
 - [ ] 30 dias de operação real sem perda silenciosa.
