@@ -10,18 +10,15 @@ public sealed class SubmitNotificationHandler : ISubmitNotification
 {
     private readonly INotificationStore _store;
     private readonly INotificationReader _reader;
-    private readonly IIdempotencyKeys _idempotency;
     private readonly IClock _clock;
 
     public SubmitNotificationHandler(
         INotificationStore store,
         INotificationReader reader,
-        IIdempotencyKeys idempotency,
         IClock clock)
     {
         _store = store;
         _reader = reader;
-        _idempotency = idempotency;
         _clock = clock;
     }
 
@@ -32,16 +29,9 @@ public sealed class SubmitNotificationHandler : ISubmitNotification
 
         if (key is not null)
         {
-            var claimed = await _idempotency.TryClaimAsync(command.TenantId, key, notificationId, cancellationToken);
-            if (claimed is Guid)
-            {
-                // Redis only accelerates the happy path; a claim can outlive an owner that never committed
-                // (crash between claim and persist), so confirm the durable row before replaying. When it is
-                // absent the claim is a ghost: fall through and let the unique index arbitrate a fresh submit.
-                var persistedId = await _reader.FindIdByIdempotencyKeyAsync(command.TenantId, key, cancellationToken);
-                if (persistedId is Guid replayId)
-                    return Replay(replayId);
-            }
+            var persistedId = await _reader.FindIdByIdempotencyKeyAsync(command.TenantId, key, cancellationToken);
+            if (persistedId is Guid replayId)
+                return Replay(replayId);
         }
 
         var now = _clock.UtcNow;
@@ -77,20 +67,13 @@ public sealed class SubmitNotificationHandler : ISubmitNotification
         }
         catch (DuplicateIdempotencyKeyException)
         {
-            // The fast path missed (Redis cleared, expired or unavailable); the unique index is the durable
-            // arbiter, so the conflict resolves to a replay of the original notification.
+            // Concurrent submits can both miss the initial read. The unique index arbitrates the race,
+            // then the loser resolves to the row committed by the winner.
             var existingId = await _reader.FindIdByIdempotencyKeyAsync(command.TenantId, key!, cancellationToken);
             if (existingId is not Guid replayId)
                 throw;
 
-            await _idempotency.StoreAsync(command.TenantId, key!, replayId, cancellationToken);
             return Replay(replayId);
-        }
-        catch when (key is not null)
-        {
-            // Claimed the key but failed to persist for another reason; release it so a retry can proceed.
-            await _idempotency.ReleaseAsync(command.TenantId, key, cancellationToken);
-            throw;
         }
 
         return new SubmitNotificationResult(notificationId, NotificationStatus.Accepted);

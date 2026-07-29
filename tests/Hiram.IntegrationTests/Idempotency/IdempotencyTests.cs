@@ -3,9 +3,7 @@ using System.Net.Http.Json;
 using Hiram.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using StackExchange.Redis;
 using Testcontainers.PostgreSql;
-using Testcontainers.Redis;
 
 namespace Hiram.IntegrationTests.Idempotency;
 
@@ -15,17 +13,13 @@ public class IdempotencyTests : IAsyncLifetime
     private const string AdminKey = "admin-idempotency-key";
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17").Build();
-    private readonly RedisContainer _redis = new RedisBuilder("redis:7-alpine").Build();
     private WebApplicationFactory<Program>? _factory;
-    private string _redisConnectionString = string.Empty;
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_postgres.StartAsync(), _redis.StartAsync());
-        _redisConnectionString = _redis.GetConnectionString();
+        await _postgres.StartAsync();
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Hiram", _postgres.GetConnectionString());
-        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", _redisConnectionString);
         Environment.SetEnvironmentVariable("Hiram__AdminKey", AdminKey);
         Environment.SetEnvironmentVariable("OTEL_SDK_DISABLED", "true");
 
@@ -39,12 +33,10 @@ public class IdempotencyTests : IAsyncLifetime
             await _factory.DisposeAsync();
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Hiram", null);
-        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", null);
         Environment.SetEnvironmentVariable("Hiram__AdminKey", null);
         Environment.SetEnvironmentVariable("OTEL_SDK_DISABLED", null);
 
         await _postgres.DisposeAsync();
-        await _redis.DisposeAsync();
     }
 
     [Fact]
@@ -61,16 +53,16 @@ public class IdempotencyTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task RedisCleared_StillReplaysViaDatabaseBackstop()
+    public async Task ConcurrentRequests_ReturnSameId_AndPersistOnlyOnce()
     {
         var client = await ClientForNewTenant();
 
-        var first = await Post(client, "evt-2");
-        await FlushRedis();
-        var second = await Post(client, "evt-2");
+        var submissions = await Task.WhenAll(
+            Post(client, "evt-2"),
+            Post(client, "evt-2"));
 
-        Assert.Equal(first.Id, second.Id);
-        Assert.True(second.Replayed);
+        Assert.Equal(submissions[0].Id, submissions[1].Id);
+        Assert.Single(submissions, result => result.Replayed);
     }
 
     [Fact]
@@ -121,14 +113,6 @@ public class IdempotencyTests : IAsyncLifetime
         var client = _factory!.CreateClient();
         client.DefaultRequestHeaders.Add("X-Api-Key", key!.Key);
         return client;
-    }
-
-    private async Task FlushRedis()
-    {
-        var options = ConfigurationOptions.Parse(_redisConnectionString);
-        options.AllowAdmin = true;
-        await using var admin = await ConnectionMultiplexer.ConnectAsync(options);
-        await admin.GetServer(admin.GetEndPoints()[0]).FlushDatabaseAsync();
     }
 
     private sealed record AcceptedDto(Guid Id, string Status);

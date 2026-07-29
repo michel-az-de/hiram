@@ -11,7 +11,6 @@ using Hiram.Application.Scheduling;
 using Hiram.Application.Tenancy;
 using Hiram.Application.Templates;
 using Hiram.Application.Webhooks;
-using Hiram.Infrastructure.Caching;
 using Hiram.Infrastructure.Delivery;
 using Hiram.Infrastructure.Persistence;
 using Hiram.Infrastructure.Push;
@@ -22,7 +21,6 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using StackExchange.Redis;
 
 namespace Hiram.Infrastructure;
 
@@ -108,17 +106,4 @@ public static class DependencyInjection
         return services;
     }
 
-    public static IServiceCollection AddHiramRedis(this IServiceCollection services, string connectionString)
-    {
-        var options = ConfigurationOptions.Parse(connectionString);
-        // Authentication must survive a Redis outage, so a failed connection degrades the throttle
-        // instead of aborting the host on startup.
-        options.AbortOnConnectFail = false;
-
-        services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(options));
-        services.AddSingleton<IApiKeyUsageThrottle, RedisApiKeyUsageThrottle>();
-        services.AddSingleton<IIdempotencyKeys, RedisIdempotencyKeys>();
-
-        return services;
-    }
 }

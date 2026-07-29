@@ -22,7 +22,7 @@ internal sealed class NotificationRequestConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.IdempotencyKey).HasColumnName("idempotency_key").HasMaxLength(255);
 
         // One accepted notification per (tenant, idempotency key). Rows without a key are unconstrained,
-        // so the unique index is partial. This is the durable backstop behind the Redis fast path.
+        // so the unique index is partial. PostgreSQL is the authority for idempotency.
         builder.HasIndex(x => new { x.TenantId, x.IdempotencyKey })
             .HasDatabaseName("ux_notification_requests_idempotency")
             .IsUnique()

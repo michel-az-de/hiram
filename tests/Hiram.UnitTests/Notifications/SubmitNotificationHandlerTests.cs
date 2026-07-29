@@ -31,43 +31,20 @@ public class SubmitNotificationHandlerTests
         }
     }
 
-    private sealed class FakeIdempotencyKeys : IIdempotencyKeys
-    {
-        public Guid? ClaimResult { get; set; }
-        public int ClaimCalls { get; private set; }
-        public int StoreCalls { get; private set; }
-        public int ReleaseCalls { get; private set; }
-        public Guid? LastStoredId { get; private set; }
-
-        public Task<Guid?> TryClaimAsync(Guid tenantId, string key, Guid notificationId, CancellationToken cancellationToken)
-        {
-            ClaimCalls++;
-            return Task.FromResult(ClaimResult);
-        }
-
-        public Task StoreAsync(Guid tenantId, string key, Guid notificationId, CancellationToken cancellationToken)
-        {
-            StoreCalls++;
-            LastStoredId = notificationId;
-            return Task.CompletedTask;
-        }
-
-        public Task ReleaseAsync(Guid tenantId, string key, CancellationToken cancellationToken)
-        {
-            ReleaseCalls++;
-            return Task.CompletedTask;
-        }
-    }
-
     private sealed class FakeReader : INotificationReader
     {
         public Guid? ExistingId { get; set; }
+        public Queue<Guid?> IdempotencyResults { get; } = new();
+        public int IdempotencyLookups { get; private set; }
 
         public Task<NotificationRequest?> FindAsync(Guid tenantId, Guid id, CancellationToken cancellationToken) =>
             Task.FromResult<NotificationRequest?>(null);
 
-        public Task<Guid?> FindIdByIdempotencyKeyAsync(Guid tenantId, string idempotencyKey, CancellationToken cancellationToken) =>
-            Task.FromResult(ExistingId);
+        public Task<Guid?> FindIdByIdempotencyKeyAsync(Guid tenantId, string idempotencyKey, CancellationToken cancellationToken)
+        {
+            IdempotencyLookups++;
+            return Task.FromResult(IdempotencyResults.TryDequeue(out var result) ? result : ExistingId);
+        }
 
         public Task<IReadOnlyList<NotificationRequest>> QueryAsync(NotificationQuery query, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<NotificationRequest>>([]);
@@ -87,16 +64,14 @@ public class SubmitNotificationHandlerTests
     private sealed record Harness(
         SubmitNotificationHandler Handler,
         CapturingStore Store,
-        FakeIdempotencyKeys Idempotency,
         FakeReader Reader);
 
     private static Harness Build()
     {
         var store = new CapturingStore();
-        var idempotency = new FakeIdempotencyKeys();
         var reader = new FakeReader();
-        var handler = new SubmitNotificationHandler(store, reader, idempotency, new FixedClock(FixedNow));
-        return new Harness(handler, store, idempotency, reader);
+        var handler = new SubmitNotificationHandler(store, reader, new FixedClock(FixedNow));
+        return new Harness(handler, store, reader);
     }
 
     private static SubmitNotificationCommand ValidCommand(string? idempotencyKey = null) =>
@@ -162,20 +137,19 @@ public class SubmitNotificationHandlerTests
     }
 
     [Fact]
-    public async Task Submit_WithoutIdempotencyKey_NeverConsultsTheFastPath()
+    public async Task Submit_WithoutIdempotencyKey_DoesNotQueryForAnExistingRequest()
     {
         var harness = Build();
 
         await harness.Handler.SubmitAsync(ValidCommand(), CancellationToken.None);
 
-        Assert.Equal(0, harness.Idempotency.ClaimCalls);
+        Assert.Equal(0, harness.Reader.IdempotencyLookups);
     }
 
     [Fact]
     public async Task Submit_WithNewIdempotencyKey_AcceptsAndStoresTheKeyOnTheRequest()
     {
         var harness = Build();
-        harness.Idempotency.ClaimResult = null;
 
         var result = await harness.Handler.SubmitAsync(ValidCommand("evt-1"), CancellationToken.None);
 
@@ -189,7 +163,6 @@ public class SubmitNotificationHandlerTests
     {
         var harness = Build();
         var original = Guid.NewGuid();
-        harness.Idempotency.ClaimResult = original;
         harness.Reader.ExistingId = original;
 
         var result = await harness.Handler.SubmitAsync(ValidCommand("evt-1"), CancellationToken.None);
@@ -200,51 +173,32 @@ public class SubmitNotificationHandlerTests
     }
 
     [Fact]
-    public async Task Submit_WhenClaimHasNoPersistedRow_SubmitsFreshInsteadOfReplaying()
-    {
-        var harness = Build();
-        harness.Idempotency.ClaimResult = Guid.NewGuid(); // Redis points at a claim...
-        harness.Reader.ExistingId = null;                 // ...whose owner never committed a row.
-
-        var result = await harness.Handler.SubmitAsync(ValidCommand("evt-1"), CancellationToken.None);
-
-        Assert.False(result.Replayed);
-        Assert.Equal(1, harness.Store.SaveCalls);
-        Assert.NotEqual(Guid.Empty, result.NotificationId);
-    }
-
-    [Fact]
-    public async Task Submit_WhenDatabaseRejectsDuplicate_ReplaysOriginalAndRepairsTheCache()
+    public async Task Submit_WhenDatabaseRejectsConcurrentDuplicate_ReplaysOriginal()
     {
         var harness = Build();
         var original = Guid.NewGuid();
-        harness.Idempotency.ClaimResult = null;
         harness.Store.ThrowOnSave = new DuplicateIdempotencyKeyException();
-        harness.Reader.ExistingId = original;
+        harness.Reader.IdempotencyResults.Enqueue(null);
+        harness.Reader.IdempotencyResults.Enqueue(original);
 
         var result = await harness.Handler.SubmitAsync(ValidCommand("evt-1"), CancellationToken.None);
 
         Assert.True(result.Replayed);
         Assert.Equal(original, result.NotificationId);
-        Assert.Equal(1, harness.Idempotency.StoreCalls);
-        Assert.Equal(original, harness.Idempotency.LastStoredId);
+        Assert.Equal(2, harness.Reader.IdempotencyLookups);
     }
 
     [Fact]
-    public async Task Submit_WhenSaveFailsForAnotherReason_ReleasesTheClaimAndRethrows()
+    public async Task Submit_WhenSaveFailsForAnotherReason_Rethrows()
     {
         var harness = Build();
-        harness.Idempotency.ClaimResult = null;
         harness.Store.ThrowOnSave = new InvalidOperationException("boom");
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             harness.Handler.SubmitAsync(ValidCommand("evt-1"), CancellationToken.None));
-
-        Assert.Equal(1, harness.Idempotency.ReleaseCalls);
     }
 
-    // Until the whatsapp pipeline is wired (F7 steps 6 and 7), an accepted whatsapp submit has no routing
-    // key and must fail loudly rather than route nowhere.
+    // WhatsApp remains only as a compatibility tombstone for historical rows, never as an accepted route.
     [Fact]
     public async Task Submit_ThrowsForWhatsApp_UntilTheChannelIsWired()
     {

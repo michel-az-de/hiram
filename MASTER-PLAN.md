@@ -96,8 +96,7 @@ a tentativa e conclui ou agenda retry. Falha esgotada vira dead-letter replayabl
 - Docker Compose;
 - xUnit e Testcontainers PostgreSQL.
 
-Redis e RabbitMQ permanecem apenas durante a migração definida no ADR-027 e no plano
-`plans/hiram-core.md`.
+RabbitMQ permanece apenas durante a migração definida no ADR-027 e no plano `plans/hiram-core.md`.
 
 ## 7. Migração
 

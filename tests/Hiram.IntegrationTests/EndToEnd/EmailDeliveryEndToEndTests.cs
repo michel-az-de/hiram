@@ -21,7 +21,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
-using Testcontainers.Redis;
 
 namespace Hiram.IntegrationTests.EndToEnd;
 
@@ -35,7 +34,6 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
         .WithUsername("hiram")
         .WithPassword("hiram")
         .Build();
-    private readonly RedisContainer _redis = new RedisBuilder("redis:7-alpine").Build();
     private readonly IContainer _mailpit = new ContainerBuilder("axllent/mailpit:latest")
         .WithPortBinding(1025, true)
         .WithPortBinding(8025, true)
@@ -47,13 +45,12 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_postgres.StartAsync(), _rabbit.StartAsync(), _redis.StartAsync(), _mailpit.StartAsync());
+        await Task.WhenAll(_postgres.StartAsync(), _rabbit.StartAsync(), _mailpit.StartAsync());
         _postgresConnection = _postgres.GetConnectionString();
 
         var rabbitConnection = _rabbit.GetConnectionString();
         Environment.SetEnvironmentVariable("ConnectionStrings__Hiram", _postgresConnection);
         Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", rabbitConnection);
-        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", _redis.GetConnectionString());
         Environment.SetEnvironmentVariable("Hiram__AdminKey", AdminKey);
         Environment.SetEnvironmentVariable("OTEL_SDK_DISABLED", "true");
 
@@ -86,7 +83,7 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
 
         foreach (var name in new[]
         {
-            "ConnectionStrings__Hiram", "ConnectionStrings__RabbitMq", "ConnectionStrings__Redis", "Hiram__AdminKey",
+            "ConnectionStrings__Hiram", "ConnectionStrings__RabbitMq", "Hiram__AdminKey",
             "OTEL_SDK_DISABLED", "Hiram__Email__Platform__Provider", "Hiram__Email__Platform__Settings__host",
             "Hiram__Email__Platform__Settings__port", "Hiram__Email__Platform__Settings__from",
             "Hiram__Email__Platform__Settings__security"
@@ -98,7 +95,6 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
         await Task.WhenAll(
             _postgres.DisposeAsync().AsTask(),
             _rabbit.DisposeAsync().AsTask(),
-            _redis.DisposeAsync().AsTask(),
             _mailpit.DisposeAsync().AsTask());
     }
 

@@ -20,7 +20,7 @@ echo "==> Topics"
 gh repo edit "$OWNER/$REPO" \
   --add-topic dotnet --add-topic csharp --add-topic aspnet-core \
   --add-topic notifications --add-topic multi-tenant --add-topic outbox-pattern \
-  --add-topic rabbitmq --add-topic postgresql --add-topic redis \
+  --add-topic rabbitmq --add-topic postgresql \
   --add-topic opentelemetry --add-topic keda --add-topic kubernetes \
   --add-topic clean-architecture --add-topic modular-monolith \
   --add-topic webhooks --add-topic saas

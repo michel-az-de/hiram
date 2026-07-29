@@ -4,7 +4,6 @@ using Hiram.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Testcontainers.PostgreSql;
-using Testcontainers.Redis;
 
 namespace Hiram.IntegrationTests.Webhooks;
 
@@ -14,15 +13,13 @@ public class WebhookEndpointsTests : IAsyncLifetime
     private const string AdminKey = "admin-webhook-key";
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17").Build();
-    private readonly RedisContainer _redis = new RedisBuilder("redis:7-alpine").Build();
     private WebApplicationFactory<Program>? _factory;
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_postgres.StartAsync(), _redis.StartAsync());
+        await _postgres.StartAsync();
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Hiram", _postgres.GetConnectionString());
-        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", _redis.GetConnectionString());
         Environment.SetEnvironmentVariable("Hiram__AdminKey", AdminKey);
         Environment.SetEnvironmentVariable("OTEL_SDK_DISABLED", "true");
 
@@ -35,11 +32,10 @@ public class WebhookEndpointsTests : IAsyncLifetime
         if (_factory is not null)
             await _factory.DisposeAsync();
 
-        foreach (var name in new[] { "ConnectionStrings__Hiram", "ConnectionStrings__Redis", "Hiram__AdminKey", "OTEL_SDK_DISABLED" })
+        foreach (var name in new[] { "ConnectionStrings__Hiram", "Hiram__AdminKey", "OTEL_SDK_DISABLED" })
             Environment.SetEnvironmentVariable(name, null);
 
         await _postgres.DisposeAsync();
-        await _redis.DisposeAsync();
     }
 
     [Fact]

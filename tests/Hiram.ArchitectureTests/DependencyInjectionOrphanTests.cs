@@ -63,11 +63,10 @@ public class DependencyInjectionOrphanTests
     private static IEnumerable<ServiceDescriptor> BuildContainer()
     {
         // Dummy connection strings and empty configuration: the registrations must not open a socket, so
-        // the container can be inspected without Postgres, Redis or a live host.
+        // the container can be inspected without Postgres or a live host.
         var configuration = new ConfigurationBuilder().Build();
         var services = new ServiceCollection();
         services.AddHiramInfrastructure("Host=localhost;Database=hiram;Username=hiram;Password=hiram");
-        services.AddHiramRedis("localhost:6379");
         services.AddHiramEmailDelivery(configuration);
         services.AddHiramPush(configuration);
         return services;

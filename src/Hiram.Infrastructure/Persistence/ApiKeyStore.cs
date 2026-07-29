@@ -6,6 +6,8 @@ namespace Hiram.Infrastructure.Persistence;
 
 public sealed class ApiKeyStore : IApiKeyStore
 {
+    private static readonly TimeSpan UsageWindow = TimeSpan.FromMinutes(5);
+
     private readonly HiramDbContext _context;
 
     public ApiKeyStore(HiramDbContext context)
@@ -33,10 +35,11 @@ public sealed class ApiKeyStore : IApiKeyStore
         return true;
     }
 
-    // Targeted update on the auth hot path: the throttle keeps this rare, and skipping change tracking
-    // avoids loading the row just to stamp one column.
+    // The predicate makes the throttle atomic in Postgres, including concurrent requests, while the
+    // targeted update avoids loading the row on the authentication hot path.
     public Task RecordUsageAsync(Guid apiKeyId, DateTimeOffset whenUtc, CancellationToken cancellationToken) =>
         _context.ApiKeys
-            .Where(x => x.Id == apiKeyId)
+            .Where(x => x.Id == apiKeyId
+                && (x.LastUsedAtUtc == null || x.LastUsedAtUtc <= whenUtc - UsageWindow))
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.LastUsedAtUtc, whenUtc), cancellationToken);
 }

@@ -11,7 +11,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
-using Testcontainers.Redis;
 
 namespace Hiram.IntegrationTests.EndToEnd;
 
@@ -25,18 +24,16 @@ public class WalkingSkeletonTests : IAsyncLifetime
         .WithUsername("hiram")
         .WithPassword("hiram")
         .Build();
-    private readonly RedisContainer _redis = new RedisBuilder("redis:7-alpine").Build();
 
     private WebApplicationFactory<Program>? _factory;
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_postgres.StartAsync(), _rabbit.StartAsync(), _redis.StartAsync());
+        await Task.WhenAll(_postgres.StartAsync(), _rabbit.StartAsync());
 
         var rabbitConnection = _rabbit.GetConnectionString();
         Environment.SetEnvironmentVariable("ConnectionStrings__Hiram", _postgres.GetConnectionString());
         Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", rabbitConnection);
-        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", _redis.GetConnectionString());
         Environment.SetEnvironmentVariable("Hiram__AdminKey", AdminKey);
         // The manual ActivityListener below keeps spans alive for the assertion; the OTLP exporter has
         // nothing to talk to in tests, so disable the SDK to avoid export noise and shutdown delays.
@@ -64,13 +61,11 @@ public class WalkingSkeletonTests : IAsyncLifetime
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Hiram", null);
         Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", null);
-        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", null);
         Environment.SetEnvironmentVariable("Hiram__AdminKey", null);
         Environment.SetEnvironmentVariable("OTEL_SDK_DISABLED", null);
 
         await _postgres.DisposeAsync();
         await _rabbit.DisposeAsync();
-        await _redis.DisposeAsync();
     }
 
     [Fact]

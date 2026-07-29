@@ -5,7 +5,7 @@ Thanks for your interest. Hiram is built as a production system and a portfolio 
 ## Prerequisites
 
 - .NET 10 SDK
-- Docker, for the integration suite (Testcontainers spins up Postgres, RabbitMQ, Redis and Mailpit)
+- Docker, for the integration suite (Testcontainers spins up Postgres, RabbitMQ and Mailpit)
 
 ## Build and test
 
@@ -26,6 +26,6 @@ The unit tests run anywhere. The integration tests need a running Docker engine.
 
 ## Architecture
 
-Dependencies point inward: Domain references nothing, Application references Domain, Infrastructure references Application and Domain, and the hosts (Api, Dispatcher) are composition roots. Domain and Application do not know about EF Core, RabbitMQ, Redis or HTTP.
+Dependencies point inward: Domain references nothing, Application references Domain, Infrastructure references Application and Domain, and the hosts (Api, Dispatcher) are composition roots. Domain and Application do not know about EF Core, RabbitMQ or HTTP.
 
 A new structural decision (a library, a pattern, a boundary change) needs an Architecture Decision Record in [docs/adr/](docs/adr/) before the code. The full engineering rules are in [CLAUDE.md](CLAUDE.md), and the charter and roadmap are in [MASTER-PLAN.md](MASTER-PLAN.md).
