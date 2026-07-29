@@ -17,3 +17,5 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 ### Removed
 - Remove metering, creditos e o ledger do caminho de submissao e fan-out. A migration historica
   permanece intacta e a tabela existente fica dormente ate uma limpeza de schema posterior.
+- Remove o modulo incompleto de templates WhatsApp. O valor do canal permanece apenas como tombstone
+  de compatibilidade e o submit continua rejeitando-o antes de persistir.
