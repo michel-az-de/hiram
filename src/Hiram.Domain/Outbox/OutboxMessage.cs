@@ -9,11 +9,11 @@ public sealed class OutboxMessage
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset? ProcessedAtUtc { get; private set; }
 
-    // W3C trace context captured when the row was written, so the asynchronous relay can publish
+    // W3C trace context captured when the row was written, so the asynchronous worker can process it
     // under the same trace as the request that produced it.
     public string? TraceParent { get; private set; }
 
-    // When set, the relay holds the row until this instant (window deferral, ADR-020). Null publishes
+    // When set, the queue holds the row until this instant (window deferral, ADR-020). Null dispatches
     // immediately, which is the direct path's behaviour.
     public DateTimeOffset? DispatchAt { get; private set; }
 

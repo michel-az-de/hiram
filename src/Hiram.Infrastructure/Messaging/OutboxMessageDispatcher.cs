@@ -27,10 +27,10 @@ public sealed class OutboxMessageDispatcher
         var body = Encoding.UTF8.GetBytes(message.Payload).AsMemory();
         return message.Type switch
         {
-            HiramTopology.EmailRoutingKey => _email.ProcessAsync(body, cancellationToken),
-            HiramTopology.EventRoutingKey => _event.ProcessAsync(body, cancellationToken),
-            HiramTopology.PushRoutingKey => _push.ProcessAsync(body, cancellationToken),
-            HiramTopology.WebhookRoutingKey => _webhook.ProcessAsync(body, cancellationToken),
+            "email" => _email.ProcessAsync(body, cancellationToken),
+            "event" => _event.ProcessAsync(body, cancellationToken),
+            "push" => _push.ProcessAsync(body, cancellationToken),
+            "webhook" => _webhook.ProcessAsync(body, cancellationToken),
             _ => throw new PoisonMessageException($"Outbox message type '{message.Type}' is not supported.")
         };
     }

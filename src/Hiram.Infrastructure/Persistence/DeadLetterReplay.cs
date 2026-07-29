@@ -3,7 +3,6 @@ using Hiram.Application.Abstractions;
 using Hiram.Application.Notifications;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Outbox;
-using Hiram.Infrastructure.Messaging;
 using Hiram.Infrastructure.Telemetry;
 using Microsoft.EntityFrameworkCore;
 
@@ -53,7 +52,7 @@ public sealed class DeadLetterReplay : IDeadLetterReplay
             return ReplayOutcome.NotDeadLettered;
         }
 
-        // Reuse the stored payload verbatim and a fresh trace, so the existing relay redelivers exactly what failed.
+        // Reuse the stored payload verbatim and a fresh trace, so the worker redelivers exactly what failed.
         _context.OutboxMessages.Add(new OutboxMessage(
             Guid.NewGuid(), tenantId, RoutingKeyFor(deadLetter.Channel), deadLetter.Payload, _clock.UtcNow, Activity.Current?.Id));
         deadLetter.MarkReplayed(_clock.UtcNow);
@@ -67,8 +66,8 @@ public sealed class DeadLetterReplay : IDeadLetterReplay
 
     private static string RoutingKeyFor(NotificationChannel channel) => channel switch
     {
-        NotificationChannel.Email => HiramTopology.EmailRoutingKey,
-        NotificationChannel.Push => HiramTopology.PushRoutingKey,
+        NotificationChannel.Email => "email",
+        NotificationChannel.Push => "push",
         _ => throw new ArgumentOutOfRangeException(nameof(channel), channel, "No routing key for channel.")
     };
 }
