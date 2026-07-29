@@ -15,7 +15,6 @@ builder.AddHiramTelemetry("hiram-dispatcher");
 builder.Services.AddHiramInfrastructure(postgres, builder.Configuration["DataProtection:KeysPath"]);
 builder.Services.AddHiramEmailDelivery(builder.Configuration);
 builder.Services.AddHiramPush(builder.Configuration);
-builder.Services.AddHiramMetering(builder.Configuration);
 builder.Services.AddHiramMessaging(rabbitMq);
 builder.Services.AddHostedService<OutboxRelayWorker>();
 builder.Services.AddHostedService<EmailConsumerWorker>();

@@ -247,46 +247,6 @@ namespace Hiram.Infrastructure.Persistence.Migrations
                     b.ToTable("message_claims", "notifications");
                 });
 
-            modelBuilder.Entity("Hiram.Domain.Metering.CreditLedgerEntry", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<long>("Amount")
-                        .HasColumnType("bigint")
-                        .HasColumnName("amount");
-
-                    b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<Guid?>("NotificationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("notification_id");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
-                        .HasColumnName("reason");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("NotificationId")
-                        .HasDatabaseName("ix_credit_ledger_notification_id");
-
-                    b.HasIndex("TenantId")
-                        .HasDatabaseName("ix_credit_ledger_tenant_id");
-
-                    b.ToTable("credit_ledger", "notifications");
-                });
-
             modelBuilder.Entity("Hiram.Domain.Notifications.DeliveryAttempt", b =>
                 {
                     b.Property<Guid>("Id")

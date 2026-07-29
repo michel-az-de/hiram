@@ -1,9 +1,7 @@
 using System.Text.Json;
 using Hiram.Application.Abstractions;
-using Hiram.Application.Metering;
 using Hiram.Application.Notifications;
 using Hiram.Domain.DeadLetters;
-using Hiram.Domain.Metering;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Outbox;
 
@@ -18,11 +16,10 @@ public class SubmitNotificationHandlerTests
     {
         public NotificationRequest? SavedRequest { get; private set; }
         public OutboxMessage? SavedOutbox { get; private set; }
-        public CreditLedgerEntry? SavedLedger { get; private set; }
         public int SaveCalls { get; private set; }
         public Exception? ThrowOnSave { get; set; }
 
-        public Task SaveAsync(NotificationRequest request, OutboxMessage outbox, CreditLedgerEntry ledgerEntry, CancellationToken cancellationToken)
+        public Task SaveAsync(NotificationRequest request, OutboxMessage outbox, CancellationToken cancellationToken)
         {
             SaveCalls++;
             if (ThrowOnSave is not null)
@@ -30,7 +27,6 @@ public class SubmitNotificationHandlerTests
 
             SavedRequest = request;
             SavedOutbox = outbox;
-            SavedLedger = ledgerEntry;
             return Task.CompletedTask;
         }
     }
@@ -99,8 +95,7 @@ public class SubmitNotificationHandlerTests
         var store = new CapturingStore();
         var idempotency = new FakeIdempotencyKeys();
         var reader = new FakeReader();
-        var calculator = new CreditCalculator(new CreditRates(new Dictionary<NotificationChannel, long>(), DefaultBase: 1, PerKilobyte: 1));
-        var handler = new SubmitNotificationHandler(store, reader, idempotency, new FixedClock(FixedNow), calculator);
+        var handler = new SubmitNotificationHandler(store, reader, idempotency, new FixedClock(FixedNow));
         return new Harness(handler, store, idempotency, reader);
     }
 
@@ -140,32 +135,6 @@ public class SubmitNotificationHandlerTests
         Assert.Equal(DevTenant, harness.Store.SavedOutbox!.TenantId);
         Assert.Equal(FixedNow, harness.Store.SavedOutbox.CreatedAtUtc);
         Assert.Null(harness.Store.SavedOutbox.ProcessedAtUtc);
-    }
-
-    [Fact]
-    public async Task Submit_ChargesADebitForTheAcceptedNotification()
-    {
-        var harness = Build();
-
-        var result = await harness.Handler.SubmitAsync(ValidCommand(), CancellationToken.None);
-
-        Assert.NotNull(harness.Store.SavedLedger);
-        Assert.True(harness.Store.SavedLedger!.Amount < 0);
-        Assert.Equal(result.NotificationId, harness.Store.SavedLedger.NotificationId);
-        Assert.Equal(DevTenant, harness.Store.SavedLedger.TenantId);
-    }
-
-    [Fact]
-    public async Task Submit_WithKnownIdempotencyKey_DoesNotCharge()
-    {
-        var harness = Build();
-        var original = Guid.NewGuid();
-        harness.Idempotency.ClaimResult = original;
-        harness.Reader.ExistingId = original;
-
-        await harness.Handler.SubmitAsync(ValidCommand("evt-1"), CancellationToken.None);
-
-        Assert.Null(harness.Store.SavedLedger);
     }
 
     [Fact]

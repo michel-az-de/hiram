@@ -53,7 +53,6 @@ builder.Services.AddHiramOpenApi();
 builder.Services.AddHiramInfrastructure(connectionString, builder.Configuration["DataProtection:KeysPath"]);
 builder.Services.AddHiramRedis(redisConnectionString);
 builder.Services.AddHiramPush(builder.Configuration);
-builder.Services.AddHiramMetering(builder.Configuration);
 builder.Services.AddScoped<ISubmitNotification, SubmitNotificationHandler>();
 builder.Services.AddScoped<IIngestEvent, IngestEventHandler>();
 builder.Services.AddScoped<TenantContext>();

@@ -70,7 +70,6 @@ public class DependencyInjectionOrphanTests
         services.AddHiramRedis("localhost:6379");
         services.AddHiramEmailDelivery(configuration);
         services.AddHiramPush(configuration);
-        services.AddHiramMetering(configuration);
         return services;
     }
 

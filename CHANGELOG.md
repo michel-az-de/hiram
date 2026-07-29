@@ -13,3 +13,7 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 - Adota o Protocolo Operacional v4.0 (PR-first, issue-driven, auto-merge por tier). Ver ADR de adocao e CLAUDE.md.
 - Redefine o Hiram como infraestrutura interna de notificacoes: um host e PostgreSQL no runtime
   alvo, providers externos na ultima milha e extensoes somente com consumidor ativo.
+
+### Removed
+- Remove metering, creditos e o ledger do caminho de submissao e fan-out. A migration historica
+  permanece intacta e a tabela existente fica dormente ate uma limpeza de schema posterior.
