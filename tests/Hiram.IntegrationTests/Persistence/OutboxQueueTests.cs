@@ -79,6 +79,7 @@ public sealed class OutboxQueueTests : IAsyncLifetime
         context.ChangeTracker.Clear();
         var stored = await context.OutboxMessages.AsNoTracking().SingleAsync(message => message.Id == messageId);
         Assert.Equal(retryAt, stored.AvailableAt);
+        Assert.Equal(retryAt, stored.DispatchAt);
         Assert.Equal("provider unavailable", stored.LastError);
         Assert.Null(stored.LeaseUntil);
 
@@ -104,6 +105,8 @@ public sealed class OutboxQueueTests : IAsyncLifetime
             messageId, expired.LeaseUntil, reclaimedAt, CancellationToken.None));
         Assert.False(await queue.ScheduleRetryAsync(
             messageId, expired.LeaseUntil, reclaimedAt, reclaimedAt.AddMinutes(1), "stale", CancellationToken.None));
+        Assert.False(await queue.DeadLetterAsync(
+            messageId, expired.LeaseUntil, reclaimedAt, "stale", CancellationToken.None));
 
         context.ChangeTracker.Clear();
         var stored = await context.OutboxMessages.AsNoTracking().SingleAsync(message => message.Id == messageId);
@@ -130,6 +133,24 @@ public sealed class OutboxQueueTests : IAsyncLifetime
         context.ChangeTracker.Clear();
         var stored = await context.OutboxMessages.AsNoTracking().SingleAsync(message => message.Id == messageId);
         Assert.Equal(Now.AddMinutes(1), stored.ProcessedAtUtc);
+        Assert.Null(stored.LeaseUntil);
+    }
+
+    [Fact]
+    public async Task CurrentOwner_CanDeadLetterMessageWithEvidence()
+    {
+        var messageId = Assert.Single(await Seed(1));
+        await using var context = NewContext();
+        var queue = new OutboxQueue(context);
+        var lease = Assert.Single(await queue.ClaimAsync(1, Now, TimeSpan.FromMinutes(1), CancellationToken.None));
+
+        Assert.True(await queue.DeadLetterAsync(
+            messageId, lease.LeaseUntil, Now.AddSeconds(10), "invalid payload", CancellationToken.None));
+
+        context.ChangeTracker.Clear();
+        var stored = await context.OutboxMessages.AsNoTracking().SingleAsync(message => message.Id == messageId);
+        Assert.Equal(Now.AddSeconds(10), stored.ProcessedAtUtc);
+        Assert.Equal("invalid payload", stored.LastError);
         Assert.Null(stored.LeaseUntil);
     }
 
