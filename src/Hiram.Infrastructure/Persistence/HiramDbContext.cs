@@ -3,7 +3,6 @@ using Hiram.Domain.Consents;
 using Hiram.Domain.DeadLetters;
 using Hiram.Domain.Events;
 using Hiram.Domain.Messaging;
-using Hiram.Domain.Metering;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Outbox;
 using Hiram.Domain.Push;
@@ -40,8 +39,6 @@ public sealed class HiramDbContext : DbContext
     public DbSet<WhatsAppTemplate> WhatsAppTemplates => Set<WhatsAppTemplate>();
     public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
     public DbSet<WebhookEndpoint> WebhookEndpoints => Set<WebhookEndpoint>();
-    public DbSet<CreditLedgerEntry> CreditLedger => Set<CreditLedgerEntry>();
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);

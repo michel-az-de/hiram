@@ -4,11 +4,9 @@ using System.Text;
 using System.Text.Json;
 using Hiram.Application.Abstractions;
 using Hiram.Application.Events;
-using Hiram.Application.Metering;
 using Hiram.Application.Notifications;
 using Hiram.Application.Routines;
 using Hiram.Application.Templates;
-using Hiram.Domain.Metering;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Outbox;
 using Hiram.Infrastructure.Telemetry;
@@ -28,7 +26,6 @@ public sealed class EventFanout
     private readonly ITemplateStore _templates;
     private readonly ITemplateRenderer _renderer;
     private readonly INotificationStore _store;
-    private readonly ICreditCalculator _calculator;
     private readonly IClock _clock;
     private readonly ILogger<EventFanout> _logger;
 
@@ -38,7 +35,6 @@ public sealed class EventFanout
         ITemplateStore templates,
         ITemplateRenderer renderer,
         INotificationStore store,
-        ICreditCalculator calculator,
         IClock clock,
         ILogger<EventFanout> logger)
     {
@@ -47,7 +43,6 @@ public sealed class EventFanout
         _templates = templates;
         _renderer = renderer;
         _store = store;
-        _calculator = calculator;
         _clock = clock;
         _logger = logger;
     }
@@ -146,13 +141,9 @@ public sealed class EventFanout
         var outbox = new OutboxMessage(
             Guid.NewGuid(), @event.TenantId, "email", JsonSerializer.Serialize(payload), now, Activity.Current?.Id);
 
-        var payloadBytes = Encoding.UTF8.GetByteCount(subject) + Encoding.UTF8.GetByteCount(body);
-        var cost = _calculator.Cost(NotificationChannel.Email, payloadBytes);
-        var ledgerEntry = CreditLedgerEntry.Debit(@event.TenantId, notificationId, cost, "event:fanout", now);
-
         try
         {
-            await _store.SaveAsync(request, outbox, ledgerEntry, cancellationToken);
+            await _store.SaveAsync(request, outbox, cancellationToken);
         }
         catch (DuplicateIdempotencyKeyException)
         {
