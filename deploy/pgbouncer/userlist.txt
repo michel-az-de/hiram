@@ -1,3 +1,0 @@
-;; PgBouncer auth file (SCRAM-SHA-256). Generate the real hash out of band and inject it as a secret;
-;; do not commit credentials. Format: "user" "SCRAM-SHA-256$<iterations>:<salt>$<storedkey>:<serverkey>"
-"hiram" "SCRAM-SHA-256$4096:CHANGE_ME"
