@@ -1,6 +1,6 @@
 # ADR-016: Deploy do Hiram em k3s e KEDA no ambiente do EasyStok
 
-**Status:** Aceito
+**Status:** Supersedido pelo ADR-027
 **Data:** 2026-06-28
 **Decisores:** Felipe (arquiteto)
 

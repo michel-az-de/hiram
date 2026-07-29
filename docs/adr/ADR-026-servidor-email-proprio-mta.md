@@ -1,6 +1,6 @@
 # ADR-026: Servidor de email próprio (MTA self-hosted Stalwart) com relay autenticado no último salto
 
-**Status:** Proposto
+**Status:** Supersedido pelo ADR-027
 **Data:** 2026-07-14
 **Decisores:** Felipe (arquiteto)
 
