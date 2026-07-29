@@ -7,9 +7,8 @@
 <p align="center"><em>The word is never lost.</em></p>
 
 <p align="center">
-  Multi-tenant notification platform. Email, push, SMS and WhatsApp behind one API,<br>
-  with outbox-guaranteed delivery, credit metering, configurable AI autonomy<br>
-  and end-to-end OpenTelemetry.
+  Internal multi-tenant notification gateway for .NET products and selected clients.<br>
+  Durable submission, provider-independent email delivery, retries, audit and replay.
 </p>
 
 <p align="center">
@@ -22,98 +21,136 @@
 
 ## What this is
 
-Hiram accepts a notification request, persists it together with an outbox row in a single PostgreSQL transaction, and takes responsibility from there: channel routing, per-tenant providers, retries, status webhooks signed with `X-Hiram-Signature`, and a credit ledger for usage. If the database confirmed it, it will be delivered.
+Hiram accepts a notification, persists it with an outbox row in the same PostgreSQL transaction,
+and takes responsibility from there. It authenticates tenants, honors idempotency keys, resolves an
+email provider, retries transient failures, records every attempt and exposes dead-letter replay.
 
-**Stack:** .NET 10 · ASP.NET Core · EF Core · PostgreSQL · RabbitMQ · Redis · OpenTelemetry · Docker · k3s + KEDA
+Hiram is internal infrastructure, not a general-purpose notification SaaS. Email is the required
+channel. Templates, raw events, routines and Web Push are compatibility extensions that remain only
+while an active project uses them.
 
-## Architecture
+## Current status
+
+The existing runtime is implemented and covered by CI, but still uses:
+
+- Hiram.Api;
+- Hiram.Dispatcher;
+- PostgreSQL;
+- RabbitMQ;
+- Redis.
+
+[ADR-027](docs/adr/ADR-027-hiram-core.md) approved a smaller target: one Hiram host and PostgreSQL,
+with providers external to the runtime. The incremental migration is specified in
+[plans/hiram-core.md](plans/hiram-core.md). Until those steps merge, the quick start below describes
+the current runtime rather than the target.
+
+## Current architecture
 
 ```mermaid
 flowchart LR
   client[Tenant app] -->|API key| api[Hiram.Api]
-  api -->|idempotency| redis[(Redis)]
-  api -->|request plus outbox in one tx| pg[(PostgreSQL)]
-  pg -.->|skip locked| relay[Outbox relay]
-  relay --> mq{{RabbitMQ exchange hiram.notifications}}
-  mq --> email[Email consumer]
-  mq --> push[Push consumer]
-  mq --> webhook[Webhook consumer]
-  email --> smtp[SMTP or Resend]
-  push --> vapid[Web Push VAPID]
-  webhook --> hook[Tenant endpoint, X-Hiram-Signature]
-  email -. exhausted .-> dlq[(dead letter)]
-  push -. exhausted .-> dlq
+  api -->|request plus outbox in one transaction| pg[(PostgreSQL)]
+  api -->|fast path only| redis[(Redis)]
+  pg --> relay[Outbox relay]
+  relay --> mq{{RabbitMQ}}
+  mq --> dispatcher[Channel processor]
+  dispatcher --> provider[SMTP or Resend]
+  dispatcher --> attempts[(Delivery attempts)]
 ```
 
-The founding invariant: the API writes the `NotificationRequest` and its `OutboxMessage` in one PostgreSQL transaction, so an accepted notification is never lost. The Dispatcher relays the outbox to RabbitMQ with `FOR UPDATE SKIP LOCKED`, and per-channel consumers deliver, retry, dead letter and replay over the same spine.
+PostgreSQL is already the durable authority for the notification, outbox and idempotency. Redis is
+a fast path. RabbitMQ currently transports outbox items to channel processors and will be replaced
+by a leased PostgreSQL queue during the Hiram Core migration.
 
-## Status
+## Core guarantees
 
-F1 and F2 complete. Email ships end to end on top of the F0 outbox skeleton, with production safety: real tenants and hashed API keys, honored `Idempotency-Key`, two interchangeable providers per tenant (SMTP via MailKit, Resend over HTTP), a Polly send pipeline that records one `DeliveryAttempt` per try, the full state machine (`accepted -> queued -> sending -> sent | failed | suppressed`), per-tenant shadow mode, and cursor-paginated audit queries. The first F2 slice is in: a delivery that exhausts its retries or fails permanently is dead lettered with the reason recorded, and replayable through `POST /v1/notifications/{id}/replay` over the same outbox, while a message that can never be processed is parked in a dedicated dead letter queue instead of being dropped. Templates render with Scriban at submit time, so a tenant manages named per-channel templates and sends only the data, with strict variables turning a missing field into a 400. Web Push is the third F2 channel: a tenant registers browser subscriptions, the platform signs with VAPID, and a notification targets a subscription by id, reusing the same outbox, dead letter and replay as email. Status webhooks close F2: a tenant registers endpoints, and a terminal status emits an event signed with HMAC-SHA256 in `X-Hiram-Signature`, delivered with retry over the same outbox. F3 has begun: every accepted notification is charged in credits, computed from channel and payload size, written to an append-only ledger in the same transaction as the request and outbox, so an accepted notification is always a charged notification. Roadmap, phase plans and architecture decisions live in this repository:
+- tenant isolation;
+- hashed, revocable API keys;
+- `Idempotency-Key` scoped by tenant;
+- notification and outbox persisted atomically;
+- provider-independent email delivery;
+- structured retries and delivery attempts;
+- dead-letter and replay;
+- channel blocks and consent enforcement in the event-routing path;
+- signed status webhooks;
+- OpenTelemetry instrumentation.
 
-| Document | Purpose |
-|---|---|
-| [MASTER-PLAN.md](MASTER-PLAN.md) | Charter, architecture, phases F0 to F6 (pt-BR) |
-| [docs/adr/](docs/adr/) | Architecture decision records (pt-BR) |
-| [docs/BRAND.md](docs/BRAND.md) | Brand and signature system (pt-BR) |
-| [docs/design/](docs/design/) | Design system, tokens and logo assets |
-| [CLAUDE.md](CLAUDE.md) | Engineering rules for AI-assisted development |
+No system can guarantee exactly one provider call across every crash boundary. Hiram treats the
+post-provider uncertainty explicitly through durable claims, provider callbacks and fail-safe
+recovery rather than silently resending.
 
 ## Quick start
 
-The dev infrastructure runs in Docker, the hosts run on .NET 10. Run everything from the repository root.
+The current development infrastructure requires Docker:
 
-1. Start Postgres, RabbitMQ, Redis, Mailpit and the Aspire Dashboard:
+```bash
+docker compose -f docker-compose.dev.yml up -d
+```
 
-   ```bash
-   docker compose -f docker-compose.dev.yml up -d
-   ```
+Set the provisional admin key:
 
-2. Set the admin key that guards the provisional admin endpoints (kept in user-secrets, never committed):
+```bash
+dotnet user-secrets set "Hiram:AdminKey" "admin-dev-local" --project src/Hiram.Api
+```
 
-   ```bash
-   dotnet user-secrets set "Hiram:AdminKey" "admin-dev-local" --project src/Hiram.Api
-   ```
+Start the current hosts in separate terminals:
 
-3. Start the API (applies migrations on startup, listens on `http://localhost:3357`) and, in another shell, the Dispatcher (outbox relay plus email consumer). Start the Dispatcher after the API so the schema already exists:
+```bash
+dotnet run --project src/Hiram.Api
+dotnet run --project src/Hiram.Dispatcher
+```
 
-   ```bash
-   dotnet run --project src/Hiram.Api
-   dotnet run --project src/Hiram.Dispatcher
-   ```
+Create a tenant and API key:
 
-4. Create a tenant and issue an API key. The clear key (`hk_live_...`) is shown only once:
+```bash
+curl -s -X POST http://localhost:3357/v1/admin/tenants \
+  -H "X-Admin-Key: admin-dev-local" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"example","deliveryMode":"live"}'
 
-   ```bash
-   curl -s -X POST http://localhost:3357/v1/admin/tenants \
-     -H "X-Admin-Key: admin-dev-local" -H "Content-Type: application/json" \
-     -d '{"name":"easystok","deliveryMode":"live"}'
+curl -s -X POST http://localhost:3357/v1/admin/api-keys \
+  -H "X-Admin-Key: admin-dev-local" \
+  -H "Content-Type: application/json" \
+  -d '{"tenantId":"<tenant-id>","name":"example-server"}'
+```
 
-   curl -s -X POST http://localhost:3357/v1/admin/api-keys \
-     -H "X-Admin-Key: admin-dev-local" -H "Content-Type: application/json" \
-     -d '{"tenantId":"<tenant-id>","name":"easystok-server"}'
-   ```
+Send and query a notification:
 
-5. Send a notification and read it back. An `Idempotency-Key` makes the call safe to retry:
+```bash
+curl -i -X POST http://localhost:3357/v1/notifications \
+  -H "X-Api-Key: hk_live_..." \
+  -H "Idempotency-Key: evt-0001" \
+  -H "Content-Type: application/json" \
+  -d '{"channel":"email","recipient":"ops@example.com","subject":"hello","body":"from hiram"}'
 
-   ```bash
-   curl -i -X POST http://localhost:3357/v1/notifications \
-     -H "X-Api-Key: hk_live_..." -H "Idempotency-Key: evt-0001" -H "Content-Type: application/json" \
-     -d '{"channel":"email","recipient":"ops@example.com","subject":"hello","body":"f1"}'
+curl -s http://localhost:3357/v1/notifications/<notification-id> \
+  -H "X-Api-Key: hk_live_..."
+```
 
-   curl -s http://localhost:3357/v1/notifications/<id> -H "X-Api-Key: hk_live_..."
-   ```
+Development tools:
 
-   The POST returns `202` with the id and status `accepted`. The Dispatcher delivers through the dev SMTP provider and the GET reports `sent` with its delivery attempts. Repeating the POST with the same `Idempotency-Key` returns the original id and the header `Idempotency-Replayed: true`. A tenant created with `"deliveryMode":"shadow"` reaches `sent` but records a `shadow_would_send` attempt without delivering.
+- Scalar: `http://localhost:3357/scalar`
+- Mailpit: `http://localhost:8025`
+- Aspire Dashboard: `http://localhost:18888`
+- RabbitMQ management during migration: `http://localhost:15672`
 
-Where to look:
+## Verification
 
-- API reference (Scalar): `http://localhost:3357/scalar`
-- Delivered email (Mailpit): `http://localhost:8025`
-- Distributed trace (Aspire Dashboard): `http://localhost:18888`, one trace id spanning the API, publish, consume and send spans
-- RabbitMQ management: `http://localhost:15672` (user `hiram`, password `hiram`)
+```bash
+dotnet build Hiram.sln --configuration Release
+dotnet test Hiram.sln --configuration Release
+```
 
-Run the tests with `dotnet test`. The integration suite uses Testcontainers and needs a running Docker engine.
+Integration tests use Testcontainers and require Docker. CI runs the complete suite.
+
+## Documentation
+
+| Document | Purpose |
+|---|---|
+| [MASTER-PLAN.md](MASTER-PLAN.md) | Hiram Core charter and success criteria |
+| [plans/hiram-core.md](plans/hiram-core.md) | Executable migration |
+| [docs/adr/ADR-027-hiram-core.md](docs/adr/ADR-027-hiram-core.md) | Architecture decision |
+| [docs/adr/](docs/adr/) | Decision history |
 
 ## License
 
