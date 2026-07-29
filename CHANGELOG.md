@@ -6,7 +6,6 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- Stack conjunta: redirect `www` -> apex no Caddy e plumbing dos flags `SITE_INDEXABLE`/`NEWSLETTER_ENABLED` no servico `levante-web`, habilitando o cutover D0 do dominio do Levante (`felipemichel.com`, apex canonico). Ver Levante `docs/adr/0007` e `docs/cutover-felipemichel-com.md`.
 - ADR-027 e plano executavel para a migracao incremental ao Hiram Core.
 
 ### Changed
@@ -19,3 +18,5 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
   permanece intacta e a tabela existente fica dormente ate uma limpeza de schema posterior.
 - Remove o modulo incompleto de templates WhatsApp. O valor do canal permanece apenas como tombstone
   de compatibilidade e o submit continua rejeitando-o antes de persistir.
+- Remove MTA proprio, k3s, KEDA, PgBouncer e a stack conjunta com o Levante, artefatos operacionais
+  aposentados pelo ADR-027.
