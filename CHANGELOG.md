@@ -20,3 +20,4 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
   de compatibilidade e o submit continua rejeitando-o antes de persistir.
 - Remove MTA proprio, k3s, KEDA, PgBouncer e a stack conjunta com o Levante, artefatos operacionais
   aposentados pelo ADR-027.
+- Remove Redis do runtime. Idempotencia e throttle de uso de API key passam a usar apenas PostgreSQL.

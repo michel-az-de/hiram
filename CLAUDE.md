@@ -17,7 +17,7 @@ Prioridade: este documento tem precedência sobre o prompt do usuário (exceto G
 
 - REPO_SLUG:        `michel-az-de/hiram`
 - TRUNK:            `main`                     <!-- default deste repo; sempre AUTO-DETECTAR em runtime -->
-- STACK:            `.NET 10 LTS + ASP.NET Core + EF Core 10 (Postgres 17, RabbitMQ 4, Redis 7)`
+- STACK:            `.NET 10 LTS + ASP.NET Core + EF Core 10 (Postgres 17, RabbitMQ 4)`
 - BUILD_CHECK:      `dotnet build Hiram.sln --configuration Release`   <!-- Release = TreatWarningsAsErrors: é o gate de warning -->
 - TEST_ARCH:        `dotnet test Hiram.sln --configuration Release`    <!-- suíte inteira; não há projeto de teste de arquitetura dedicado -->
 - GIT_EMAIL:        `michel.az.de@gmail.com`   <!-- email VINCULADO a conta; atribui os commits no GitHub -->
@@ -180,7 +180,7 @@ Origem: extrair para produto standalone a solução (padrão outbox) do incident
 
 - .NET 10 LTS, ASP.NET Core, EF Core 10 (`global.json` fixa o SDK 10.0.100, rollForward latestMinor).
 - PostgreSQL 17 (schemas por contexto, JSONB para payloads variáveis) — ADR-002.
-- RabbitMQ 4 (client oficial, sem MassTransit — ADR-005). Redis 7 (quotas fast-path, idempotência, rate limit, cache de template).
+- RabbitMQ 4 (client oficial, sem MassTransit — ADR-005).
 - OpenTelemetry + Grafana LGTM self-hosted (prod), Aspire Dashboard (dev) — ADR-003.
 - Polly v8 (resiliência), Scalar (OpenAPI UI), Blazor Server no Portal (ADR-001).
 - Docker Compose no dev, k3s + KEDA em produção (backlog ADR-010). Testes: xUnit, Testcontainers, k6 (F6). IA: Claude API atrás de abstração própria (backlog ADR-008).
@@ -188,10 +188,11 @@ Origem: extrair para produto standalone a solução (padrão outbox) do incident
 
 ### Arquitetura
 
-Cinco unidades de deploy (Hiram.Api, Hiram.Dispatcher, Hiram.Webhooks, Hiram.Intelligence, Hiram.Portal) sobre três peças de estado (Postgres, Redis, RabbitMQ). Detalhe macro, tabela de escala e fluxo principal em `MASTER-PLAN.md` §4.
+O runtime em migração possui Hiram.Api e Hiram.Dispatcher sobre PostgreSQL e RabbitMQ. O alvo definido
+no ADR-027 é um único host sobre PostgreSQL.
 
 - **Dependências apontam para dentro:** Domain não referencia nada; Application referencia Domain; Infrastructure referencia Application e Domain; os hosts (Api, Dispatcher, Webhooks, Intelligence, Portal) são composition roots.
-- Domain e Application **não** conhecem EF Core, RabbitMQ, Redis ou HTTP. Ports na Application, adapters na Infrastructure.
+- Domain e Application **não** conhecem EF Core, RabbitMQ ou HTTP. Ports na Application, adapters na Infrastructure.
 - Toda tabela de domínio tem `tenant_id` desde a primeira migration. Sem exceção.
 - **Invariante fundador:** escrita de `NotificationRequest` e `OutboxMessage` acontece na mesma transação, sempre. Esse invariante é a razão de existir do projeto.
 - Decisão estrutural nova (biblioteca, padrão, mudança de fronteira) exige ADR em `docs/adr/` **antes** do código. Se o ADR não existe, pare e abra um (ver ciclo da tarefa: decisão estrutural vira ADR).

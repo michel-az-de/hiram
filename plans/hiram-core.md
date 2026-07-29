@@ -35,6 +35,8 @@ Gate:
 
 ## Passo 2: remover Redis
 
+**Status:** concluído na issue #89.
+
 - Substituir `IIdempotencyKeys` por fluxo PostgreSQL-first.
 - Tratar conflito do índice único como replay da requisição original.
 - Remover throttle Redis de `last_used_at`; registrar uso com atualização condicionada no banco ou
