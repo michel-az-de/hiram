@@ -109,7 +109,6 @@ public class DependencyInjectionOrphanTests
         yield return typeof(Domain.Notifications.NotificationRequest).Assembly;
         yield return typeof(Application.Notifications.SubmitNotificationHandler).Assembly;
         yield return typeof(DependencyInjection).Assembly;
-        yield return typeof(Dispatcher.PostgresDispatcherWorker).Assembly;
         yield return Assembly.Load("Hiram.Api");
     }
 

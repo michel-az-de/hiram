@@ -11,6 +11,7 @@ using Hiram.Api.Providers;
 using Hiram.Api.Push;
 using Hiram.Api.Templates;
 using Hiram.Api.Webhooks;
+using Hiram.Api.Workers;
 using Hiram.Application.Events;
 using Hiram.Application.Notifications;
 using Hiram.Infrastructure;
@@ -41,14 +42,14 @@ if (args.Contains("--migrate-only"))
     return 0;
 }
 
-builder.AddHiramTelemetry("hiram-api", tracing => tracing
+builder.AddHiramTelemetry("hiram", tracing => tracing
     .AddAspNetCoreInstrumentation()
     .AddHttpClientInstrumentation());
 
 builder.Services.AddProblemDetails();
 builder.Services.AddHiramOpenApi();
 builder.Services.AddHiramInfrastructure(connectionString, builder.Configuration["DataProtection:KeysPath"]);
-builder.Services.AddHiramPush(builder.Configuration);
+builder.Services.AddHiramWorkers(builder.Configuration);
 builder.Services.AddScoped<ISubmitNotification, SubmitNotificationHandler>();
 builder.Services.AddScoped<IIngestEvent, IngestEventHandler>();
 builder.Services.AddScoped<TenantContext>();

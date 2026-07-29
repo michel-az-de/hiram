@@ -2,16 +2,12 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.Http.Json;
 using Hiram.Contracts;
-using Hiram.Dispatcher;
 using Hiram.Domain.Outbox;
-using Hiram.Infrastructure;
-using Hiram.Infrastructure.Messaging;
 using Hiram.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Testcontainers.PostgreSql;
 
 namespace Hiram.IntegrationTests.EndToEnd;
@@ -35,19 +31,8 @@ public class WalkingSkeletonTests : IAsyncLifetime
         // nothing to talk to in tests, so disable the SDK to avoid export noise and shutdown delays.
         Environment.SetEnvironmentVariable("OTEL_SDK_DISABLED", "true");
 
-        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseEnvironment("Development");
-            builder.ConfigureServices((context, services) =>
-            {
-                // The API host does not run the send pipeline, so the in-process consumer needs the
-                // delivery services (resolver, providers pipeline) wired up like the dispatcher.
-                services.AddHiramEmailDelivery(context.Configuration);
-                services.AddHiramMessageProcessors();
-                services.AddScoped<PostgresOutboxPump>();
-                services.AddHostedService<PostgresDispatcherWorker>();
-            });
-        });
+        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(
+            builder => builder.UseEnvironment("Development"));
     }
 
     public async Task DisposeAsync()

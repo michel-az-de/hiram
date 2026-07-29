@@ -18,7 +18,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Hiram.Api\Hiram.Api.csproj" />
-    <ProjectReference Include="..\..\src\Hiram.Dispatcher\Hiram.Dispatcher.csproj" />
     <ProjectReference Include="..\..\src\Hiram.Infrastructure\Hiram.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Hiram.Application\Hiram.Application.csproj" />
     <ProjectReference Include="..\..\src\Hiram.Domain\Hiram.Domain.csproj" />
