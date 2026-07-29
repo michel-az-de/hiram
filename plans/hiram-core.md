@@ -52,6 +52,8 @@ Gate:
 
 ## Passo 3: introduzir a fila PostgreSQL
 
+**Status:** fundação de lease entregue na issue #91; ativação do dispatcher acompanhada pela #92.
+
 - Estender o outbox com `available_at`, `lease_until`, `attempt_count` e `last_error`.
 - Criar operação atômica de claim usando `FOR UPDATE SKIP LOCKED`.
 - Renovar ou concluir lease de forma explícita.

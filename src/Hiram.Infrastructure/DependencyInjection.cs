@@ -6,6 +6,7 @@ using Hiram.Application.Events;
 using Hiram.Application.Messaging;
 using Hiram.Application.Routines;
 using Hiram.Application.Notifications;
+using Hiram.Application.Outbox;
 using Hiram.Application.Push;
 using Hiram.Application.Scheduling;
 using Hiram.Application.Tenancy;
@@ -32,6 +33,7 @@ public static class DependencyInjection
         services.AddHiramDataProtection(dataProtectionKeyRingPath);
         services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
         services.AddScoped<INotificationStore, NotificationStore>();
+        services.AddScoped<IOutboxQueue, OutboxQueue>();
         services.AddScoped<IEventStore, EventStore>();
         services.AddScoped<IRoutineCatalog, RoutineCatalog>();
         services.AddScoped<IRoutineStore, RoutineStore>();
