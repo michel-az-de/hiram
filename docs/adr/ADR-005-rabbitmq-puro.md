@@ -1,6 +1,6 @@
 # ADR-005: RabbitMQ com client puro e outbox próprio, sem MassTransit
 
-**Status:** Aceito (formaliza prática estabelecida na F0)
+**Status:** Supersedido pelo ADR-027, remoção concluída na issue #95
 **Data:** 2026-06-12
 **Decisores:** Felipe (arquiteto)
 

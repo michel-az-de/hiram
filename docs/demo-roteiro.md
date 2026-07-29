@@ -42,21 +42,20 @@ Falas:
 - Sobre o `idempotency`: "duas chamadas com a mesma Idempotency-Key, o mesmo id volta nas duas e
   só existe um email. Retry de rede do seu lado nunca vira email duplicado para o seu cliente."
 
-## Minuto 3 a 5, ato 2: derrube o broker, nada se perde
+## Minuto 3 a 5, ato 2: pare o dispatcher, nada se perde
 
 ```bash
-./demo.sh broker-down
-./demo.sh submit Bruno Enterprise      # 202 accepted com o broker MORTO
+./demo.sh dispatcher-down
+./demo.sh submit Bruno Enterprise      # 202 accepted com o worker PARADO
 ./demo.sh status <id>                  # "accepted"
-./demo.sh broker-up                    # ~25s depois o status vira "sent" sozinho
+./demo.sh dispatcher-up                # o status vira "sent" sozinho
 ```
 
-Fala: "Acabei de matar o RabbitMQ. A API continua aceitando com 202, porque o aceite não depende
-da fila: request e outbox gravam na mesma transação Postgres. Religuei, e o relay entregou sem
-nenhuma intervenção. É esse o seguro contra o incidente que originou o projeto. Nenhuma
-notificação aceita se perde."
+Fala: "Acabei de parar o worker. A API continua aceitando com 202, porque request e outbox gravam
+na mesma transação PostgreSQL. Religuei, e o worker retomou a fila sem nenhuma intervenção. É esse
+o seguro contra o incidente que originou o projeto. Nenhuma notificação aceita se perde."
 
-Enquanto espera o broker voltar, mostre o `status`: a transição acontece na frente do prospect.
+Enquanto espera o worker voltar, mostre o `status`: a transição acontece na frente do prospect.
 
 ## Minuto 5 a 8, ato 3: falha real, DLQ com razão, replay
 
@@ -112,7 +111,7 @@ projetor tem internet, a demo inteira roda no celular, a URL é pública.
 |---|---|
 | fixtures do zero | ~8s |
 | ato 1 (submit + idempotência + inbox) | ~10s |
-| ato 2 (broker down/up até sent) | ~45s, dominado pelo boot do RabbitMQ |
+| ato 2 (dispatcher down/up até sent) | ~20s |
 | ato 3 (retries + DLQ + replay até sent) | ~45s |
 | ato 4 (ledger) | ~2s |
 | total | 134s |

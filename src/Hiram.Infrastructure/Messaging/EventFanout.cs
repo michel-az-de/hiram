@@ -15,7 +15,7 @@ using Microsoft.Extensions.Logging;
 namespace Hiram.Infrastructure.Messaging;
 
 // Turns one ingested event into the same rendered request and outbox row the direct path produces, one
-// per resolved channel, so the existing relay, consumer, retry, dead letter and shadow deliver it. The
+// per resolved channel, so the existing queue, processor, retry, dead letter and shadow deliver it. The
 // routine engine decides which channels fire; this fans that decision out into concrete messages.
 public sealed class EventFanout
 {

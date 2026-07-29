@@ -24,7 +24,7 @@ internal sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outb
         builder.Property(x => x.AttemptCount).HasColumnName("attempt_count").IsRequired();
         builder.Property(x => x.LastError).HasColumnName("last_error").HasMaxLength(4000);
 
-        // Partial index over the relay hot path: only unprocessed rows, oldest first.
+        // Partial index over the queue hot path: only unprocessed rows, oldest first.
         builder.HasIndex(x => x.CreatedAtUtc)
             .HasDatabaseName("ix_outbox_messages_unprocessed")
             .HasFilter("processed_at_utc IS NULL");

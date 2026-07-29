@@ -1,13 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using Hiram.Application.Notifications;
 using Hiram.Contracts;
 using Hiram.Dispatcher;
 using Hiram.Domain.Notifications;
-using Hiram.Domain.Outbox;
 using Hiram.Domain.Routines;
 using Hiram.Domain.Templates;
 using Hiram.Domain.Tenants;
@@ -18,9 +16,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
 using Testcontainers.PostgreSql;
-using Testcontainers.RabbitMq;
 
 namespace Hiram.IntegrationTests.EndToEnd;
 
@@ -30,10 +26,6 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
     private const string AdminKey = "admin-f1-e2e-key";
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17").Build();
-    private readonly RabbitMqContainer _rabbit = new RabbitMqBuilder("rabbitmq:4-management")
-        .WithUsername("hiram")
-        .WithPassword("hiram")
-        .Build();
     private readonly IContainer _mailpit = new ContainerBuilder("axllent/mailpit:latest")
         .WithPortBinding(1025, true)
         .WithPortBinding(8025, true)
@@ -45,12 +37,10 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_postgres.StartAsync(), _rabbit.StartAsync(), _mailpit.StartAsync());
+        await Task.WhenAll(_postgres.StartAsync(), _mailpit.StartAsync());
         _postgresConnection = _postgres.GetConnectionString();
 
-        var rabbitConnection = _rabbit.GetConnectionString();
         Environment.SetEnvironmentVariable("ConnectionStrings__Hiram", _postgresConnection);
-        Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", rabbitConnection);
         Environment.SetEnvironmentVariable("Hiram__AdminKey", AdminKey);
         Environment.SetEnvironmentVariable("OTEL_SDK_DISABLED", "true");
 
@@ -67,11 +57,9 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
             builder.ConfigureServices((context, services) =>
             {
                 services.AddHiramEmailDelivery(context.Configuration);
-                services.AddHiramMessaging(rabbitConnection);
-                services.AddHostedService<OutboxRelayWorker>();
-                services.AddHostedService<EmailConsumerWorker>();
-                services.AddHostedService<EventConsumerWorker>();
-                services.AddHostedService<PushConsumerWorker>();
+                services.AddHiramMessageProcessors();
+                services.AddScoped<PostgresOutboxPump>();
+                services.AddHostedService<PostgresDispatcherWorker>();
             });
         });
     }
@@ -83,7 +71,7 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
 
         foreach (var name in new[]
         {
-            "ConnectionStrings__Hiram", "ConnectionStrings__RabbitMq", "Hiram__AdminKey",
+            "ConnectionStrings__Hiram", "Hiram__AdminKey",
             "OTEL_SDK_DISABLED", "Hiram__Email__Platform__Provider", "Hiram__Email__Platform__Settings__host",
             "Hiram__Email__Platform__Settings__port", "Hiram__Email__Platform__Settings__from",
             "Hiram__Email__Platform__Settings__security"
@@ -94,7 +82,6 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
 
         await Task.WhenAll(
             _postgres.DisposeAsync().AsTask(),
-            _rabbit.DisposeAsync().AsTask(),
             _mailpit.DisposeAsync().AsTask());
     }
 
@@ -441,45 +428,6 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
         var detail = await WaitForStatus(client, id, "dead_lettered");
         Assert.Equal("dead_lettered", detail.Status);
         Assert.Contains(detail.Attempts, attempt => attempt.Outcome == "permanent_failure");
-    }
-
-    [Fact]
-    public async Task PoisonMessage_LandsInDeadLetterParkingLot()
-    {
-        // Creating a client boots the host, which applies the migrations before the direct DB write below.
-        var (tenantId, _) = await NewTenantClient("live");
-        // An outbox row pointing at a notification that never existed is deterministic poison once consumed.
-        var missingNotificationId = Guid.NewGuid();
-
-        await using (var db = NewDb())
-        {
-            db.OutboxMessages.Add(new OutboxMessage(
-                Guid.NewGuid(), tenantId, HiramTopology.EmailRoutingKey,
-                JsonSerializer.Serialize(new OutboxNotificationPayload(
-                    missingNotificationId, tenantId, "email", "ops@example.com", "poison", "body")),
-                DateTimeOffset.UtcNow));
-            await db.SaveChangesAsync();
-        }
-
-        Assert.True(await WaitForParkedMessageAsync());
-    }
-
-    private async Task<bool> WaitForParkedMessageAsync()
-    {
-        await using var connection = new RabbitMqConnection(_rabbit.GetConnectionString(), NullLogger<RabbitMqConnection>.Instance);
-        var rabbit = await connection.GetConnectionAsync(CancellationToken.None);
-        await using var channel = await rabbit.CreateChannelAsync();
-
-        for (var attempt = 0; attempt < 50; attempt++)
-        {
-            var result = await channel.BasicGetAsync(HiramTopology.DeadLetterQueue, autoAck: true);
-            if (result is not null)
-                return true;
-
-            await Task.Delay(100);
-        }
-
-        return false;
     }
 
     private HiramDbContext NewDb() =>

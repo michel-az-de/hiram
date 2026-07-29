@@ -27,7 +27,7 @@ Enquanto o passo 2.3 (callbacks de provider) não estiver pronto, "entrega real"
 - AceitacaoAbaixoDoSLO: taxa de sent/accepted abaixo de 99.9% sustentada por janela curta e janela
   longa (multi-window burn rate), error budget de ~43 min/mês.
 - BounceAlto: bounce maior que 2% (warning) e maior que 5% (crítico, risco de reputação de domínio).
-- OutboxLagAlto: lag overdue p95 maior que 30s sustentado (Dispatcher parado ou RabbitMQ cheio).
+- OutboxLagAlto: lag overdue p95 maior que 30s sustentado (worker parado ou leases acumulando).
 - DeadLetterSubindo: dead_lettered/accepted maior que 0.1%.
 - OrcamentoConexoes: conexões físicas / max_connections maior que 80% (antes de derrubar o ERP).
 

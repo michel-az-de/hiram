@@ -181,7 +181,7 @@ próprios e clientes selecionados.
 - ADR-001, Portal Blazor: supersedido.
 - ADR-003, LGTM self-hosted em produção: parcialmente supersedido. OpenTelemetry permanece; a stack
   LGTM deixa de ser dependência do Hiram.
-- ADR-005, RabbitMQ puro: supersedido para o runtime padrão.
+- ADR-005, RabbitMQ puro: supersedido.
 - ADR-007, metering ledger: supersedido.
 - ADR-014, Web Push: reclassificado como extensão de compatibilidade.
 - ADR-016, k3s e KEDA: supersedido.

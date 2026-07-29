@@ -70,7 +70,7 @@ Gate:
 
 ## Passo 4: migrar processadores e remover RabbitMQ
 
-**Status:** processadores migrados na issue #92; remoção do fallback RabbitMQ é a próxima fatia.
+**Status:** concluído pelas issues #92 e #95.
 
 - Introduzir um dispatcher por tipo de mensagem sobre o outbox.
 - Adaptar email, webhook e extensões comprovadamente usadas.
@@ -115,15 +115,13 @@ ter evidência de consumidor ativo. Sem evidência, a extensão recebe issue pr�
 
 ## Rollback
 
-Cada passo deve permitir rollback pelo PR correspondente. Durante a troca de RabbitMQ, apenas uma
-topologia pode reivindicar novos itens por vez. O flag de transição seleciona o caminho inteiro, não
-faz dual dispatch. Voltar ao caminho anterior exige parar workers, confirmar ausência de lease ativo
-e então alterar a configuração.
+Cada passo permite rollback pelo PR correspondente. A fila PostgreSQL não possui caminho paralelo de
+dispatch: somente um worker pode deter o lease de cada item.
 
 ## Definition of Done
 
 - [ ] Um host e um PostgreSQL são suficientes para produção.
-- [ ] Redis e RabbitMQ não fazem parte do runtime, CI ou documentação.
+- [x] Redis e RabbitMQ não fazem parte do runtime, CI ou documentação ativa.
 - [ ] Escopos de SaaS foram removidos.
 - [ ] API `/v1` compatível para recursos mantidos.
 - [ ] Build Release e suíte completa verdes.

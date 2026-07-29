@@ -1,6 +1,6 @@
 # Public demo stack (ADR-022): the production images behind Caddy with automatic TLS on a sslip.io
-# host. Postgres and RabbitMQ stay unpublished; only Caddy (80/443) and the NSG-restricted
-# Mailpit and RabbitMQ management UIs reach the host. Copy .env.demo.example to .env and fill it in.
+# host. Postgres stays unpublished; only Caddy (80/443) and the NSG-restricted Mailpit UI reach the
+# host. Copy .env.demo.example to .env and fill it in.
 name: hiram-demo
 
 services:
@@ -16,20 +16,6 @@ services:
       test: ["CMD-SHELL", "pg_isready -U hiram -d hiram"]
       interval: 5s
       timeout: 3s
-      retries: 10
-    restart: unless-stopped
-
-  rabbitmq:
-    image: rabbitmq:4-management
-    environment:
-      RABBITMQ_DEFAULT_USER: hiram
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set in .env}
-    ports:
-      - "15672:15672"
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
-      interval: 10s
-      timeout: 5s
       retries: 10
     restart: unless-stopped
 
@@ -91,8 +77,6 @@ services:
     image: ghcr.io/michel-az-de/hiram-dispatcher:${HIRAM_IMAGE_TAG:-latest}
     environment:
       ConnectionStrings__Hiram: "Host=postgres;Port=5432;Database=hiram;Username=hiram;Password=${POSTGRES_PASSWORD}"
-      ConnectionStrings__RabbitMq: "amqp://hiram:${RABBITMQ_PASSWORD}@rabbitmq:5672/"
-      Hiram__Messaging__Transport: "postgres"
       DataProtection__KeysPath: "/var/hiram/dataprotection-keys"
       Hiram__Email__Platform__Provider: "smtp"
       # The smtp provider reads lowercase setting keys and the dictionary is case sensitive.
@@ -111,8 +95,6 @@ services:
         condition: service_completed_successfully
       keyring-init:
         condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
     restart: unless-stopped
 
   caddy:
