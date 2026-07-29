@@ -18,6 +18,10 @@ public class OutboxMessageTests
 
         Assert.Null(message.ProcessedAtUtc);
         Assert.False(message.IsProcessed);
+        Assert.Equal(DateTimeOffset.UnixEpoch, message.AvailableAt);
+        Assert.Null(message.LeaseUntil);
+        Assert.Equal(0, message.AttemptCount);
+        Assert.Null(message.LastError);
     }
 
     [Fact]

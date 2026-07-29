@@ -381,6 +381,13 @@ namespace Hiram.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<DateTimeOffset>("AvailableAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("available_at");
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -389,6 +396,14 @@ namespace Hiram.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("dispatch_at");
 
+                    b.Property<string>("LastError")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_until");
                     b.Property<string>("Payload")
                         .IsRequired()
                         .HasColumnType("jsonb")
@@ -419,6 +434,9 @@ namespace Hiram.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_outbox_messages_unprocessed")
                         .HasFilter("processed_at_utc IS NULL");
 
+                    b.HasIndex("AvailableAt", "CreatedAtUtc")
+                        .HasDatabaseName("ix_outbox_messages_available")
+                        .HasFilter("processed_at_utc IS NULL");
                     b.ToTable("outbox_messages", "notifications");
                 });
 
@@ -745,7 +763,6 @@ namespace Hiram.Infrastructure.Persistence.Migrations
 
                     b.ToTable("webhook_endpoints", "notifications");
                 });
-
 #pragma warning restore 612, 618
         }
     }

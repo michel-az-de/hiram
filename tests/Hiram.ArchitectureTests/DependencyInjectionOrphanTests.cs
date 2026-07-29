@@ -19,6 +19,7 @@ public class DependencyInjectionOrphanTests
         "Hiram.Application.Scheduling.WindowScheduler",     // #40 models the window and passes dispatch_at
         "Hiram.Application.Scheduling.DailyLimitPolicy",    // #40 daily limit, needs a counter store
         "Hiram.Application.Consents.ConsentReconciler",     // ADR-018 step 2.0, consent dual-write
+        "Hiram.Application.Outbox.IOutboxQueue",             // #92 wires the PostgreSQL dispatcher
     };
 
     [Fact]

@@ -17,6 +17,11 @@ public sealed class OutboxMessage
     // immediately, which is the direct path's behaviour.
     public DateTimeOffset? DispatchAt { get; private set; }
 
+    public DateTimeOffset AvailableAt { get; private set; }
+    public DateTimeOffset? LeaseUntil { get; private set; }
+    public int AttemptCount { get; private set; }
+    public string? LastError { get; private set; }
+
     // Parameterless ctor exists so EF Core can materialize rows without re-running creation invariants.
     private OutboxMessage()
     {
@@ -43,6 +48,10 @@ public sealed class OutboxMessage
         ProcessedAtUtc = null;
         TraceParent = traceParent;
         DispatchAt = dispatchAt;
+        AvailableAt = dispatchAt ?? createdAtUtc;
+        LeaseUntil = null;
+        AttemptCount = 0;
+        LastError = null;
     }
 
     public bool IsProcessed => ProcessedAtUtc is not null;
@@ -53,5 +62,7 @@ public sealed class OutboxMessage
             throw new InvalidOperationException("Outbox message is already processed.");
 
         ProcessedAtUtc = processedAtUtc;
+        LeaseUntil = null;
+        LastError = null;
     }
 }
