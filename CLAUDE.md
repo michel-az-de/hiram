@@ -166,7 +166,7 @@ PS6 self-review do plano antes de apresentar; PS7 pausa quando o estado contradi
      ========================================================= -->
 ## PROJETO (específico do repo)
 
-Você está trabalhando no **Hiram**, plataforma multi-tenant de notificações (email, push, SMS, WhatsApp) com entrega confiável via outbox, cobrança por créditos, enriquecimento por IA com autonomia configurável por tenant e operação totalmente observável. Contexto completo em `MASTER-PLAN.md`, decisões em `docs/adr/`, plano da fase atual em `plans/`. **Leia o plano da fase antes de qualquer código.**
+Você está trabalhando no **Hiram Core**, gateway multi-tenant interno para notificações transacionais de produtos próprios e clientes selecionados. O runtime suportado usa um host, PostgreSQL, providers externos, outbox com leases, retry, auditoria, dead-letter e replay. Contexto completo em `MASTER-PLAN.md`, decisões em `docs/adr/`, plano da fase atual em `plans/`. **Leia o plano da fase antes de qualquer código.**
 
 Origem: extrair para produto standalone a solução (padrão outbox) do incidente P0 de blackout de notificações do EasyStok. Prioridades quando entram em conflito: **Produção > Portfolio > Reputação**. Se uma escolha melhora o portfolio mas arrisca a produção, a produção vence.
 
