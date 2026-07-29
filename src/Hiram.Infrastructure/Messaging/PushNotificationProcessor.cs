@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Hiram.Application.Abstractions;
+using Hiram.Application.Blocks;
 using Hiram.Application.Delivery;
 using Hiram.Application.Notifications;
 using Hiram.Application.Push;
@@ -25,6 +26,7 @@ public sealed class PushNotificationProcessor
 
     private readonly HiramDbContext _context;
     private readonly IPushSender _sender;
+    private readonly BlockGate _blocks;
     private readonly ResiliencePipeline<SendOutcome> _pipeline;
     private readonly IClock _clock;
     private readonly ILogger<PushNotificationProcessor> _logger;
@@ -32,12 +34,14 @@ public sealed class PushNotificationProcessor
     public PushNotificationProcessor(
         HiramDbContext context,
         IPushSender sender,
+        BlockGate blocks,
         ResiliencePipeline<SendOutcome> pipeline,
         IClock clock,
         ILogger<PushNotificationProcessor> logger)
     {
         _context = context;
         _sender = sender;
+        _blocks = blocks;
         _pipeline = pipeline;
         _clock = clock;
         _logger = logger;
@@ -71,8 +75,21 @@ public sealed class PushNotificationProcessor
             ["notification_id"] = notification.Id
         });
 
-        if (notification.Status is NotificationStatus.Sent or NotificationStatus.Failed or NotificationStatus.DeadLettered)
+        if (notification.Status is NotificationStatus.Sent or NotificationStatus.Failed or NotificationStatus.DeadLettered or NotificationStatus.Suppressed)
             return;
+
+        // Kill-switch (ADR-024): an active channel block suppresses the send, covering the direct
+        // POST /v1/notifications path that never passed through the fan-out. Checked before the claim, while
+        // the status is still a suppressible pre-send state. Without an active block, delivery is unchanged.
+        if (notification.Status is NotificationStatus.Accepted or NotificationStatus.Queued
+            && await _blocks.IsBlockedAsync(notification.TenantId, notification.Channel, _clock.UtcNow, cancellationToken))
+        {
+            notification.MarkSuppressed();
+            await _context.SaveChangesAsync(cancellationToken);
+            HiramDiagnostics.NotificationsSuppressed.Add(1, new KeyValuePair<string, object?>("hiram.reason", "block"));
+            _logger.LogInformation("Push suppressed by an active channel block");
+            return;
+        }
 
         // Claim the send atomically before touching the provider: only one consumer moves the row out of the
         // pre-send state, so concurrent redelivery (prefetch or multiple replicas) cannot both reach the
