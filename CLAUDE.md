@@ -17,7 +17,7 @@ Prioridade: este documento tem precedência sobre o prompt do usuário (exceto G
 
 - REPO_SLUG:        `michel-az-de/hiram`
 - TRUNK:            `main`                     <!-- default deste repo; sempre AUTO-DETECTAR em runtime -->
-- STACK:            `.NET 10 LTS + ASP.NET Core + EF Core 10 (Postgres 17, RabbitMQ 4)`
+- STACK:            `.NET 10 LTS + ASP.NET Core + EF Core 10 (Postgres 17)`
 - BUILD_CHECK:      `dotnet build Hiram.sln --configuration Release`   <!-- Release = TreatWarningsAsErrors: é o gate de warning -->
 - TEST_ARCH:        `dotnet test Hiram.sln --configuration Release`    <!-- suíte inteira; não há projeto de teste de arquitetura dedicado -->
 - GIT_EMAIL:        `michel.az.de@gmail.com`   <!-- email VINCULADO a conta; atribui os commits no GitHub -->
@@ -180,7 +180,7 @@ Origem: extrair para produto standalone a solução (padrão outbox) do incident
 
 - .NET 10 LTS, ASP.NET Core, EF Core 10 (`global.json` fixa o SDK 10.0.100, rollForward latestMinor).
 - PostgreSQL 17 (schemas por contexto, JSONB para payloads variáveis) — ADR-002.
-- RabbitMQ 4 (client oficial, sem MassTransit — ADR-005).
+- O PostgreSQL hospeda dados de domínio, idempotência e a fila durável por leases.
 - OpenTelemetry + Grafana LGTM self-hosted (prod), Aspire Dashboard (dev) — ADR-003.
 - Polly v8 (resiliência), Scalar (OpenAPI UI), Blazor Server no Portal (ADR-001).
 - Docker Compose no dev, k3s + KEDA em produção (backlog ADR-010). Testes: xUnit, Testcontainers, k6 (F6). IA: Claude API atrás de abstração própria (backlog ADR-008).
@@ -188,11 +188,11 @@ Origem: extrair para produto standalone a solução (padrão outbox) do incident
 
 ### Arquitetura
 
-O runtime em migração possui Hiram.Api e Hiram.Dispatcher sobre PostgreSQL. RabbitMQ permanece apenas
-como rollback explícito e mutuamente exclusivo até sua remoção. O alvo do ADR-027 é um único host.
+O runtime em migração possui Hiram.Api e Hiram.Dispatcher sobre PostgreSQL. O alvo do ADR-027 é um
+único host.
 
 - **Dependências apontam para dentro:** Domain não referencia nada; Application referencia Domain; Infrastructure referencia Application e Domain; os hosts (Api, Dispatcher, Webhooks, Intelligence, Portal) são composition roots.
-- Domain e Application **não** conhecem EF Core, RabbitMQ ou HTTP. Ports na Application, adapters na Infrastructure.
+- Domain e Application **não** conhecem EF Core ou HTTP. Ports na Application, adapters na Infrastructure.
 - Toda tabela de domínio tem `tenant_id` desde a primeira migration. Sem exceção.
 - **Invariante fundador:** escrita de `NotificationRequest` e `OutboxMessage` acontece na mesma transação, sempre. Esse invariante é a razão de existir do projeto.
 - Decisão estrutural nova (biblioteca, padrão, mudança de fronteira) exige ADR em `docs/adr/` **antes** do código. Se o ADR não existe, pare e abra um (ver ciclo da tarefa: decisão estrutural vira ADR).
@@ -203,7 +203,7 @@ O código será escrito por IA mas não pode ter cara de IA. Regras duras:
 
 - Comentário só explica porquê, nunca o quê. Se o código precisa de comentário para dizer o que faz, reescreva o código.
 - Proibido XML doc boilerplate. Documentação XML apenas em contratos públicos (Hiram.Contracts) e quando agrega informação que a assinatura não dá.
-- Proibidos sufixos vazios: Manager, Helper, Util, Common, Misc, Processor genérico. Nomes vêm da linguagem do domínio: `OutboxRelay`, `QuotaGate`, `ProviderResolver`, `CreditLedger`.
+- Proibidos sufixos vazios: Manager, Helper, Util, Common, Misc, Processor genérico. Nomes vêm da linguagem do domínio: `OutboxQueue`, `ProviderResolver`, `CreditLedger`.
 - Guard clauses no topo, early return, métodos curtos. Proibido `#region`.
 - Proibido `async void` fora de event handlers de UI. Todo método público assíncrono aceita `CancellationToken`.
 - Proibido `catch` vazio ou `catch (Exception)` que só loga e engole. Exceção tratada é exceção com decisão: retry, compensação ou propagação.

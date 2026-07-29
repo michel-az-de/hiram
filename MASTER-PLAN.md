@@ -96,7 +96,8 @@ a tentativa e conclui ou agenda retry. Falha esgotada vira dead-letter replayabl
 - Docker Compose;
 - xUnit e Testcontainers PostgreSQL.
 
-RabbitMQ permanece apenas durante a migração definida no ADR-027 e no plano `plans/hiram-core.md`.
+O PostgreSQL é a única autoridade de fila e entrega. Os processadores reivindicam o outbox
+diretamente por leases recuperáveis.
 
 ## 7. Migração
 
@@ -106,7 +107,7 @@ RabbitMQ permanece apenas durante a migração definida no ADR-027 e no plano `p
 | C1 | retirada de escopo de produto e deploys extras | email direto sem regressão |
 | C2 | idempotência PostgreSQL-only | concorrência e replay verdes |
 | C3 | outbox com lease e dispatch PostgreSQL | retry, crash e dead-letter verdes |
-| C4 | remoção de RabbitMQ e consolidação do host | um binário e uma imagem |
+| C4 | consolidação do host | um binário e uma imagem |
 | C5 | Compose, backup, restore e runbook | instalação e operação comprovadas |
 | C6 | uso real | 30 dias sem perda silenciosa |
 

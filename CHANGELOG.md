@@ -14,8 +14,7 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 - Adota o Protocolo Operacional v4.0 (PR-first, issue-driven, auto-merge por tier). Ver ADR de adocao e CLAUDE.md.
 - Redefine o Hiram como infraestrutura interna de notificacoes: um host e PostgreSQL no runtime
   alvo, providers externos na ultima milha e extensoes somente com consumidor ativo.
-- Torna o dispatcher PostgreSQL o transporte padrao do outbox. RabbitMQ permanece apenas como rollback
-  explicito e mutuamente exclusivo durante a ultima fatia da migracao.
+- Torna o dispatcher PostgreSQL o unico transporte do outbox.
 
 ### Removed
 - Remove metering, creditos e o ledger do caminho de submissao e fan-out. A migration historica
@@ -25,3 +24,5 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 - Remove MTA proprio, k3s, KEDA, PgBouncer e a stack conjunta com o Levante, artefatos operacionais
   aposentados pelo ADR-027.
 - Remove Redis do runtime. Idempotencia e throttle de uso de API key passam a usar apenas PostgreSQL.
+- Remove RabbitMQ, o relay intermediario, consumers AMQP e o Testcontainer do broker. Processadores
+  reivindicam o outbox diretamente no PostgreSQL.

@@ -84,7 +84,7 @@
       "mainEntity": [
         { "@type": "Question", "name": "What is Hiram?", "acceptedAnswer": { "@type": "Answer", "text": "Hiram is a multi-tenant notification platform. You send a notification through one REST API and Hiram owns delivery: persistence, provider routing, retries and audit." } },
         { "@type": "Question", "name": "Which channels are available today?", "acceptedAnswer": { "@type": "Answer", "text": "Transactional email is live in production, through SMTP or Resend per tenant. Push, SMS and WhatsApp are on the roadmap, behind the same request contract." } },
-        { "@type": "Question", "name": "How does Hiram guarantee delivery?", "acceptedAnswer": { "@type": "Answer", "text": "The notification request and its outbox row are written in a single PostgreSQL transaction. Once that commit succeeds the message cannot be lost, and a relay drives it to delivery with retries." } },
+        { "@type": "Question", "name": "How does Hiram guarantee delivery?", "acceptedAnswer": { "@type": "Answer", "text": "The notification request and its outbox row are written in a single PostgreSQL transaction. Once that commit succeeds the message cannot be lost, and a leased worker drives it to delivery with retries." } },
         { "@type": "Question", "name": "Is Hiram multi-tenant?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Every domain table carries a tenant from the first migration, and each tenant has isolated API keys, providers and delivery mode." } },
         { "@type": "Question", "name": "How do I authenticate and send?", "acceptedAnswer": { "@type": "Answer", "text": "Authenticate at the Handshake with a per-tenant API key, then POST to /v1/notifications. An Idempotency-Key makes the call safe to retry, and you can read delivery back with cursor pagination." } },
         { "@type": "Question", "name": "Is it production ready?", "acceptedAnswer": { "@type": "Answer", "text": "Email is production ready as of phase F1, with real providers, idempotency, shadow mode and full delivery audit. Later phases add channels, metering and a portal." } }
@@ -140,7 +140,7 @@
         <p class="fineprint">Email is live today. Push, SMS and WhatsApp are on the roadmap, behind the same API.</p>
       </div>
       <div class="hero-trace">
-        <svg class="trace" viewBox="0 0 320 470" role="img" aria-label="Delivery path: accept, persist in one transaction, relay, then deliver.">
+        <svg class="trace" viewBox="0 0 320 470" role="img" aria-label="Delivery path: accept, persist in one transaction, claim, then deliver.">
           <line class="trace-spine" x1="26" y1="46" x2="26" y2="436"/>
           <line class="trace-flow" x1="26" y1="46" x2="26" y2="436"/>
           <g class="tnode">
@@ -156,8 +156,8 @@
           </g>
           <g class="tnode">
             <circle class="tdot" cx="26" cy="306" r="6"/>
-            <text class="tt" x="50" y="302">Relay</text>
-            <text class="ts" x="50" y="321">OutboxRelay picks it up</text>
+            <text class="tt" x="50" y="302">Claim</text>
+            <text class="ts" x="50" y="321">worker leases the outbox row</text>
           </g>
           <g class="tnode">
             <circle class="tdot" cx="26" cy="436" r="6"/>
@@ -196,7 +196,7 @@
             </li>
             <li>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9 17.5 20 6.5"/></svg>
-              <span><strong>No silent loss.</strong> Once the commit succeeds, the relay picks the message up and drives it to delivery.</span>
+              <span><strong>No silent loss.</strong> Once the commit succeeds, a leased worker picks the message up and drives it to delivery.</span>
             </li>
             <li>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5 9 17.5 20 6.5"/></svg>
@@ -241,8 +241,8 @@
           <p>The request and its outbox row are written in one transaction. From this moment the notification cannot be lost.</p>
         </div>
         <div class="step">
-          <h3>Relay</h3>
-          <p>OutboxRelay publishes the message and resolves the provider configured for the tenant, SMTP or Resend for email.</p>
+          <h3>Claim</h3>
+          <p>A worker leases the outbox row and resolves the provider configured for the tenant, SMTP or Resend for email.</p>
         </div>
         <div class="step">
           <h3>Deliver</h3>
@@ -331,7 +331,7 @@
       <div class="timeline">
         <div class="phase">
           <span class="ph-id">F0 <span class="done">done</span></span>
-          <div><h3>Walking skeleton</h3><p>Outbox, relay, consume and one trace from end to end.</p></div>
+          <div><h3>Walking skeleton</h3><p>Outbox, lease, process and one trace from end to end.</p></div>
         </div>
         <div class="phase">
           <span class="ph-id">F1 <span class="done">done</span></span>
@@ -378,7 +378,7 @@
         </div>
         <div class="faq-item">
           <h3>How does Hiram guarantee delivery?</h3>
-          <p>The notification request and its outbox row are written in a single PostgreSQL transaction. Once that commit succeeds the message cannot be lost, and a relay drives it to delivery with retries.</p>
+          <p>The notification request and its outbox row are written in a single PostgreSQL transaction. Once that commit succeeds the message cannot be lost, and a leased worker drives it to delivery with retries.</p>
         </div>
         <div class="faq-item">
           <h3>Is Hiram multi-tenant?</h3>

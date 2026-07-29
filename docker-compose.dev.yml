@@ -19,23 +19,6 @@ services:
       timeout: 3s
       retries: 10
 
-  rabbitmq:
-    image: rabbitmq:4-management
-    container_name: hiram-rabbitmq
-    # A named user is required because the built-in guest account is refused on non-loopback
-    # connections, which is how the host processes reach the broker through the published port.
-    environment:
-      RABBITMQ_DEFAULT_USER: hiram
-      RABBITMQ_DEFAULT_PASS: hiram
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
   # Mailpit is the local SMTP sink: the dev SMTP provider delivers here and the messages show up in the UI.
   mailpit:
     image: axllent/mailpit:latest

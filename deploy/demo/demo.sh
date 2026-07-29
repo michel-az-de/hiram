@@ -86,6 +86,8 @@ case "${1:-help}" in
     echo
     ;;
 
+  dispatcher-down) $COMPOSE stop dispatcher  >/dev/null && echo "dispatcher PARADO: a API continua aceitando no outbox" ;;
+  dispatcher-up)   $COMPOSE start dispatcher >/dev/null && echo "dispatcher de volta: o outbox volta a escoar" ;;
   provider-down) $COMPOSE stop mailpit  >/dev/null && echo "provider de email PARADO: proximas entregas viram retry e dead letter" ;;
   provider-up)   $COMPOSE start mailpit >/dev/null && echo "provider de volta: replay reentrega" ;;
 
@@ -107,6 +109,6 @@ case "${1:-help}" in
     ;;
 
   *)
-    echo "uso: $0 {fixtures|submit [nome] [plano]|idempotency|status <id>|provider-down|provider-up|replay <id>|inbox-clear|urls}"
+    echo "uso: $0 {fixtures|submit [nome] [plano]|idempotency|status <id>|dispatcher-down|dispatcher-up|provider-down|provider-up|replay <id>|inbox-clear|urls}"
     ;;
 esac

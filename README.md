@@ -31,7 +31,7 @@ while an active project uses them.
 
 ## Current status
 
-The existing runtime is implemented and covered by CI, but still uses:
+The existing runtime is implemented and covered by CI. It currently runs as two hosts backed by:
 
 - Hiram.Api;
 - Hiram.Dispatcher;
@@ -54,8 +54,7 @@ flowchart LR
 ```
 
 PostgreSQL is the durable authority for notifications, idempotency and the leased outbox queue.
-RabbitMQ remains temporarily available only as an explicit rollback transport; it is never active
-at the same time as the PostgreSQL dispatcher.
+Channel processors claim outbox rows directly with bounded leases and recover expired work.
 
 ## Core guarantees
 
@@ -127,7 +126,6 @@ Development tools:
 - Scalar: `http://localhost:3357/scalar`
 - Mailpit: `http://localhost:8025`
 - Aspire Dashboard: `http://localhost:18888`
-- RabbitMQ management during migration: `http://localhost:15672`
 
 ## Verification
 
