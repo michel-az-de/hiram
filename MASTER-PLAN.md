@@ -107,7 +107,7 @@ diretamente por leases recuperáveis.
 | C1 | retirada de escopo de produto e deploys extras | email direto sem regressão |
 | C2 | idempotência PostgreSQL-only | concorrência e replay verdes |
 | C3 | outbox com lease e dispatch PostgreSQL | retry, crash e dead-letter verdes |
-| C4 | consolidação do host | um binário e uma imagem |
+| C4 | host único e imagem `hiram` | concluído na issue #97 |
 | C5 | Compose, backup, restore e runbook | instalação e operação comprovadas |
 | C6 | uso real | 30 dias sem perda silenciosa |
 

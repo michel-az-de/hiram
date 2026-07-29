@@ -6,7 +6,7 @@ public sealed class WebhookEndpoint
     public Guid TenantId { get; private set; }
     public string Url { get; private set; }
 
-    // The HMAC secret, encrypted at rest. The dispatcher decrypts it to sign the callback body.
+    // The HMAC secret is encrypted at rest and decrypted only while signing a callback.
     public string SecretProtected { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
 

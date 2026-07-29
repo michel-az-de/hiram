@@ -4,18 +4,14 @@ using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using Hiram.Application.Notifications;
 using Hiram.Contracts;
-using Hiram.Dispatcher;
 using Hiram.Domain.Notifications;
 using Hiram.Domain.Routines;
 using Hiram.Domain.Templates;
 using Hiram.Domain.Tenants;
-using Hiram.Infrastructure;
-using Hiram.Infrastructure.Messaging;
 using Hiram.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
 
 namespace Hiram.IntegrationTests.EndToEnd;
@@ -51,17 +47,8 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
         Environment.SetEnvironmentVariable("Hiram__Email__Platform__Settings__from", "no-reply@hiram.dev");
         Environment.SetEnvironmentVariable("Hiram__Email__Platform__Settings__security", "none");
 
-        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseEnvironment("Development");
-            builder.ConfigureServices((context, services) =>
-            {
-                services.AddHiramEmailDelivery(context.Configuration);
-                services.AddHiramMessageProcessors();
-                services.AddScoped<PostgresOutboxPump>();
-                services.AddHostedService<PostgresDispatcherWorker>();
-            });
-        });
+        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(
+            builder => builder.UseEnvironment("Development"));
     }
 
     public async Task DisposeAsync()
@@ -414,7 +401,7 @@ public class EmailDeliveryEndToEndTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PushToUnknownSubscription_DeadLettersThroughTheDispatcher()
+    public async Task PushToUnknownSubscription_DeadLettersThroughTheWorker()
     {
         var (_, client) = await NewTenantClient("live");
 

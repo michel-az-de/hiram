@@ -4,7 +4,7 @@ using Hiram.Application.Outbox;
 using Hiram.Infrastructure.Messaging;
 using Hiram.Infrastructure.Telemetry;
 
-namespace Hiram.Dispatcher;
+namespace Hiram.Api.Workers;
 
 public sealed class PostgresOutboxPump
 {

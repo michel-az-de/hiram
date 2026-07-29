@@ -1,6 +1,6 @@
 # Demo pública na VM dedicada
 
-Stack da demo conforme ADR-022: imagens de produção da Api e do Dispatcher atrás de um Caddy com TLS
+Stack da demo conforme ADR-022: a imagem de produção do Hiram atrás de um Caddy com TLS
 automático no host sslip.io, Mailpit como caixa de entrada visível em `/mailpit`, tenant de console em
 shadow e tenant live entregando no Mailpit. Nada aqui é produção; o runtime suportado segue o ADR-027.
 
@@ -20,13 +20,12 @@ Para fixar um commit específico, defina `HIRAM_IMAGE_TAG=<sha>` no `.env`. Para
 que ainda não está no main, o build local continua possível:
 
 ```bash
-docker build -f src/Hiram.Api/Dockerfile -t ghcr.io/michel-az-de/hiram-api:local .
-docker build -f src/Hiram.Dispatcher/Dockerfile -t ghcr.io/michel-az-de/hiram-dispatcher:local .
+docker build -f src/Hiram.Api/Dockerfile -t ghcr.io/michel-az-de/hiram:local .
 # HIRAM_IMAGE_TAG=local no .env
 ```
 
-O serviço `migrate` aplica o schema uma vez e sai; a Api só sobe depois dele. O NSG da VM precisa de
-80 e 443 abertos para a internet; as portas de gestão (8025, 15672) continuam restritas ao IP do
+O serviço `migrate` aplica o schema uma vez e sai; o Hiram só sobe depois dele. O NSG da VM precisa
+de 80 e 443 abertos para a internet; a porta de gestão do Mailpit (8025) continua restrita ao IP do
 operador.
 
 ## Dados da demo

@@ -5,8 +5,8 @@ using Hiram.Infrastructure.Security;
 using Microsoft.Extensions.DependencyInjection;
 
 // Cross-process harness for the shared Data Protection key ring. One invocation protects,
-// a separate invocation unprotects, so the test can prove the dispatcher decrypts what the
-// api encrypted. It exercises the real AddHiramDataProtection registration and the real
+// a separate invocation unprotects, so the test can prove another host replica decrypts what the
+// first encrypted. It exercises the real AddHiramDataProtection registration and the real
 // DataProtectionSecretProtector, never an in-proc reimplementation.
 if (args.Length != 3)
 {

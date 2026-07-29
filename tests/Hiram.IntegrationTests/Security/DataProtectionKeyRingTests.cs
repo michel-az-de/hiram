@@ -11,22 +11,22 @@ public sealed class DataProtectionKeyRingTests : IDisposable
     public DataProtectionKeyRingTests() => Directory.CreateDirectory(_root);
 
     [Fact]
-    public async Task ApiEncrypts_DispatcherDecrypts_AcrossProcesses()
+    public async Task HostReplicaEncrypts_AnotherReplicaDecrypts_AcrossProcesses()
     {
         var sharedKeyRing = CreateDir("keyring");
-        var apiProfile = CreateDir("api-profile");
-        var dispatcherProfile = CreateDir("dispatcher-profile");
+        var firstProfile = CreateDir("first-profile");
+        var secondProfile = CreateDir("second-profile");
         const string secret = "tenant-smtp-password-42";
 
-        var protect = await RunProbeAsync(apiProfile, "protect", sharedKeyRing, secret);
+        var protect = await RunProbeAsync(firstProfile, "protect", sharedKeyRing, secret);
         Assert.True(protect.ExitCode == 0, $"protect process failed: {protect.StdErr}");
         var ciphertext = protect.StdOut.Trim();
         Assert.NotEqual(secret, ciphertext);
 
-        var unprotect = await RunProbeAsync(dispatcherProfile, "unprotect", sharedKeyRing, ciphertext);
+        var unprotect = await RunProbeAsync(secondProfile, "unprotect", sharedKeyRing, ciphertext);
         Assert.True(
             unprotect.ExitCode == 0,
-            $"dispatcher process could not decrypt the api ciphertext: {unprotect.StdErr}");
+            $"second host process could not decrypt the ciphertext: {unprotect.StdErr}");
         Assert.Equal(secret, unprotect.StdOut.Trim());
     }
 

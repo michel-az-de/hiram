@@ -181,17 +181,17 @@ Origem: extrair para produto standalone a solução (padrão outbox) do incident
 - .NET 10 LTS, ASP.NET Core, EF Core 10 (`global.json` fixa o SDK 10.0.100, rollForward latestMinor).
 - PostgreSQL 17 (schemas por contexto, JSONB para payloads variáveis) — ADR-002.
 - O PostgreSQL hospeda dados de domínio, idempotência e a fila durável por leases.
-- OpenTelemetry + Grafana LGTM self-hosted (prod), Aspire Dashboard (dev) — ADR-003.
-- Polly v8 (resiliência), Scalar (OpenAPI UI), Blazor Server no Portal (ADR-001).
-- Docker Compose no dev, k3s + KEDA em produção (backlog ADR-010). Testes: xUnit, Testcontainers, k6 (F6). IA: Claude API atrás de abstração própria (backlog ADR-008).
+- OpenTelemetry com coletor externo opcional e Aspire Dashboard no desenvolvimento.
+- Polly v8 para resiliência e Scalar para a referência OpenAPI.
+- Docker Compose, xUnit e Testcontainers.
 - `Directory.Build.props`: Nullable enable, ImplicitUsings enable, LangVersion latest, **TreatWarningsAsErrors em Release** (por isso o BUILD_CHECK é em Release).
 
 ### Arquitetura
 
-O runtime em migração possui Hiram.Api e Hiram.Dispatcher sobre PostgreSQL. O alvo do ADR-027 é um
-único host.
+O runtime possui um host Hiram sobre PostgreSQL. API HTTP e workers compartilham o processo; o
+PostgreSQL é a única peça obrigatória de estado.
 
-- **Dependências apontam para dentro:** Domain não referencia nada; Application referencia Domain; Infrastructure referencia Application e Domain; os hosts (Api, Dispatcher, Webhooks, Intelligence, Portal) são composition roots.
+- **Dependências apontam para dentro:** Domain não referencia nada; Application referencia Domain; Infrastructure referencia Application e Domain; Hiram.Api é o composition root.
 - Domain e Application **não** conhecem EF Core ou HTTP. Ports na Application, adapters na Infrastructure.
 - Toda tabela de domínio tem `tenant_id` desde a primeira migration. Sem exceção.
 - **Invariante fundador:** escrita de `NotificationRequest` e `OutboxMessage` acontece na mesma transação, sempre. Esse invariante é a razão de existir do projeto.

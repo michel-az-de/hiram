@@ -134,7 +134,7 @@ if (form) {
         hintEl.textContent = 'A API respondeu ' + response.status + '. Confira a chave e os campos.';
       }
     } catch (error) {
-      responseEl.innerHTML = '<span class="c1">// a API local não respondeu. Rode a Hiram.Api ou volte ao palco.</span>';
+      responseEl.innerHTML = '<span class="c1">// a API local não respondeu. Rode o Hiram ou volte ao palco.</span>';
       hintEl.textContent = 'API local indisponível; o palco continua funcionando.';
     } finally {
       if (sendButton) sendButton.disabled = false;

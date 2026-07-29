@@ -69,9 +69,8 @@ public static class DependencyInjection
 
     public static IServiceCollection AddHiramDataProtection(this IServiceCollection services, string? keyRingPath = null)
     {
-        // Api and dispatcher are separate processes: they must share the same key ring and the same
-        // application discriminator, otherwise the dispatcher cannot decrypt the tenant secrets the
-        // api encrypted. The key ring path is a shared volume in production.
+        // Replicas must share the same key ring and application discriminator, otherwise a request
+        // can write a tenant secret that another instance cannot decrypt.
         var dataProtection = services.AddDataProtection().SetApplicationName("hiram");
         if (!string.IsNullOrWhiteSpace(keyRingPath))
             dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keyRingPath));
@@ -79,8 +78,8 @@ public static class DependencyInjection
         return services;
     }
 
-    // Wired only into the dispatcher, the host that runs the send pipeline. The resolver is scoped so it
-    // reads the tenant config through a request scoped DbContext and gets a fresh Resend client per message.
+    // The resolver is scoped so it reads the tenant config through a request scoped DbContext and gets
+    // a fresh Resend client per message.
     public static IServiceCollection AddHiramEmailDelivery(this IServiceCollection services, IConfiguration configuration)
     {
         var platform = configuration.GetSection("Hiram:Email:Platform");

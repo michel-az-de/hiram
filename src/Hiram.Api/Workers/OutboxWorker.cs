@@ -1,15 +1,15 @@
-namespace Hiram.Dispatcher;
+namespace Hiram.Api.Workers;
 
-public sealed class PostgresDispatcherWorker : BackgroundService
+public sealed class OutboxWorker : BackgroundService
 {
     private static readonly TimeSpan IdleDelay = TimeSpan.FromMilliseconds(250);
 
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ILogger<PostgresDispatcherWorker> _logger;
+    private readonly ILogger<OutboxWorker> _logger;
 
-    public PostgresDispatcherWorker(
+    public OutboxWorker(
         IServiceScopeFactory scopeFactory,
-        ILogger<PostgresDispatcherWorker> logger)
+        ILogger<OutboxWorker> logger)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
@@ -33,7 +33,7 @@ public sealed class PostgresDispatcherWorker : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "PostgreSQL dispatcher loop failed");
+                _logger.LogError(ex, "Outbox worker loop failed");
                 await Task.Delay(IdleDelay, stoppingToken);
             }
         }
