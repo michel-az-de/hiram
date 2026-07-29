@@ -10,7 +10,6 @@ using Hiram.Domain.Routines;
 using Hiram.Domain.Templates;
 using Hiram.Domain.Tenants;
 using Hiram.Domain.Webhooks;
-using Hiram.Domain.WhatsApp;
 using Microsoft.EntityFrameworkCore;
 
 namespace Hiram.Infrastructure.Persistence;
@@ -36,7 +35,6 @@ public sealed class HiramDbContext : DbContext
     public DbSet<DeliveryAttempt> DeliveryAttempts => Set<DeliveryAttempt>();
     public DbSet<DeadLetterMessage> DeadLetterMessages => Set<DeadLetterMessage>();
     public DbSet<Template> Templates => Set<Template>();
-    public DbSet<WhatsAppTemplate> WhatsAppTemplates => Set<WhatsAppTemplate>();
     public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
     public DbSet<WebhookEndpoint> WebhookEndpoints => Set<WebhookEndpoint>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)

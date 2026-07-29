@@ -746,68 +746,6 @@ namespace Hiram.Infrastructure.Persistence.Migrations
                     b.ToTable("webhook_endpoints", "notifications");
                 });
 
-            modelBuilder.Entity("Hiram.Domain.WhatsApp.WhatsAppTemplate", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("category");
-
-                    b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("Language")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("language");
-
-                    b.Property<string>("MetaName")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)")
-                        .HasColumnName("meta_name");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("Parameters")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("parameters");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<DateTimeOffset>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId", "Name")
-                        .IsUnique()
-                        .HasDatabaseName("ux_whatsapp_templates_tenant_name");
-
-                    b.ToTable("whatsapp_templates", "notifications");
-                });
 #pragma warning restore 612, 618
         }
     }

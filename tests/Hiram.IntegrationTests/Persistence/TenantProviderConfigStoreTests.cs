@@ -58,28 +58,4 @@ public class TenantProviderConfigStoreTests : IAsyncLifetime
         Assert.Null(config);
     }
 
-    [Fact]
-    public async Task FindAsync_ReturnsConfig_ForWhatsAppChannel()
-    {
-        var tenantId = Guid.NewGuid();
-        await using (var seed = NewContext())
-        {
-            seed.TenantProviderConfigs.Add(new TenantProviderConfig(
-                tenantId, NotificationChannel.WhatsApp, "cloud-api",
-                "{\"phoneNumberId\":\"123456\",\"wabaId\":\"789\"}", "protected:token", DateTimeOffset.UtcNow));
-            await seed.SaveChangesAsync();
-        }
-
-        await using var context = NewContext();
-        var store = new TenantProviderConfigStore(context);
-
-        var config = await store.FindAsync(tenantId, NotificationChannel.WhatsApp, CancellationToken.None);
-
-        Assert.NotNull(config);
-        Assert.Equal(NotificationChannel.WhatsApp, config!.Channel);
-        Assert.Equal("cloud-api", config.Provider);
-        Assert.Equal("protected:token", config.SecretProtected);
-        var settings = JsonSerializer.Deserialize<Dictionary<string, string>>(config.Settings)!;
-        Assert.Equal("123456", settings["phoneNumberId"]);
-    }
 }

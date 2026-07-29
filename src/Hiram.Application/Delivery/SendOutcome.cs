@@ -8,8 +8,8 @@ public abstract record SendOutcome
     {
     }
 
-    // ProviderMessageId is the provider's own id for the accepted message (Resend's id, later WhatsApp's
-    // wamid), null when the provider returns none such as SMTP. It is the handle a status callback matches on.
+    // ProviderMessageId is the provider's own id for the accepted message, null when the provider returns
+    // none such as SMTP. It is the handle a status callback matches on.
     public sealed record Sent(string? ProviderMessageId = null) : SendOutcome;
 
     public sealed record TransientFailure(string Reason) : SendOutcome;
