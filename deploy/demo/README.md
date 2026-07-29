@@ -2,7 +2,7 @@
 
 Stack da demo conforme ADR-022: imagens de produção da Api e do Dispatcher atrás de um Caddy com TLS
 automático no host sslip.io, Mailpit como caixa de entrada visível em `/mailpit`, tenant de console em
-shadow e tenant live entregando no Mailpit. Nada aqui é produção; produção segue o ADR-016.
+shadow e tenant live entregando no Mailpit. Nada aqui é produção; o runtime suportado segue o ADR-027.
 
 ## Provisionamento na VM
 

@@ -8,12 +8,14 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 ### Added
 - ADR-027 e plano executavel para a migracao incremental ao Hiram Core.
 - Primitiva de fila PostgreSQL com claim atomico, lease renovavel, retry agendado e recuperacao de
-  leases vencidos. O relay RabbitMQ permanece ativo ate a migracao completa dos processadores.
+  leases vencidos.
 
 ### Changed
 - Adota o Protocolo Operacional v4.0 (PR-first, issue-driven, auto-merge por tier). Ver ADR de adocao e CLAUDE.md.
 - Redefine o Hiram como infraestrutura interna de notificacoes: um host e PostgreSQL no runtime
   alvo, providers externos na ultima milha e extensoes somente com consumidor ativo.
+- Torna o dispatcher PostgreSQL o transporte padrao do outbox. RabbitMQ permanece apenas como rollback
+  explicito e mutuamente exclusivo durante a ultima fatia da migracao.
 
 ### Removed
 - Remove metering, creditos e o ledger do caminho de submissao e fan-out. A migration historica

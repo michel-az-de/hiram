@@ -188,8 +188,8 @@ Origem: extrair para produto standalone a solução (padrão outbox) do incident
 
 ### Arquitetura
 
-O runtime em migração possui Hiram.Api e Hiram.Dispatcher sobre PostgreSQL e RabbitMQ. O alvo definido
-no ADR-027 é um único host sobre PostgreSQL.
+O runtime em migração possui Hiram.Api e Hiram.Dispatcher sobre PostgreSQL. RabbitMQ permanece apenas
+como rollback explícito e mutuamente exclusivo até sua remoção. O alvo do ADR-027 é um único host.
 
 - **Dependências apontam para dentro:** Domain não referencia nada; Application referencia Domain; Infrastructure referencia Application e Domain; os hosts (Api, Dispatcher, Webhooks, Intelligence, Portal) são composition roots.
 - Domain e Application **não** conhecem EF Core, RabbitMQ ou HTTP. Ports na Application, adapters na Infrastructure.

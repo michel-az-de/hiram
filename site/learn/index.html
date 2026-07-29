@@ -86,8 +86,8 @@
           <p>O request e a linha de outbox são gravados juntos, ou nada é gravado. Se o commit passou, a mensagem não se perde.</p>
         </li>
         <li class="flow-node">
-          <h3>Publicar <span class="flow-where">OutboxRelay → RabbitMQ</span></h3>
-          <p>O relé lê o outbox já comprometido e publica a mensagem para o dispatcher, sem perder nada no caminho.</p>
+          <h3>Reivindicar <span class="flow-where">PostgreSQL · lease atômico</span></h3>
+          <p>O dispatcher reivindica a linha disponível com lease, sem duplicar trabalho entre workers concorrentes.</p>
         </li>
         <li class="flow-node">
           <h3>Entregar <span class="flow-where">Dispatcher → SMTP / Resend</span></h3>
