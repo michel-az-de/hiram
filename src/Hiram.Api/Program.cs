@@ -41,9 +41,6 @@ if (args.Contains("--migrate-only"))
     return 0;
 }
 
-var redisConnectionString = builder.Configuration.GetConnectionString("Redis")
-    ?? throw new InvalidOperationException("Connection string 'Redis' is not configured.");
-
 builder.AddHiramTelemetry("hiram-api", tracing => tracing
     .AddAspNetCoreInstrumentation()
     .AddHttpClientInstrumentation());
@@ -51,14 +48,12 @@ builder.AddHiramTelemetry("hiram-api", tracing => tracing
 builder.Services.AddProblemDetails();
 builder.Services.AddHiramOpenApi();
 builder.Services.AddHiramInfrastructure(connectionString, builder.Configuration["DataProtection:KeysPath"]);
-builder.Services.AddHiramRedis(redisConnectionString);
 builder.Services.AddHiramPush(builder.Configuration);
 builder.Services.AddScoped<ISubmitNotification, SubmitNotificationHandler>();
 builder.Services.AddScoped<IIngestEvent, IngestEventHandler>();
 builder.Services.AddScoped<TenantContext>();
 builder.Services.AddHealthChecks()
-    .AddCheck<PostgresHealthCheck>("postgres", tags: ["ready"])
-    .AddCheck<RedisHealthCheck>("redis", tags: ["ready"]);
+    .AddCheck<PostgresHealthCheck>("postgres", tags: ["ready"]);
 
 var app = builder.Build();
 

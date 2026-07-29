@@ -13,7 +13,6 @@ public sealed class EnvironmentConfigTests : IDisposable
     public EnvironmentConfigTests()
     {
         Environment.SetEnvironmentVariable("ConnectionStrings__Hiram", "Host=localhost;Port=1;Database=hiram;Username=u;Password=p");
-        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", "localhost:6390,abortConnect=false");
         Environment.SetEnvironmentVariable("Hiram__AdminKey", "env-only-admin");
         Environment.SetEnvironmentVariable("OTEL_SDK_DISABLED", "true");
     }
@@ -33,7 +32,6 @@ public sealed class EnvironmentConfigTests : IDisposable
     public void Dispose()
     {
         Environment.SetEnvironmentVariable("ConnectionStrings__Hiram", null);
-        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", null);
         Environment.SetEnvironmentVariable("Hiram__AdminKey", null);
         Environment.SetEnvironmentVariable("OTEL_SDK_DISABLED", null);
     }

@@ -4,7 +4,6 @@ using Hiram.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Testcontainers.PostgreSql;
-using Testcontainers.Redis;
 
 namespace Hiram.IntegrationTests.Push;
 
@@ -15,15 +14,13 @@ public class PushEndpointsTests : IAsyncLifetime
     private const string VapidPublicKey = "test-vapid-public-key";
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17").Build();
-    private readonly RedisContainer _redis = new RedisBuilder("redis:7-alpine").Build();
     private WebApplicationFactory<Program>? _factory;
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_postgres.StartAsync(), _redis.StartAsync());
+        await _postgres.StartAsync();
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Hiram", _postgres.GetConnectionString());
-        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", _redis.GetConnectionString());
         Environment.SetEnvironmentVariable("Hiram__AdminKey", AdminKey);
         Environment.SetEnvironmentVariable("Hiram__Push__Vapid__PublicKey", VapidPublicKey);
         Environment.SetEnvironmentVariable("OTEL_SDK_DISABLED", "true");
@@ -39,7 +36,7 @@ public class PushEndpointsTests : IAsyncLifetime
 
         foreach (var name in new[]
         {
-            "ConnectionStrings__Hiram", "ConnectionStrings__Redis", "Hiram__AdminKey",
+            "ConnectionStrings__Hiram", "Hiram__AdminKey",
             "Hiram__Push__Vapid__PublicKey", "OTEL_SDK_DISABLED"
         })
         {
@@ -47,7 +44,6 @@ public class PushEndpointsTests : IAsyncLifetime
         }
 
         await _postgres.DisposeAsync();
-        await _redis.DisposeAsync();
     }
 
     [Fact]

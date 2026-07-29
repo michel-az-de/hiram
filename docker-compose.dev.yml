@@ -36,19 +36,6 @@ services:
       timeout: 5s
       retries: 10
 
-  # Redis comes up now to keep the dev environment stable across phases, but it is
-  # only consumed from F1 onward (quota fast-path, idempotency, rate limit, template cache).
-  redis:
-    image: redis:7-alpine
-    container_name: hiram-redis
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 10
-
   # Mailpit is the local SMTP sink: the dev SMTP provider delivers here and the messages show up in the UI.
   mailpit:
     image: axllent/mailpit:latest

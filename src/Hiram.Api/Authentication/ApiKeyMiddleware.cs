@@ -21,7 +21,6 @@ public sealed class ApiKeyMiddleware
     public async Task InvokeAsync(
         HttpContext context,
         IApiKeyStore apiKeys,
-        IApiKeyUsageThrottle throttle,
         TenantContext tenant,
         IClock clock)
     {
@@ -50,8 +49,7 @@ public sealed class ApiKeyMiddleware
 
         tenant.Resolve(apiKey.TenantId);
 
-        if (await throttle.ShouldRecordUsageAsync(apiKey.Id, context.RequestAborted))
-            await apiKeys.RecordUsageAsync(apiKey.Id, clock.UtcNow, context.RequestAborted);
+        await apiKeys.RecordUsageAsync(apiKey.Id, clock.UtcNow, context.RequestAborted);
 
         await _next(context);
     }

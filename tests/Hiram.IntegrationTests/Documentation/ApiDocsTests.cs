@@ -4,7 +4,6 @@ using Hiram.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Testcontainers.PostgreSql;
-using Testcontainers.Redis;
 
 namespace Hiram.IntegrationTests.Documentation;
 
@@ -12,15 +11,13 @@ namespace Hiram.IntegrationTests.Documentation;
 public class ApiDocsTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17").Build();
-    private readonly RedisContainer _redis = new RedisBuilder("redis:7-alpine").Build();
     private WebApplicationFactory<Program>? _factory;
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_postgres.StartAsync(), _redis.StartAsync());
+        await _postgres.StartAsync();
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Hiram", _postgres.GetConnectionString());
-        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", _redis.GetConnectionString());
         Environment.SetEnvironmentVariable("OTEL_SDK_DISABLED", "true");
 
         _factory = new WebApplicationFactory<Program>()
@@ -33,11 +30,9 @@ public class ApiDocsTests : IAsyncLifetime
             await _factory.DisposeAsync();
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Hiram", null);
-        Environment.SetEnvironmentVariable("ConnectionStrings__Redis", null);
         Environment.SetEnvironmentVariable("OTEL_SDK_DISABLED", null);
 
         await _postgres.DisposeAsync();
-        await _redis.DisposeAsync();
     }
 
     [Fact]
