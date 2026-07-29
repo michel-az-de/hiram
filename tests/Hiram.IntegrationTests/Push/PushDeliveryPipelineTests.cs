@@ -154,6 +154,24 @@ public class PushDeliveryPipelineTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Process_IsNoOp_WhenSuppressedPushIsRedelivered()
+    {
+        var (tenantId, notificationId, subscriptionId) = await Seed(DeliveryMode.Live);
+        var sender = new ScriptedPushSender([new SendOutcome.PermanentFailure("must not be called")]);
+        var payload = PayloadFor(notificationId, tenantId, subscriptionId);
+
+        await using (var context = NewContext())
+            await BuildProcessor(context, sender, new ChannelBlocked(NotificationChannel.Push))
+                .ProcessAsync(payload, CancellationToken.None);
+
+        await using (var context = NewContext())
+            await BuildProcessor(context, sender).ProcessAsync(payload, CancellationToken.None);
+
+        Assert.Equal(NotificationStatus.Suppressed, await StatusOf(notificationId));
+        Assert.Equal(0, sender.Calls);
+    }
+
+    [Fact]
     public async Task Process_Delivers_Unchanged_WhenNoBlockActive()
     {
         // ADR-024 regression guard: with no active block the push path is exactly what it was.
