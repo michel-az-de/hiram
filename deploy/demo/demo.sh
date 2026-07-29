@@ -86,8 +86,6 @@ case "${1:-help}" in
     echo
     ;;
 
-  broker-down)  $COMPOSE stop rabbitmq  >/dev/null && echo "rabbitmq PARADO: o aceite continua funcionando" ;;
-  broker-up)    $COMPOSE start rabbitmq >/dev/null && echo "rabbitmq de volta: o relay entrega o que ficou no outbox" ;;
   provider-down) $COMPOSE stop mailpit  >/dev/null && echo "provider de email PARADO: proximas entregas viram retry e dead letter" ;;
   provider-up)   $COMPOSE start mailpit >/dev/null && echo "provider de volta: replay reentrega" ;;
 
@@ -95,17 +93,6 @@ case "${1:-help}" in
     [ -n "${2:-}" ] || { echo "uso: $0 replay <notification-id>"; exit 1; }
     curl -sf -X POST "$BASE/v1/notifications/$2/replay" -H "X-Api-Key: $(live_key)"
     echo
-    ;;
-
-  # Every accepted notification debited the ledger inside the same transaction; the sum is the bill.
-  ledger)
-    TENANT=$(cat .demo-live-tenant)
-    docker exec hiram-demo-postgres-1 psql -U hiram -d hiram -c \
-      "SELECT amount AS creditos, reason AS motivo, notification_id, created_at_utc::timestamp(0)
-         FROM notifications.credit_ledger WHERE tenant_id = '$TENANT'
-        ORDER BY created_at_utc DESC LIMIT 10;
-       SELECT sum(amount) AS total_de_creditos_debitados
-         FROM notifications.credit_ledger WHERE tenant_id = '$TENANT';"
     ;;
 
   inbox-clear)
@@ -120,6 +107,6 @@ case "${1:-help}" in
     ;;
 
   *)
-    echo "uso: $0 {fixtures|submit [nome] [plano]|idempotency|status <id>|broker-down|broker-up|provider-down|provider-up|replay <id>|ledger|inbox-clear|urls}"
+    echo "uso: $0 {fixtures|submit [nome] [plano]|idempotency|status <id>|provider-down|provider-up|replay <id>|inbox-clear|urls}"
     ;;
 esac

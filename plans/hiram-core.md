@@ -52,7 +52,7 @@ Gate:
 
 ## Passo 3: introduzir a fila PostgreSQL
 
-**Status:** fundação de lease entregue na issue #91; ativação do dispatcher acompanhada pela #92.
+**Status:** fundação de lease entregue na issue #91 e dispatcher PostgreSQL ativado na #92.
 
 - Estender o outbox com `available_at`, `lease_until`, `attempt_count` e `last_error`.
 - Criar operação atômica de claim usando `FOR UPDATE SKIP LOCKED`.
@@ -69,6 +69,8 @@ Gate:
 - poison message termina em dead-letter.
 
 ## Passo 4: migrar processadores e remover RabbitMQ
+
+**Status:** processadores migrados na issue #92; remoção do fallback RabbitMQ é a próxima fatia.
 
 - Introduzir um dispatcher por tipo de mensagem sobre o outbox.
 - Adaptar email, webhook e extensões comprovadamente usadas.

@@ -3,14 +3,16 @@ using System.Diagnostics;
 using System.Net.Http.Json;
 using Hiram.Contracts;
 using Hiram.Dispatcher;
+using Hiram.Domain.Outbox;
 using Hiram.Infrastructure;
 using Hiram.Infrastructure.Messaging;
+using Hiram.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Testcontainers.PostgreSql;
-using Testcontainers.RabbitMq;
 
 namespace Hiram.IntegrationTests.EndToEnd;
 
@@ -18,22 +20,16 @@ namespace Hiram.IntegrationTests.EndToEnd;
 public class WalkingSkeletonTests : IAsyncLifetime
 {
     private const string AdminKey = "admin-e2e-key";
+    private static readonly Guid DevTenant = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17").Build();
-    private readonly RabbitMqContainer _rabbit = new RabbitMqBuilder("rabbitmq:4-management")
-        .WithUsername("hiram")
-        .WithPassword("hiram")
-        .Build();
-
     private WebApplicationFactory<Program>? _factory;
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_postgres.StartAsync(), _rabbit.StartAsync());
+        await _postgres.StartAsync();
 
-        var rabbitConnection = _rabbit.GetConnectionString();
         Environment.SetEnvironmentVariable("ConnectionStrings__Hiram", _postgres.GetConnectionString());
-        Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", rabbitConnection);
         Environment.SetEnvironmentVariable("Hiram__AdminKey", AdminKey);
         // The manual ActivityListener below keeps spans alive for the assertion; the OTLP exporter has
         // nothing to talk to in tests, so disable the SDK to avoid export noise and shutdown delays.
@@ -47,9 +43,9 @@ public class WalkingSkeletonTests : IAsyncLifetime
                 // The API host does not run the send pipeline, so the in-process consumer needs the
                 // delivery services (resolver, providers pipeline) wired up like the dispatcher.
                 services.AddHiramEmailDelivery(context.Configuration);
-                services.AddHiramMessaging(rabbitConnection);
-                services.AddHostedService<OutboxRelayWorker>();
-                services.AddHostedService<EmailConsumerWorker>();
+                services.AddHiramMessageProcessors();
+                services.AddScoped<PostgresOutboxPump>();
+                services.AddHostedService<PostgresDispatcherWorker>();
             });
         });
     }
@@ -60,12 +56,10 @@ public class WalkingSkeletonTests : IAsyncLifetime
             await _factory.DisposeAsync();
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Hiram", null);
-        Environment.SetEnvironmentVariable("ConnectionStrings__RabbitMq", null);
         Environment.SetEnvironmentVariable("Hiram__AdminKey", null);
         Environment.SetEnvironmentVariable("OTEL_SDK_DISABLED", null);
 
         await _postgres.DisposeAsync();
-        await _rabbit.DisposeAsync();
     }
 
     [Fact]
@@ -105,14 +99,47 @@ public class WalkingSkeletonTests : IAsyncLifetime
         Assert.NotNull(view);
         Assert.Equal("sent", view!.Status);
 
-        var publish = SingleActivity(activities, "publish email");
         var consume = SingleActivity(activities, "consume email");
 
-        // Publish continues the request's trace and the consume continues the publish: one trace end to end.
-        Assert.Equal(publish.TraceId, consume.TraceId);
-        Assert.NotEqual(default, publish.ParentSpanId);
+        // The outbox preserves the request traceparent and the PostgreSQL worker resumes it directly.
+        Assert.NotEqual(default, consume.ParentSpanId);
         Assert.Contains(activities, a =>
-            a.Source.Name == "Microsoft.AspNetCore" && a.TraceId == publish.TraceId);
+            a.Source.Name == "Microsoft.AspNetCore" && a.TraceId == consume.TraceId);
+    }
+
+    [Fact]
+    public async Task UnsupportedOutboxType_IsDeadLetteredWithEvidence()
+    {
+        _ = _factory!.CreateClient();
+        var messageId = Guid.NewGuid();
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HiramDbContext>();
+            context.OutboxMessages.Add(new OutboxMessage(
+                messageId,
+                DevTenant,
+                "unsupported",
+                "{}",
+                DateTimeOffset.UtcNow));
+            await context.SaveChangesAsync();
+        }
+
+        OutboxMessage? stored = null;
+        for (var attempt = 0; attempt < 40; attempt++)
+        {
+            await using var scope = _factory.Services.CreateAsyncScope();
+            var context = scope.ServiceProvider.GetRequiredService<HiramDbContext>();
+            stored = await context.OutboxMessages.AsNoTracking().SingleAsync(message => message.Id == messageId);
+            if (stored.ProcessedAtUtc is not null)
+                break;
+
+            await Task.Delay(250);
+        }
+
+        Assert.NotNull(stored!.ProcessedAtUtc);
+        Assert.Contains("not supported", stored.LastError);
+        Assert.Null(stored.LeaseUntil);
     }
 
     private async Task<string> IssueApiKey()

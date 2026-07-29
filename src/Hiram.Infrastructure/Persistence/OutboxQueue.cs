@@ -135,6 +135,28 @@ public sealed class OutboxQueue : IOutboxQueue
             .ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(message => message.AvailableAt, availableAtUtc)
+                    .SetProperty(message => message.DispatchAt, availableAtUtc)
+                    .SetProperty(message => message.LeaseUntil, (DateTimeOffset?)null)
+                    .SetProperty(message => message.LastError, storedError),
+                cancellationToken);
+        return updated == 1;
+    }
+
+    public async Task<bool> DeadLetterAsync(
+        Guid messageId,
+        DateTimeOffset expectedLeaseUntil,
+        DateTimeOffset failedAtUtc,
+        string error,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(error))
+            throw new ArgumentException("Dead letter error is required.", nameof(error));
+
+        var storedError = error.Length <= MaximumErrorLength ? error : error[..MaximumErrorLength];
+        var updated = await OwnedLease(messageId, expectedLeaseUntil, failedAtUtc)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(message => message.ProcessedAtUtc, failedAtUtc)
                     .SetProperty(message => message.LeaseUntil, (DateTimeOffset?)null)
                     .SetProperty(message => message.LastError, storedError),
                 cancellationToken);

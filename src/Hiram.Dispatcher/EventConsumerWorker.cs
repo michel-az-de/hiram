@@ -1,5 +1,3 @@
-using System.Text.Json;
-using Hiram.Application.Events;
 using Hiram.Infrastructure.Messaging;
 
 namespace Hiram.Dispatcher;
@@ -25,21 +23,8 @@ public sealed class EventConsumerWorker : RabbitConsumerWorker
 
     protected override async Task ProcessAsync(ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
     {
-        OutboxEventPayload? payload;
-        try
-        {
-            payload = JsonSerializer.Deserialize<OutboxEventPayload>(body.Span);
-        }
-        catch (JsonException ex)
-        {
-            throw new PoisonMessageException("Event message payload is not valid JSON.", ex);
-        }
-
-        if (payload is null)
-            throw new PoisonMessageException("Event message payload is empty.");
-
         await using var scope = _scopeFactory.CreateAsyncScope();
-        var fanout = scope.ServiceProvider.GetRequiredService<EventFanout>();
-        await fanout.FanOutAsync(payload, cancellationToken);
+        var processor = scope.ServiceProvider.GetRequiredService<EventMessageProcessor>();
+        await processor.ProcessAsync(body, cancellationToken);
     }
 }

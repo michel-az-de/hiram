@@ -28,4 +28,11 @@ public interface IOutboxQueue
         DateTimeOffset availableAtUtc,
         string error,
         CancellationToken cancellationToken);
+
+    Task<bool> DeadLetterAsync(
+        Guid messageId,
+        DateTimeOffset expectedLeaseUntil,
+        DateTimeOffset failedAtUtc,
+        string error,
+        CancellationToken cancellationToken);
 }

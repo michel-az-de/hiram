@@ -35,8 +35,7 @@ The existing runtime is implemented and covered by CI, but still uses:
 
 - Hiram.Api;
 - Hiram.Dispatcher;
-- PostgreSQL;
-- RabbitMQ.
+- PostgreSQL.
 
 [ADR-027](docs/adr/ADR-027-hiram-core.md) approved a smaller target: one Hiram host and PostgreSQL,
 with providers external to the runtime. The incremental migration is specified in
@@ -49,16 +48,14 @@ the current runtime rather than the target.
 flowchart LR
   client[Tenant app] -->|API key| api[Hiram.Api]
   api -->|request plus outbox in one transaction| pg[(PostgreSQL)]
-  pg --> relay[Outbox relay]
-  relay --> mq{{RabbitMQ}}
-  mq --> dispatcher[Channel processor]
+  pg -->|lease claim| dispatcher[Channel processor]
   dispatcher --> provider[SMTP or Resend]
   dispatcher --> attempts[(Delivery attempts)]
 ```
 
-PostgreSQL is the durable authority for the notification, outbox and idempotency. RabbitMQ currently
-transports outbox items to channel processors and will be replaced by a leased PostgreSQL queue
-during the Hiram Core migration.
+PostgreSQL is the durable authority for notifications, idempotency and the leased outbox queue.
+RabbitMQ remains temporarily available only as an explicit rollback transport; it is never active
+at the same time as the PostgreSQL dispatcher.
 
 ## Core guarantees
 
