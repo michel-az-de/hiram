@@ -355,7 +355,6 @@ namespace Hiram.Infrastructure.Persistence.Migrations
                         .HasColumnName("status");
 
                     b.Property<string>("Subject")
-                        .IsRequired()
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)")
                         .HasColumnName("subject");
@@ -388,6 +387,7 @@ namespace Hiram.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("AvailableAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("available_at");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -404,6 +404,7 @@ namespace Hiram.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("LeaseUntil")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("lease_until");
+
                     b.Property<string>("Payload")
                         .IsRequired()
                         .HasColumnType("jsonb")
@@ -437,6 +438,7 @@ namespace Hiram.Infrastructure.Persistence.Migrations
                     b.HasIndex("AvailableAt", "CreatedAtUtc")
                         .HasDatabaseName("ix_outbox_messages_available")
                         .HasFilter("processed_at_utc IS NULL");
+
                     b.ToTable("outbox_messages", "notifications");
                 });
 

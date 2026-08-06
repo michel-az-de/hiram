@@ -76,7 +76,7 @@ internal static class NotificationEndpoints
                 ["idempotencyKey"] = ["Idempotency-Key must be at most 255 characters."]
             });
 
-        string subject;
+        string? subject;
         string body;
         if (request.Template is not null)
         {
@@ -103,7 +103,7 @@ internal static class NotificationEndpoints
         }
         else
         {
-            subject = request.Subject!;
+            subject = request.Subject;
             body = request.Body!;
         }
 
@@ -240,7 +240,9 @@ internal static class NotificationEndpoints
             errors[nameof(request.Template)] = ["Provide either subject and body, or a template, not both."];
         else if (!hasTemplate)
         {
-            if (string.IsNullOrWhiteSpace(request.Subject))
+            if (channel is { } known
+                && NotificationRequest.RequiresSubject(known)
+                && string.IsNullOrWhiteSpace(request.Subject))
                 errors[nameof(request.Subject)] = ["Subject is required when no template is given."];
             if (string.IsNullOrWhiteSpace(request.Body))
                 errors[nameof(request.Body)] = ["Body is required when no template is given."];

@@ -39,6 +39,15 @@ public class NotificationRequestTests
         Assert.Equal(createdAt, request.CreatedAtUtc);
     }
 
+    [Theory]
+    [InlineData(NotificationChannel.Email)]
+    [InlineData(NotificationChannel.Push)]
+    public void Constructor_Throws_WhenSubjectIsMissing_OnAChannelThatCarriesOne(NotificationChannel channel)
+    {
+        Assert.Throws<ArgumentException>(() => new NotificationRequest(
+            Guid.NewGuid(), Guid.NewGuid(), channel, "to@example.com", subject: null, "body", DateTimeOffset.UnixEpoch));
+    }
+
     [Fact]
     public void Constructor_Throws_WhenIdIsEmpty()
     {

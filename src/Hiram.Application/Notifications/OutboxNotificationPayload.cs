@@ -5,5 +5,5 @@ public sealed record OutboxNotificationPayload(
     Guid TenantId,
     string Channel,
     string Recipient,
-    string Subject,
+    string? Subject,
     string Body);

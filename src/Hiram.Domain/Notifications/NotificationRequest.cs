@@ -6,7 +6,10 @@ public sealed class NotificationRequest
     public Guid TenantId { get; private set; }
     public NotificationChannel Channel { get; private set; }
     public string Recipient { get; private set; }
-    public string Subject { get; private set; }
+
+    // Null on channels that have no subject line, such as SMS. Email and push still require one.
+    public string? Subject { get; private set; }
+
     public string Body { get; private set; }
     public NotificationStatus Status { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
@@ -18,7 +21,6 @@ public sealed class NotificationRequest
     private NotificationRequest()
     {
         Recipient = null!;
-        Subject = null!;
         Body = null!;
     }
 
@@ -27,7 +29,7 @@ public sealed class NotificationRequest
         Guid tenantId,
         NotificationChannel channel,
         string recipient,
-        string subject,
+        string? subject,
         string body,
         DateTimeOffset createdAtUtc,
         string? idempotencyKey = null)
@@ -40,8 +42,8 @@ public sealed class NotificationRequest
             throw new ArgumentOutOfRangeException(nameof(channel), channel, "Unknown notification channel.");
         if (string.IsNullOrWhiteSpace(recipient))
             throw new ArgumentException("Recipient is required.", nameof(recipient));
-        if (string.IsNullOrWhiteSpace(subject))
-            throw new ArgumentException("Subject is required.", nameof(subject));
+        if (RequiresSubject(channel) && string.IsNullOrWhiteSpace(subject))
+            throw new ArgumentException($"Subject is required on the {channel} channel.", nameof(subject));
         if (string.IsNullOrWhiteSpace(body))
             throw new ArgumentException("Body is required.", nameof(body));
 
@@ -55,6 +57,11 @@ public sealed class NotificationRequest
         IdempotencyKey = idempotencyKey;
         Status = NotificationStatus.Accepted;
     }
+
+    // An email carries a subject line and push renders one as the notification title. SMS has neither,
+    // so demanding one there would force callers to invent a value that never leaves the database.
+    public static bool RequiresSubject(NotificationChannel channel) =>
+        channel is NotificationChannel.Email or NotificationChannel.Push;
 
     public void MarkSending()
     {
