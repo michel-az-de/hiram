@@ -32,8 +32,12 @@ exige o CLAUDE.md, e satisfaz o gatilho do ADR-027.
   pelo `POST /v1/notifications` direto.
 - `subject` e obrigatorio na entidade e `NOT NULL` na coluna, o que nao corresponde a SMS nem a
   WhatsApp.
-- A conta Twilio disponivel e trial, autenticada por API Key, sem numero comprado e sem messaging
-  service. O SendGrid, produto de email do Twilio, tem conta e chave proprias, ainda inexistentes.
+- A conta Twilio disponivel e trial, autenticada por API Key, com 30 dias de validade. O remetente de
+  SMS e WhatsApp e um numero emprestado pela Twilio, nao um numero comprado, e por isso nao aparece em
+  `IncomingPhoneNumbers`. O email nao passa pelo SendGrid: a Twilio Email API responde em
+  `https://comms.twilio.com/v1/Emails` com a mesma credencial da conta.
+- Em trial, os tres canais aceitam somente conteudo pre-aprovado. Isso foi verificado contra a API, nao
+  apenas na documentacao, e esta registrado na secao de verificacao empirica deste ADR.
 
 ## Decisao
 
@@ -52,7 +56,7 @@ mecanica comum de entrega deixa de ser propriedade do processor de email.
    separado de `NotificationStatus`.
 5. **Consentimento no caminho direto.** `ConsentPolicy` passa a ser consultada tambem no
    `POST /v1/notifications`, fechando a lacuna que hoje deixa o gate valer so no fan-out.
-6. **Ordem das fatias.** Email por SendGrid primeiro, SMS depois, WhatsApp sandbox por ultimo. A
+6. **Ordem das fatias.** Email pela Twilio Email API primeiro, SMS depois, WhatsApp por ultimo. A
    primeira fatia valida credencial, DI e testes sem tocar em estrutura; a segunda estreia a porta
    nova; a terceira carrega o peso de consent, template e janela.
 
@@ -66,11 +70,12 @@ mecanica comum de entrega deixa de ser propriedade do processor de email.
    `AccountSid` que compoe a URL. `AccountSid` e identificadores nao secretos vao para o `settings`
    jsonb de `tenant_provider_configs`; o secret vai para o campo protegido por Data Protection. Nenhum
    valor aparece em codigo, log ou arquivo versionado. No desenvolvimento a origem e user-secrets.
-3. **SendGrid e conta separada.** O email por Twilio usa a API do SendGrid, com chave propria e
-   remetente verificado, nao o `AccountSid`. Isso e um adapter distinto, nao uma variacao do adapter de
-   SMS.
-4. **SendGrid nao substitui SMTP nem Resend.** Entra como terceiro `IEmailProvider`, escolhido por
-   tenant. Nenhum tenant existente muda de provider por causa deste ADR.
+3. **Email pela Twilio Email API, nao pelo SendGrid.** O canal usa `POST https://comms.twilio.com/v1/Emails`
+   com a mesma credencial de conta dos demais canais, o que dispensa criar conta e chave de SendGrid. A
+   API exige `from.address`, `to[].address`, `content.subject` e `content.html`, responde de forma
+   assincrona e devolve um identificador de operacao, que e o `provider_message_id` deste canal.
+4. **O adapter `twilio-email` nao substitui SMTP nem Resend.** Entra como terceiro `IEmailProvider`,
+   escolhido por tenant. Nenhum tenant existente muda de provider por causa deste ADR.
 5. **Escopo Nivel 1, sem inbound.** Nenhum canal recebe mensagem nesta fatia. Sem opt-out automatico
    por STOP, sem janela de sessao de 24h tratada pelo produto, sem interativas. O opt-out continua
    sendo o registro explicito de consentimento pela API.
@@ -83,21 +88,33 @@ mecanica comum de entrega deixa de ser propriedade do processor de email.
 8. **Idempotencia do callback.** A chave e `(provider, message_sid, status)`. O callback tolera
    duplicata e chegada fora de ordem. Evento sem correspondencia local vira dead-letter com alerta,
    nunca aceitar e descartar.
-9. **Assinatura por provider, sem reuso do `WebhookSignature`.** O `X-Twilio-Signature` e HMAC-SHA1 em
-   base64 sobre a URL concatenada com os parametros do formulario ordenados; o Event Webhook do
-   SendGrid usa ECDSA. Nenhum dos dois e o HMAC-SHA256 sobre corpo JSON que o Hiram usa nos webhooks de
-   saida. Cada verificacao e propria, e assinatura invalida responde 401 sem processar.
+9. **Assinatura por provider, sem reuso do `WebhookSignature`.** O `X-Twilio-Signature` do Messaging e
+   HMAC-SHA1 em base64 sobre a URL concatenada com os parametros do formulario ordenados, e nao e o
+   HMAC-SHA256 sobre corpo JSON que o Hiram usa nos webhooks de saida. O esquema do callback de status
+   da Email API sera confirmado na fatia correspondente e nao e presumido igual ao do Messaging.
+   Assinatura invalida responde 401 sem processar.
 10. **Rota de callback fora de `/v1`.** O provider nao carrega `X-Api-Key`. Abrir excecao dentro do
     prefixo protegido enfraqueceria o middleware para toda a superficie; a rota nasce fora dele, com a
     assinatura como unica autenticacao.
-11. **Pipeline de resiliencia por canal.** Limites de rate e classificacao de erro diferem entre
-    SendGrid e Messaging. Cada canal constroi seu pipeline, no molde do `EmailDeliveryPipeline`.
+11. **Pipeline de resiliencia por canal.** Limites de rate e classificacao de erro diferem entre a
+    Email API e o Messaging, e o WhatsApp ainda impoe espacamento proprio entre mensagens. Cada canal
+    constroi seu pipeline, no molde do `EmailDeliveryPipeline`.
 12. **Testes sem rede no gate.** O CI mantem o padrao do repo, stub de `HttpMessageHandler`, sem
     credencial. Verificacao contra sandbox real e local, com user-secrets, e nunca condiciona o merge.
-13. **Limite do ambiente atual.** A conta e trial, sem numero e sem messaging service, e nao existe
-    conta SendGrid. Logo, cada fatia entrega adapter e teste deterministico, e a evidencia ponta a ponta
-    fica registrada na issue quando a credencial correspondente existir.
-14. **Antecipacao consciente do gate de 30 dias.** O plano do Hiram Core condiciona escopo novo a 30
+13. **Modo trial e configuracao de tenant, nao variavel de ambiente.** Enquanto a conta for trial, o
+    conteudo enviado ao provider nao e o corpo da notificacao, e sim um conteudo pre-aprovado. Isso vive
+    em `tenant_provider_configs.settings`, com `trial_mode` e a chave do template, porque o Hiram e
+    multi-tenant e uma variavel global decidiria por todos os tenants ao mesmo tempo. Sair do trial passa
+    a ser uma atualizacao de configuracao, sem deploy. O corpo real continua persistido em
+    `notification_requests`, e o `DeliveryAttempt` registra que o envio ocorreu em modo trial, para que o
+    historico nao afirme ter entregue um texto que nunca saiu.
+14. **Evidencia de status e limitada no trial.** Uma mensagem aceita retorna identificador, mas a
+    consulta individual responde 403 e a listagem da conta nao a exibe. Logo, no trial o estado de
+    entrega nao pode depender de consulta ao provider; o callback e o unico caminho, e o produto nao
+    deve nascer com um pollador que so funciona em conta paga.
+15. **Verify e OTP ficam fora.** O Hiram entrega notificacao, nao gera nem valida codigo de verificacao.
+    O produto Verify da Twilio, indisponivel no trial, nao entra neste ADR nem em fatia derivada dele.
+16. **Antecipacao consciente do gate de 30 dias.** O plano do Hiram Core condiciona escopo novo a 30
     dias de operacao real, ainda em curso. Esta integracao antecipa esse gate por decisao explicita, e
     a pendencia permanece aberta no plano, nao e considerada cumprida.
 
@@ -157,16 +174,44 @@ inviabiliza a validacao imediata. Adiada, nao descartada.
 
 ### Email pelo Twilio
 
-#### Opcao A: SendGrid como terceiro adapter (escolhida)
+#### Opcao A: Twilio Email API como terceiro adapter (escolhida)
 
-**Pros:** valida a integracao com o menor risco estrutural, e mantem SMTP e Resend intactos.
-**Contras:** depende de conta e verificacao de remetente que ainda nao existem.
+**Pros:** usa a credencial que a conta ja tem, sem conta nem chave adicionais, mantem SMTP e Resend
+intactos, e a mesma API continua valendo depois do upgrade, entao o adapter nao e descartavel.
+**Contras:** no trial o remetente e fixo e o conteudo e pre-aprovado, entao a fatia comprova o caminho
+de entrega, nao o conteudo.
 
-#### Opcao B: manter o email fora do Twilio
+#### Opcao B: SendGrid com conta e chave proprias
 
-**Pros:** nenhuma conta nova.
+**Pros:** superficie madura, com modo de validacao que nao entrega e nao consome cota.
+**Contras:** exige criar conta, verificar remetente e administrar uma segunda credencial, para um
+resultado que a Twilio Email API ja entrega com a credencial existente. Rejeitada.
+
+#### Opcao C: manter o email fora do Twilio
+
+**Pros:** nenhuma superficie nova.
 **Contras:** deixa a primeira fatia sem caminho de menor risco e joga a estreia da arquitetura nova
 direto no canal com mais regra de compliance. Rejeitada.
+
+## Verificacao empirica em 2026-08-06
+
+As bordas acima nao vieram so da documentacao. Foram medidas contra a API da conta de trial, e o que
+foi medido diverge do que o levantamento inicial do console afirmava.
+
+| Verificacao | Resultado |
+|---|---|
+| SMS com `Body=sms_2fa` para o numero verificado | aceito, `queued`. A Twilio expandiu a chave no texto canonico do template, o corpo devolvido nao e a chave |
+| Numero remetente em `IncomingPhoneNumbers` | lista vazia. O remetente de trial nao e um numero provisionado na conta |
+| Email com assunto e HTML livres | rejeitado com `400 Invalid template: email content does not match any approved template` |
+| Email com a chave do template no corpo, em seis variacoes | todas rejeitadas. A validacao compara o conteudo em si, nao aceita identificador |
+| `content.subject` e `content.html` ausentes | rejeitado como parametro obrigatorio, mesmo em trial |
+| Consulta da mensagem aceita, por identificador | `403 Forbidden` |
+| Listagem de mensagens da conta apos o envio | vazia |
+
+Consequencia direta: o trial comprova o caminho de entrega, aceite, persistencia, outbox, tentativa e
+classificacao de erro, e nao comprova conteudo nem estado de entrega. O conteudo exato aprovado para
+email so e visivel no console autenticado, entao a fatia de email depende desse dado ser fornecido pelo
+operador, e o adapter o trata como configuracao, nunca como constante no codigo.
 
 ## Consequencias
 
@@ -182,8 +227,10 @@ direto no canal com mais regra de compliance. Rejeitada.
 - uma rota publica a mais para endurecer, com tres esquemas de assinatura diferentes no repositorio;
 - o refactor toca o caminho critico de entrega antes de entregar valor visivel;
 - `subject` nulo exige leitura defensiva em todo consumidor da tabela;
-- dependencia de conta trial, que limita a evidencia ponta a ponta ate haver numero, join code e chave
-  do SendGrid.
+- o trial impoe conteudo pre-aprovado nos tres canais, entao a evidencia de ponta a ponta comprova o
+  caminho e nao o conteudo, e a comprovacao completa depende do upgrade da conta;
+- o modo trial e um caminho a mais no adapter, que precisa morrer quando a conta for paga, sob risco de
+  virar codigo morto permanente.
 
 ## Limites e gatilhos de revisao
 
@@ -207,7 +254,9 @@ opt-out por STOP ou janela de sessao, que reabrem este ADR.
 
 1. [ ] Extrair a mecanica de entrega do `EmailNotificationProcessor` para um processor de canal
    generico, sem mudanca de comportamento observavel.
-2. [ ] Adapter SendGrid como terceiro `IEmailProvider`, com testes de stub e classificacao de erro.
+2. [ ] Adapter `twilio-email` como terceiro `IEmailProvider`, contra a Twilio Email API, com testes de
+   stub, classificacao de erro e conteudo aprovado vindo de configuracao.
+2.1 [ ] Modo trial na configuracao de provider por tenant, com registro no `DeliveryAttempt`.
 3. [ ] `subject` nulo: migration, ajuste da entidade e validacao por canal no endpoint.
 4. [ ] Canal SMS: valor no enum, chave de roteamento, `ISmsProvider`, resolver, adapter Twilio
    Messages, normalizacao E.164 e configuracao por tenant.
