@@ -65,10 +65,22 @@ public class ProviderConfigEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Put_RejectsNonEmailChannel()
+    public async Task Put_RejectsAChannelWithNoResolverBehindIt()
     {
         var (client, _) = await NewTenant();
 
+        var response = await client.PutAsJsonAsync("/v1/providers/whatsapp",
+            new SetProviderConfigRequest("smtp", new Dictionary<string, string>(), null));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_RejectsAProviderFromAnotherChannel()
+    {
+        var (client, _) = await NewTenant();
+
+        // smtp is a real provider, but not one that answers for SMS.
         var response = await client.PutAsJsonAsync("/v1/providers/sms",
             new SetProviderConfigRequest("smtp", new Dictionary<string, string>(), null));
 

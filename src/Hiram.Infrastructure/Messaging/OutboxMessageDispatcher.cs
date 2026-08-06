@@ -8,6 +8,7 @@ public sealed class OutboxMessageDispatcher
     private readonly ChannelDeliveryProcessor _delivery;
     private readonly EmailChannelDelivery _email;
     private readonly PushChannelDelivery _push;
+    private readonly SmsChannelDelivery _sms;
     private readonly EventMessageProcessor _event;
     private readonly WebhookDeliveryProcessor _webhook;
 
@@ -15,12 +16,14 @@ public sealed class OutboxMessageDispatcher
         ChannelDeliveryProcessor delivery,
         EmailChannelDelivery email,
         PushChannelDelivery push,
+        SmsChannelDelivery sms,
         EventMessageProcessor @event,
         WebhookDeliveryProcessor webhook)
     {
         _delivery = delivery;
         _email = email;
         _push = push;
+        _sms = sms;
         _event = @event;
         _webhook = webhook;
     }
@@ -33,6 +36,7 @@ public sealed class OutboxMessageDispatcher
             "email" => _delivery.ProcessAsync(_email, body, cancellationToken),
             "event" => _event.ProcessAsync(body, cancellationToken),
             "push" => _delivery.ProcessAsync(_push, body, cancellationToken),
+            "sms" => _delivery.ProcessAsync(_sms, body, cancellationToken),
             "webhook" => _webhook.ProcessAsync(body, cancellationToken),
             _ => throw new PoisonMessageException($"Outbox message type '{message.Type}' is not supported.")
         };
