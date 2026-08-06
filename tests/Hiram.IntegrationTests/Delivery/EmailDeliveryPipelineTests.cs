@@ -95,18 +95,19 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
             })
             .Build();
 
-    private EmailNotificationProcessor BuildProcessor(HiramDbContext context, IEmailProvider provider, IBlockStore? blocks = null)
-    {
-        var resolver = new EmailProviderResolver(
+    private static EmailChannelDelivery BuildDelivery(IEmailProvider provider) =>
+        new(new EmailProviderResolver(
             new NoTenantConfig(),
             new NoopProtector(),
             new PlatformEmailDefaults("fake", null, new Dictionary<string, string>()),
-            [provider]);
+            [provider]));
 
-        return new EmailNotificationProcessor(
-            context, resolver, new BlockGate(blocks ?? new NoBlocks()), FastPipeline(), new TestClock(),
-            NullLogger<EmailNotificationProcessor>.Instance);
-    }
+    private static ChannelDeliveryProcessor BuildProcessor(HiramDbContext context, IBlockStore? blocks = null) =>
+        new(context, new BlockGate(blocks ?? new NoBlocks()), FastPipeline(), new TestClock(),
+            NullLogger<ChannelDeliveryProcessor>.Instance);
+
+    private static Task Process(HiramDbContext context, IEmailProvider provider, byte[] payload, IBlockStore? blocks = null) =>
+        BuildProcessor(context, blocks).ProcessAsync(BuildDelivery(provider), payload, CancellationToken.None);
 
     private sealed class NoBlocks : IBlockStore
     {
@@ -177,7 +178,7 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         var provider = new ScriptedProvider("fake", [new SendOutcome.TransientFailure("temporary"), new SendOutcome.Sent()]);
 
         await using (var context = NewContext())
-            await BuildProcessor(context, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None);
+            await Process(context, provider, PayloadFor(notificationId, tenantId));
 
         Assert.Equal(NotificationStatus.Sent, await StatusOf(notificationId));
 
@@ -194,7 +195,7 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         var provider = new ScriptedProvider("fake", [new SendOutcome.Sent("re_abc123")]);
 
         await using (var context = NewContext())
-            await BuildProcessor(context, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None);
+            await Process(context, provider, PayloadFor(notificationId, tenantId));
 
         var attempts = await AttemptsFor(notificationId);
         Assert.Single(attempts);
@@ -209,8 +210,7 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         var provider = new CountingProvider();
 
         await using (var context = NewContext())
-            await BuildProcessor(context, provider, new ChannelBlocked(NotificationChannel.Email))
-                .ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None);
+            await Process(context, provider, PayloadFor(notificationId, tenantId), new ChannelBlocked(NotificationChannel.Email));
 
         Assert.Equal(NotificationStatus.Suppressed, await StatusOf(notificationId));
         Assert.Equal(0, provider.Calls);
@@ -225,7 +225,7 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         var provider = new CountingProvider();
 
         await using (var context = NewContext())
-            await BuildProcessor(context, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None);
+            await Process(context, provider, PayloadFor(notificationId, tenantId));
 
         Assert.Equal(NotificationStatus.Sent, await StatusOf(notificationId));
         Assert.Equal(1, provider.Calls);
@@ -238,7 +238,7 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         var provider = new ScriptedProvider("fake", [new SendOutcome.PermanentFailure("rejected")]);
 
         await using (var context = NewContext())
-            await BuildProcessor(context, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None);
+            await Process(context, provider, PayloadFor(notificationId, tenantId));
 
         Assert.Equal(NotificationStatus.DeadLettered, await StatusOf(notificationId));
         Assert.Equal(1, provider.Calls);
@@ -261,7 +261,7 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         var provider = new ScriptedProvider("fake", Enumerable.Repeat<SendOutcome>(new SendOutcome.TransientFailure("temporary"), 5));
 
         await using (var context = NewContext())
-            await BuildProcessor(context, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None);
+            await Process(context, provider, PayloadFor(notificationId, tenantId));
 
         Assert.Equal(NotificationStatus.DeadLettered, await StatusOf(notificationId));
         Assert.Equal(3, provider.Calls);
@@ -286,7 +286,7 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         var provider = new ScriptedProvider("fake", [new SendOutcome.PermanentFailure("must not be called")]);
 
         await using (var context = NewContext())
-            await BuildProcessor(context, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None);
+            await Process(context, provider, PayloadFor(notificationId, tenantId));
 
         Assert.Equal(0, provider.Calls);
         Assert.Equal(NotificationStatus.Sent, await StatusOf(notificationId));
@@ -304,10 +304,9 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
     {
         var provider = new ScriptedProvider("fake", [new SendOutcome.Sent()]);
         await using var context = NewContext();
-        var processor = BuildProcessor(context, provider);
 
         await Assert.ThrowsAsync<PoisonMessageException>(() =>
-            processor.ProcessAsync(PayloadFor(Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None));
+            Process(context, provider, PayloadFor(Guid.NewGuid(), Guid.NewGuid())));
     }
 
     [Fact]
@@ -315,11 +314,10 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
     {
         var provider = new ScriptedProvider("fake", [new SendOutcome.Sent()]);
         await using var context = NewContext();
-        var processor = BuildProcessor(context, provider);
         var emptyPayload = System.Text.Encoding.UTF8.GetBytes("null");
 
         await Assert.ThrowsAsync<PoisonMessageException>(() =>
-            processor.ProcessAsync(emptyPayload, CancellationToken.None));
+            Process(context, provider, emptyPayload));
     }
 
     [Fact]
@@ -329,10 +327,9 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         // A context pointing at a port with no Postgres makes the load fail transiently, not deterministically.
         await using var context = new HiramDbContext(new DbContextOptionsBuilder<HiramDbContext>()
             .UseNpgsql("Host=127.0.0.1;Port=1;Database=none;Username=none;Password=none").Options);
-        var processor = BuildProcessor(context, provider);
 
         var error = await Record.ExceptionAsync(() =>
-            processor.ProcessAsync(PayloadFor(Guid.NewGuid(), Guid.NewGuid()), CancellationToken.None));
+            Process(context, provider, PayloadFor(Guid.NewGuid(), Guid.NewGuid())));
 
         Assert.NotNull(error);
         Assert.IsNotType<PoisonMessageException>(error);
@@ -351,7 +348,7 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         var provider = new ScriptedProvider("fake", [new SendOutcome.Sent()]);
 
         await using (var context = NewContext())
-            await BuildProcessor(context, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None);
+            await Process(context, provider, PayloadFor(notificationId, tenantId));
 
         await using var verify = NewContext();
         var webhookOutbox = await verify.OutboxMessages.Where(o => o.TenantId == tenantId && o.Type == "webhook").ToListAsync();
@@ -365,7 +362,7 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         var provider = new ScriptedProvider("fake", [new SendOutcome.Sent()]);
 
         await using (var context = NewContext())
-            await BuildProcessor(context, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None);
+            await Process(context, provider, PayloadFor(notificationId, tenantId));
 
         await using var verify = NewContext();
         Assert.Empty(await verify.OutboxMessages.Where(o => o.TenantId == tenantId && o.Type == "webhook").ToListAsync());
@@ -382,8 +379,8 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
 
         // Two consumers race the same message (prefetch or two replicas). Only the claim winner sends.
         await Task.WhenAll(
-            BuildProcessor(contextA, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None),
-            BuildProcessor(contextB, provider).ProcessAsync(PayloadFor(notificationId, tenantId), CancellationToken.None));
+            Process(contextA, provider, PayloadFor(notificationId, tenantId)),
+            Process(contextB, provider, PayloadFor(notificationId, tenantId)));
 
         Assert.Equal(1, provider.Calls);
         Assert.Equal(NotificationStatus.Sent, await StatusOf(notificationId));
