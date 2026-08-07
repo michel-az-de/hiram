@@ -5,20 +5,23 @@ namespace Hiram.Infrastructure.Messaging;
 
 public sealed class OutboxMessageDispatcher
 {
-    private readonly EmailNotificationProcessor _email;
+    private readonly ChannelDeliveryProcessor _delivery;
+    private readonly EmailChannelDelivery _email;
+    private readonly PushChannelDelivery _push;
     private readonly EventMessageProcessor _event;
-    private readonly PushNotificationProcessor _push;
     private readonly WebhookDeliveryProcessor _webhook;
 
     public OutboxMessageDispatcher(
-        EmailNotificationProcessor email,
+        ChannelDeliveryProcessor delivery,
+        EmailChannelDelivery email,
+        PushChannelDelivery push,
         EventMessageProcessor @event,
-        PushNotificationProcessor push,
         WebhookDeliveryProcessor webhook)
     {
+        _delivery = delivery;
         _email = email;
-        _event = @event;
         _push = push;
+        _event = @event;
         _webhook = webhook;
     }
 
@@ -27,9 +30,9 @@ public sealed class OutboxMessageDispatcher
         var body = Encoding.UTF8.GetBytes(message.Payload).AsMemory();
         return message.Type switch
         {
-            "email" => _email.ProcessAsync(body, cancellationToken),
+            "email" => _delivery.ProcessAsync(_email, body, cancellationToken),
             "event" => _event.ProcessAsync(body, cancellationToken),
-            "push" => _push.ProcessAsync(body, cancellationToken),
+            "push" => _delivery.ProcessAsync(_push, body, cancellationToken),
             "webhook" => _webhook.ProcessAsync(body, cancellationToken),
             _ => throw new PoisonMessageException($"Outbox message type '{message.Type}' is not supported.")
         };

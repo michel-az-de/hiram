@@ -6,10 +6,11 @@ public static class MessagingDependencyInjection
 {
     public static IServiceCollection AddHiramMessageProcessors(this IServiceCollection services)
     {
-        services.AddScoped<EmailNotificationProcessor>();
+        services.AddScoped<ChannelDeliveryProcessor>();
+        services.AddScoped<EmailChannelDelivery>();
+        services.AddScoped<PushChannelDelivery>();
         services.AddScoped<EventFanout>();
         services.AddScoped<EventMessageProcessor>();
-        services.AddScoped<PushNotificationProcessor>();
         services.AddHttpClient<WebhookDeliveryProcessor>();
         services.AddScoped<OutboxMessageDispatcher>();
 

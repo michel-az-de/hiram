@@ -86,9 +86,12 @@ public class PushDeliveryPipelineTests : IAsyncLifetime
             })
             .Build();
 
-    private PushNotificationProcessor BuildProcessor(HiramDbContext context, IPushSender sender, IBlockStore? blocks = null) =>
-        new(context, sender, new BlockGate(blocks ?? new NoBlocks()), FastPipeline(), new TestClock(),
-            NullLogger<PushNotificationProcessor>.Instance);
+    private static ChannelDeliveryProcessor BuildProcessor(HiramDbContext context, IBlockStore? blocks = null) =>
+        new(context, new BlockGate(blocks ?? new NoBlocks()), FastPipeline(), new TestClock(),
+            NullLogger<ChannelDeliveryProcessor>.Instance);
+
+    private static Task Process(HiramDbContext context, IPushSender sender, byte[] payload, IBlockStore? blocks = null) =>
+        BuildProcessor(context, blocks).ProcessAsync(new PushChannelDelivery(context, sender), payload, CancellationToken.None);
 
     private async Task<(Guid TenantId, Guid NotificationId, Guid SubscriptionId)> Seed(DeliveryMode mode, bool withSubscription = true)
     {
@@ -132,7 +135,7 @@ public class PushDeliveryPipelineTests : IAsyncLifetime
         var sender = new ScriptedPushSender([new SendOutcome.Sent()]);
 
         await using (var context = NewContext())
-            await BuildProcessor(context, sender).ProcessAsync(PayloadFor(notificationId, tenantId, subscriptionId), CancellationToken.None);
+            await Process(context, sender, PayloadFor(notificationId, tenantId, subscriptionId));
 
         Assert.Equal(NotificationStatus.Sent, await StatusOf(notificationId));
         Assert.Equal(1, sender.Calls);
@@ -146,8 +149,7 @@ public class PushDeliveryPipelineTests : IAsyncLifetime
         var sender = new ScriptedPushSender([new SendOutcome.PermanentFailure("must not be called")]);
 
         await using (var context = NewContext())
-            await BuildProcessor(context, sender, new ChannelBlocked(NotificationChannel.Push))
-                .ProcessAsync(PayloadFor(notificationId, tenantId, subscriptionId), CancellationToken.None);
+            await Process(context, sender, PayloadFor(notificationId, tenantId, subscriptionId), new ChannelBlocked(NotificationChannel.Push));
 
         Assert.Equal(NotificationStatus.Suppressed, await StatusOf(notificationId));
         Assert.Equal(0, sender.Calls);
@@ -161,11 +163,10 @@ public class PushDeliveryPipelineTests : IAsyncLifetime
         var payload = PayloadFor(notificationId, tenantId, subscriptionId);
 
         await using (var context = NewContext())
-            await BuildProcessor(context, sender, new ChannelBlocked(NotificationChannel.Push))
-                .ProcessAsync(payload, CancellationToken.None);
+            await Process(context, sender, payload, new ChannelBlocked(NotificationChannel.Push));
 
         await using (var context = NewContext())
-            await BuildProcessor(context, sender).ProcessAsync(payload, CancellationToken.None);
+            await Process(context, sender, payload);
 
         Assert.Equal(NotificationStatus.Suppressed, await StatusOf(notificationId));
         Assert.Equal(0, sender.Calls);
@@ -179,7 +180,7 @@ public class PushDeliveryPipelineTests : IAsyncLifetime
         var sender = new ScriptedPushSender([new SendOutcome.Sent()]);
 
         await using (var context = NewContext())
-            await BuildProcessor(context, sender).ProcessAsync(PayloadFor(notificationId, tenantId, subscriptionId), CancellationToken.None);
+            await Process(context, sender, PayloadFor(notificationId, tenantId, subscriptionId));
 
         Assert.Equal(NotificationStatus.Sent, await StatusOf(notificationId));
         Assert.Equal(1, sender.Calls);
@@ -192,7 +193,7 @@ public class PushDeliveryPipelineTests : IAsyncLifetime
         var sender = new ScriptedPushSender([new SendOutcome.Sent()]);
 
         await using (var context = NewContext())
-            await BuildProcessor(context, sender).ProcessAsync(PayloadFor(notificationId, tenantId, subscriptionId), CancellationToken.None);
+            await Process(context, sender, PayloadFor(notificationId, tenantId, subscriptionId));
 
         Assert.Equal(NotificationStatus.DeadLettered, await StatusOf(notificationId));
         Assert.Equal(0, sender.Calls);
@@ -207,7 +208,7 @@ public class PushDeliveryPipelineTests : IAsyncLifetime
         var sender = new ScriptedPushSender(Enumerable.Repeat<SendOutcome>(new SendOutcome.TransientFailure("503"), 5));
 
         await using (var context = NewContext())
-            await BuildProcessor(context, sender).ProcessAsync(PayloadFor(notificationId, tenantId, subscriptionId), CancellationToken.None);
+            await Process(context, sender, PayloadFor(notificationId, tenantId, subscriptionId));
 
         Assert.Equal(NotificationStatus.DeadLettered, await StatusOf(notificationId));
         Assert.Equal(3, sender.Calls);
@@ -222,7 +223,7 @@ public class PushDeliveryPipelineTests : IAsyncLifetime
         var sender = new ScriptedPushSender([new SendOutcome.PermanentFailure("must not be called")]);
 
         await using (var context = NewContext())
-            await BuildProcessor(context, sender).ProcessAsync(PayloadFor(notificationId, tenantId, subscriptionId), CancellationToken.None);
+            await Process(context, sender, PayloadFor(notificationId, tenantId, subscriptionId));
 
         Assert.Equal(0, sender.Calls);
         Assert.Equal(NotificationStatus.Sent, await StatusOf(notificationId));
