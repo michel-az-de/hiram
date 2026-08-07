@@ -6,12 +6,23 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Canal SMS entregue pela Twilio: porta `ISmsProvider`, adapter `twilio-sms` sobre o recurso Messages
+  e `PUT /v1/providers/sms` para o tenant configurar a propria conta de operadora. Sem provider
+  configurado o envio falha como permanente, sem chamar a rede, porque o credito e do tenant.
+- Adapter `twilio-email` como terceiro provider de email, escolhido por tenant ao lado de SMTP e
+  Resend. Nenhum tenant existente muda de provider.
+- ADR-028 registrando a Twilio como provider multicanal de ultima milha.
 - ADR-027 e plano executavel para a migracao incremental ao Hiram Core.
 - Primitiva de fila PostgreSQL com claim atomico, lease renovavel, retry agendado e recuperacao de
   leases vencidos.
 - Runbook operacional e prova descartavel de backup e restore do PostgreSQL e do key ring no CI.
 
 ### Changed
+- Torna `subject` opcional por canal. A coluna passa a aceitar nulo por migration e a obrigatoriedade
+  vive no dominio, exigida em email e push, ausente em SMS.
+- Extrai a mecanica comum de entrega (claim, bloqueio, modo shadow, tentativa, dead letter e webhook)
+  do processor de email para um processor de canal reutilizavel. Cada canal contribui apenas com a
+  montagem da mensagem e a chamada ao adapter.
 - Adota o Protocolo Operacional v4.0 (PR-first, issue-driven, auto-merge por tier). Ver ADR de adocao e CLAUDE.md.
 - Redefine o Hiram como infraestrutura interna de notificacoes: um host e PostgreSQL no runtime
   alvo, providers externos na ultima milha e extensoes somente com consumidor ativo.
