@@ -15,7 +15,8 @@ public sealed class EmailChannelDelivery : IChannelDelivery
     public async Task<ChannelSend> ResolveAsync(NotificationRequest notification, CancellationToken cancellationToken)
     {
         var resolved = await _resolver.ResolveAsync(notification.TenantId, cancellationToken);
-        var message = new EmailMessage(notification.Recipient, notification.Subject, notification.Body);
+        // The domain rejects an email without a subject, so this is never null on this channel.
+        var message = new EmailMessage(notification.Recipient, notification.Subject!, notification.Body);
         return new EmailChannelSend(resolved, message);
     }
 }
