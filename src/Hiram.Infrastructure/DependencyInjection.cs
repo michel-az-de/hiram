@@ -63,6 +63,8 @@ public static class DependencyInjection
         services.AddSingleton<IEmailProvider, SmtpEmailProvider>();
         services.AddHttpClient<IEmailProvider, ResendEmailProvider>(client =>
             client.BaseAddress = new Uri("https://api.resend.com/"));
+        services.AddHttpClient<IEmailProvider, TwilioEmailProvider>(client =>
+            client.BaseAddress = new Uri("https://comms.twilio.com/v1/"));
 
         return services;
     }
