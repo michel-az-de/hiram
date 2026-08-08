@@ -32,7 +32,8 @@ public sealed class TwilioEmailProvider : IEmailProvider
         if (string.IsNullOrWhiteSpace(from) || string.IsNullOrWhiteSpace(apiKeySid) || string.IsNullOrWhiteSpace(apiKeySecret))
             return new SendOutcome.PermanentFailure("Twilio email requires a from address, an api key sid and an api key secret.");
 
-        var content = ContentFor(message, settings);
+        var trial = IsTrial(settings);
+        var content = ContentFor(message, settings, trial);
         if (content is null)
             return new SendOutcome.PermanentFailure(
                 "Trial mode requires trial_subject and trial_html in the provider settings.");
@@ -52,7 +53,11 @@ public sealed class TwilioEmailProvider : IEmailProvider
         try
         {
             using var response = await _http.SendAsync(request, cancellationToken);
-            return await ClassifyAsync(response, cancellationToken);
+            var outcome = await ClassifyAsync(response, cancellationToken);
+
+            // What went out was the approved message, not the rendered notification. The attempt carries
+            // that so the delivery history does not read as if the notification itself had been sent.
+            return trial && outcome is SendOutcome.Sent sent ? sent with { TrialContent = true } : outcome;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -65,11 +70,14 @@ public sealed class TwilioEmailProvider : IEmailProvider
         }
     }
 
+    private static bool IsTrial(EmailProviderSettings settings) =>
+        string.Equals(settings.Values.GetValueOrDefault("trial_mode"), "true", StringComparison.OrdinalIgnoreCase);
+
     // While the account is on trial the API accepts only its own approved messages, so the tenant configures
     // which one goes out. The notification body stays persisted either way (ADR-028).
-    private static TwilioContent? ContentFor(EmailMessage message, EmailProviderSettings settings)
+    private static TwilioContent? ContentFor(EmailMessage message, EmailProviderSettings settings, bool trial)
     {
-        if (!string.Equals(settings.Values.GetValueOrDefault("trial_mode"), "true", StringComparison.OrdinalIgnoreCase))
+        if (!trial)
             return new TwilioContent(message.Subject, message.Body);
 
         var subject = settings.Values.GetValueOrDefault("trial_subject");

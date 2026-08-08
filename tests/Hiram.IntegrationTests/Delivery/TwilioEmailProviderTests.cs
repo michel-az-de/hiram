@@ -86,6 +86,21 @@ public class TwilioEmailProviderTests
 
         var sent = Assert.IsType<SendOutcome.Sent>(outcome);
         Assert.Equal("comms_operation_01abc", sent.ProviderMessageId);
+
+        // Outside trial the notification's own content went out, so the attempt claims nothing else.
+        Assert.False(sent.TrialContent);
+    }
+
+    [Fact]
+    public async Task Send_ReportsTrialContent_WhenTheApprovedMessageReplacedTheNotification()
+    {
+        var handler = new CapturingHandler(_ => Accepted("comms_operation_01abc"));
+
+        var outcome = await Provider(handler).SendAsync(Message(), Settings(trial: true), CancellationToken.None);
+
+        // The persisted body never left, so an attempt recorded as a plain send would put a delivery in
+        // the history that did not happen (ADR-028 item 2.1).
+        Assert.True(Assert.IsType<SendOutcome.Sent>(outcome).TrialContent);
     }
 
     [Fact]

@@ -30,7 +30,8 @@ public sealed class TwilioSmsProvider : ISmsProvider
             return new SendOutcome.PermanentFailure(
                 "Twilio SMS requires account_sid, from, api_key_sid and an api key secret.");
 
-        var body = BodyFor(message, settings);
+        var trial = IsTrial(settings);
+        var body = BodyFor(message, settings, trial);
         if (body is null)
             return new SendOutcome.PermanentFailure("Trial mode requires trial_template in the provider settings.");
 
@@ -49,7 +50,11 @@ public sealed class TwilioSmsProvider : ISmsProvider
         try
         {
             using var response = await _http.SendAsync(request, cancellationToken);
-            return await TwilioMessagesApi.ClassifyAsync(Channel, response, cancellationToken);
+            var outcome = await TwilioMessagesApi.ClassifyAsync(Channel, response, cancellationToken);
+
+            // What went out was the approved text, not the persisted body. The attempt carries that so the
+            // delivery history does not read as if the notification itself had been sent.
+            return trial && outcome is SendOutcome.Sent sent ? sent with { TrialContent = true } : outcome;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -62,11 +67,14 @@ public sealed class TwilioSmsProvider : ISmsProvider
         }
     }
 
+    private static bool IsTrial(SmsProviderSettings settings) =>
+        string.Equals(settings.Values.GetValueOrDefault("trial_mode"), "true", StringComparison.OrdinalIgnoreCase);
+
     // A trial account rejects free text and accepts only the key of one of its canned messages, which it
     // expands into the final text on its side. The notification body stays persisted either way (ADR-028).
-    private static string? BodyFor(SmsMessage message, SmsProviderSettings settings)
+    private static string? BodyFor(SmsMessage message, SmsProviderSettings settings, bool trial)
     {
-        if (!string.Equals(settings.Values.GetValueOrDefault("trial_mode"), "true", StringComparison.OrdinalIgnoreCase))
+        if (!trial)
             return message.Body;
 
         var template = settings.Values.GetValueOrDefault("trial_template");
