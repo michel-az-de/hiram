@@ -113,7 +113,7 @@ internal static class TemplateEndpoints
             : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Template not found");
     }
 
-    private static void ValidateTemplate(ITemplateRenderer renderer, string subject, string body, Dictionary<string, string[]> errors)
+    private static void ValidateTemplate(ITemplateRenderer renderer, string? subject, string body, Dictionary<string, string[]> errors)
     {
         if (string.IsNullOrWhiteSpace(subject))
             errors["subject"] = ["Subject is required."];

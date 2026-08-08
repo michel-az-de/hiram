@@ -111,6 +111,16 @@ public sealed class EventFanout
             return;
         }
 
+        if (template.Subject is null)
+        {
+            // Email renders the subject as the subject line and the domain refuses to create an email
+            // template without one, so only a row written around the entity lands here. Deterministic, so
+            // it is skipped like a failed render instead of retried forever.
+            _logger.LogWarning(
+                "Template {Template} carries no subject for event {EventId}, skipping", item.TemplateName, @event.EventId);
+            return;
+        }
+
         string subject;
         string body;
         try

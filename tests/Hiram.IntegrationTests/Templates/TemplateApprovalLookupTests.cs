@@ -18,7 +18,7 @@ public class TemplateApprovalLookupTests
         public Task AddAsync(Template template, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<Template?> GetAsync(Guid tenantId, Guid id, CancellationToken cancellationToken) => Task.FromResult<Template?>(null);
         public Task<IReadOnlyList<Template>> ListAsync(Guid tenantId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<Template>>([]);
-        public Task<bool> UpdateAsync(Guid tenantId, Guid id, string subject, string body, DateTimeOffset updatedAtUtc, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<bool> UpdateAsync(Guid tenantId, Guid id, string? subject, string body, DateTimeOffset updatedAtUtc, CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<bool> ApproveAsync(Guid tenantId, Guid id, CancellationToken cancellationToken) => Task.FromResult(false);
         public Task<bool> DeleteAsync(Guid tenantId, Guid id, CancellationToken cancellationToken) => Task.FromResult(false);
     }

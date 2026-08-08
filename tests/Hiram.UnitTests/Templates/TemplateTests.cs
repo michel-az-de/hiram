@@ -14,6 +14,15 @@ public class TemplateTests
         body: "Welcome {{ name }}",
         createdAtUtc: DateTimeOffset.UnixEpoch);
 
+    private static Template CreateSms(string body = "Seu pedido saiu para entrega") => new(
+        id: Guid.NewGuid(),
+        tenantId: Guid.NewGuid(),
+        channel: NotificationChannel.Sms,
+        name: "entrega",
+        subject: null,
+        body: body,
+        createdAtUtc: DateTimeOffset.UnixEpoch);
+
     [Fact]
     public void Constructor_StoresValues_AndStampsUpdatedEqualToCreated()
     {
@@ -77,5 +86,52 @@ public class TemplateTests
         var template = CreateValid();
 
         Assert.Throws<ArgumentException>(() => template.UpdateContent("  ", "body", DateTimeOffset.UnixEpoch));
+    }
+
+    [Fact]
+    public void Constructor_AcceptsANullSubject_OnSms()
+    {
+        var template = CreateSms();
+
+        Assert.Null(template.Subject);
+        Assert.Equal(NotificationChannel.Sms, template.Channel);
+    }
+
+    // The guard follows NotificationRequest.RequiresSubject, so relaxing it for SMS must not relax email.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Constructor_Throws_WhenSubjectIsBlank_OnEmail(string? subject)
+    {
+        Assert.Throws<ArgumentException>(() => new Template(
+            Guid.NewGuid(), Guid.NewGuid(), NotificationChannel.Email, "n", subject, "b", DateTimeOffset.UnixEpoch));
+    }
+
+    [Fact]
+    public void UpdateContent_AcceptsANullSubject_OnSms()
+    {
+        var template = CreateSms();
+        var updatedAt = DateTimeOffset.UnixEpoch.AddDays(1);
+
+        template.UpdateContent(subject: null, "Novo corpo", updatedAt);
+
+        Assert.Null(template.Subject);
+        Assert.Equal("Novo corpo", template.Body);
+        Assert.Equal(2, template.Version);
+        Assert.Equal(updatedAt, template.UpdatedAtUtc);
+    }
+
+    [Fact]
+    public void Checksum_IsStable_WhenTheSubjectIsNull()
+    {
+        // A null subject must hash like any other content: the same body always yields the same checksum,
+        // and changing the body changes it. Otherwise an SMS template would look edited on every read.
+        var first = CreateSms();
+        var second = CreateSms();
+        Assert.Equal(first.Checksum, second.Checksum);
+
+        first.UpdateContent(subject: null, "Outro corpo", DateTimeOffset.UnixEpoch.AddDays(1));
+        Assert.NotEqual(second.Checksum, first.Checksum);
     }
 }

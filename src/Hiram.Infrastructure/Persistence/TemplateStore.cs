@@ -48,7 +48,7 @@ public sealed class TemplateStore : ITemplateStore
             .ThenBy(x => x.Name)
             .ToListAsync(cancellationToken);
 
-    public async Task<bool> UpdateAsync(Guid tenantId, Guid id, string subject, string body, DateTimeOffset updatedAtUtc, CancellationToken cancellationToken)
+    public async Task<bool> UpdateAsync(Guid tenantId, Guid id, string? subject, string body, DateTimeOffset updatedAtUtc, CancellationToken cancellationToken)
     {
         var template = await _context.Templates
             .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Id == id, cancellationToken);

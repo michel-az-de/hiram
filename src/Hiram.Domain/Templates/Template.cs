@@ -10,7 +10,10 @@ public sealed class Template
     public Guid TenantId { get; private set; }
     public NotificationChannel Channel { get; private set; }
     public string Name { get; private set; }
-    public string Subject { get; private set; }
+
+    // Null on channels that have no subject line, such as SMS. Email and push still require one.
+    public string? Subject { get; private set; }
+
     public string Body { get; private set; }
     public bool Approved { get; private set; }
     public int Version { get; private set; }
@@ -22,7 +25,6 @@ public sealed class Template
     private Template()
     {
         Name = null!;
-        Subject = null!;
         Body = null!;
         Checksum = null!;
     }
@@ -32,7 +34,7 @@ public sealed class Template
         Guid tenantId,
         NotificationChannel channel,
         string name,
-        string subject,
+        string? subject,
         string body,
         DateTimeOffset createdAtUtc)
     {
@@ -44,8 +46,10 @@ public sealed class Template
             throw new ArgumentOutOfRangeException(nameof(channel), channel, "Unknown notification channel.");
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Name is required.", nameof(name));
-        if (string.IsNullOrWhiteSpace(subject))
-            throw new ArgumentException("Subject is required.", nameof(subject));
+        // The channel decides: a template for a channel that renders no subject line must not carry one,
+        // because the value would never leave the database.
+        if (NotificationRequest.RequiresSubject(channel) && string.IsNullOrWhiteSpace(subject))
+            throw new ArgumentException($"Subject is required on the {channel} channel.", nameof(subject));
         if (string.IsNullOrWhiteSpace(body))
             throw new ArgumentException("Body is required.", nameof(body));
 
@@ -62,10 +66,10 @@ public sealed class Template
         UpdatedAtUtc = createdAtUtc;
     }
 
-    public void UpdateContent(string subject, string body, DateTimeOffset updatedAtUtc)
+    public void UpdateContent(string? subject, string body, DateTimeOffset updatedAtUtc)
     {
-        if (string.IsNullOrWhiteSpace(subject))
-            throw new ArgumentException("Subject is required.", nameof(subject));
+        if (NotificationRequest.RequiresSubject(Channel) && string.IsNullOrWhiteSpace(subject))
+            throw new ArgumentException($"Subject is required on the {Channel} channel.", nameof(subject));
         if (string.IsNullOrWhiteSpace(body))
             throw new ArgumentException("Body is required.", nameof(body));
 
@@ -80,6 +84,6 @@ public sealed class Template
 
     public void Approve() => Approved = true;
 
-    private static string ComputeChecksum(string subject, string body) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{subject}\n{body}")));
+    private static string ComputeChecksum(string? subject, string body) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{subject ?? string.Empty}\n{body}")));
 }
