@@ -6,6 +6,9 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Provisionamento do tenant Jornada do Candidato em `deploy/jornada/`: script idempotente que cria o
+  tenant live, emite a api key do emissor, aprova os templates de e-mail da jornada e liga cada
+  eventType ao seu template. Reexecucao reaproveita o que ja existe em vez de duplicar.
 - Canal SMS entregue pela Twilio: porta `ISmsProvider`, adapter `twilio-sms` sobre o recurso Messages
   e `PUT /v1/providers/sms` para o tenant configurar a propria conta de operadora. Sem provider
   configurado o envio falha como permanente, sem chamar a rede, porque o credito e do tenant.
