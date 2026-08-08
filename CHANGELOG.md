@@ -6,6 +6,11 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Fan-out de eventos para SMS. Uma rotina com `channels: ["email","sms"]` passa a gerar as duas
+  notificacoes: o telefone vem do proprio evento e um numero ausente ou fora de E.164 e recusado antes
+  do outbox, como ja acontece no envio direto.
+- Contador `hiram.events.no_route`, com tag do tipo do evento. Evento sem rotina continua sendo ack,
+  nao dead-letter, e sem metrica esse caminho era invisivel na operacao.
 - Superficies de configuracao abertas ao canal `sms`: `POST /v1/templates`, o campo `channels` de
   `POST /v1/admin/routines` e `POST /v1/consent`. Sem elas nao havia o que um evento entregar por SMS.
 - Canal SMS entregue pela Twilio: porta `ISmsProvider`, adapter `twilio-sms` sobre o recurso Messages
@@ -24,6 +29,8 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
   vive no dominio, exigida em email e push, ausente em SMS.
 - Estende a mesma regra a `templates.subject`, por migration nova. Um template de email continua
   exigindo subject e um de SMS recusa qualquer subject, porque ele nunca seria renderizado.
+- Centraliza a validacao E.164 em `PhoneNumber`, no dominio. O submit direto e o fan-out passam a usar
+  a mesma regra em vez de duas copias da expressao.
 - Extrai a mecanica comum de entrega (claim, bloqueio, modo shadow, tentativa, dead letter e webhook)
   do processor de email para um processor de canal reutilizavel. Cada canal contribui apenas com a
   montagem da mensagem e a chamada ao adapter.

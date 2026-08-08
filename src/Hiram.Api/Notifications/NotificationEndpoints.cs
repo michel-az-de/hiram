@@ -233,7 +233,7 @@ internal static class NotificationEndpoints
             errors[nameof(request.Channel)] = ["Channel must be one of: email, push, sms."];
         if (string.IsNullOrWhiteSpace(request.Recipient))
             errors[nameof(request.Recipient)] = ["Recipient is required."];
-        else if (channel == NotificationChannel.Sms && !IsE164(request.Recipient))
+        else if (channel == NotificationChannel.Sms && !PhoneNumber.IsE164(request.Recipient))
             errors[nameof(request.Recipient)] = ["Recipient must be a phone number in E.164 format, such as +5511999999999."];
 
         var hasTemplate = !string.IsNullOrWhiteSpace(request.Template);
@@ -262,11 +262,6 @@ internal static class NotificationEndpoints
             "sms" => NotificationChannel.Sms,
             _ => null
         };
-
-    // E.164: a plus sign, a country code that cannot start at zero, and at most 15 digits overall. A
-    // carrier rejects anything else, so catching it at submit keeps a guaranteed failure out of the outbox.
-    private static bool IsE164(string recipient) =>
-        System.Text.RegularExpressions.Regex.IsMatch(recipient.Trim(), @"^\+[1-9]\d{7,14}$");
 
     private static NotificationStatus? ParseStatus(string status) =>
         status.Trim().ToLowerInvariant() switch
