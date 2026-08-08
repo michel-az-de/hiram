@@ -6,6 +6,9 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Provisionamento do tenant Jornada do Candidato em `deploy/jornada/`: script idempotente que cria o
+  tenant live, emite a api key do emissor, aprova os templates de e-mail da jornada e liga cada
+  eventType ao seu template. Reexecucao reaproveita o que ja existe em vez de duplicar.
 - Registro da substituicao de conteudo em modo trial na tentativa de entrega. Quando o adapter
   `twilio-sms` ou `twilio-email` envia o conteudo pre-aprovado no lugar do corpo da notificacao, a
   coluna nova `delivery_attempts.trial_content` marca a tentativa e o detalhe da notificacao passa a
