@@ -23,6 +23,7 @@ internal sealed class DeliveryAttemptConfiguration : IEntityTypeConfiguration<De
         builder.Property(x => x.Shadowed).HasColumnName("shadowed").IsRequired();
         builder.Property(x => x.PayloadHash).HasColumnName("payload_hash").HasMaxLength(64);
         builder.Property(x => x.ProviderMessageId).HasColumnName("provider_message_id").HasMaxLength(128);
+        builder.Property(x => x.TrialContent).HasColumnName("trial_content").HasDefaultValue(false).IsRequired();
 
         builder.HasIndex(x => x.NotificationId).HasDatabaseName("ix_delivery_attempts_notification_id");
         builder.HasIndex(x => x.ProviderMessageId).HasDatabaseName("ix_delivery_attempts_provider_message_id");

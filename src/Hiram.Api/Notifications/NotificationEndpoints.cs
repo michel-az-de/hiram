@@ -223,7 +223,8 @@ internal static class NotificationEndpoints
             attempt.Duration.TotalMilliseconds,
             attempt.Shadowed,
             attempt.PayloadHash,
-            attempt.CreatedAtUtc);
+            attempt.CreatedAtUtc,
+            attempt.TrialContent);
 
     private static Dictionary<string, string[]> Validate(SubmitNotificationRequest request, NotificationChannel? channel)
     {

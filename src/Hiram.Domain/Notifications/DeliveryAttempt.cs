@@ -22,6 +22,11 @@ public sealed class DeliveryAttempt
     // provider returns one; it is what a status callback matches back on.
     public string? ProviderMessageId { get; private set; }
 
+    // True when the provider was sent approved content instead of the notification body, which a trial
+    // account forces (ADR-028). Without it a trial send is indistinguishable from a real one in the
+    // history, and the body stored on the notification would read as the text that was delivered.
+    public bool TrialContent { get; private set; }
+
     // Parameterless ctor exists so EF Core can materialize rows without re-running creation invariants.
     private DeliveryAttempt()
     {
@@ -40,7 +45,8 @@ public sealed class DeliveryAttempt
         DateTimeOffset createdAtUtc,
         bool shadowed = false,
         string? payloadHash = null,
-        string? providerMessageId = null)
+        string? providerMessageId = null,
+        bool trialContent = false)
     {
         if (id == Guid.Empty)
             throw new ArgumentException("Delivery attempt id is required.", nameof(id));
@@ -69,5 +75,6 @@ public sealed class DeliveryAttempt
         Shadowed = shadowed;
         PayloadHash = payloadHash;
         ProviderMessageId = providerMessageId;
+        TrialContent = trialContent;
     }
 }
