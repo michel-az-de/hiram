@@ -63,8 +63,9 @@ Ordem de precedencia: ambiente, depois `.env` ao lado do script, depois o padrao
 
 ## Estado local
 
-`.jornada-tenant` e `.jornada-key` ficam ao lado do script, com permissao 600, e estao no `.gitignore`
-deste diretorio junto do `.env`.
+`.jornada-tenant` e `.jornada-key` ficam ao lado do script e estao no `.gitignore` deste diretorio,
+junto do `.env`. O script aplica `chmod 600` nos dois; em sistema de arquivos que ignora o modo, como
+NTFS pelo Git Bash, a chamada nao tem efeito e a protecao passa a ser a do diretorio.
 
 A api key aparece em texto claro uma unica vez, na execucao que a emite: o Hiram guarda apenas o hash.
 Se o arquivo for perdido, o caminho e emitir outra em `POST /v1/admin/api-keys` e revogar a anterior.
