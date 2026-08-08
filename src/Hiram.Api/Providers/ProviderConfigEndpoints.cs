@@ -28,6 +28,7 @@ internal static class ProviderConfigEndpoints
         ITenantProviderConfigStore store,
         IEnumerable<IEmailProvider> emailProviders,
         IEnumerable<ISmsProvider> smsProviders,
+        IEnumerable<IWhatsAppProvider> whatsAppProviders,
         ISmtpDestinationPolicy destinations,
         ISecretProtector protector,
         IClock clock,
@@ -40,12 +41,15 @@ internal static class ProviderConfigEndpoints
         if (configured is null)
             return Results.ValidationProblem(new Dictionary<string, string[]>
             {
-                [nameof(channel)] = ["Only the email and sms channels can be configured."]
+                [nameof(channel)] = ["Only the email, sms and whatsapp channels can be configured."]
             });
 
-        var known = configured == NotificationChannel.Email
-            ? emailProviders.Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase)
-            : smsProviders.Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var known = configured switch
+        {
+            NotificationChannel.Email => emailProviders.Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase),
+            NotificationChannel.Sms => smsProviders.Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase),
+            _ => whatsAppProviders.Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase)
+        };
 
         var providerName = request.Provider?.Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(providerName) || !known.Contains(providerName))
@@ -91,6 +95,7 @@ internal static class ProviderConfigEndpoints
         {
             "email" => NotificationChannel.Email,
             "sms" => NotificationChannel.Sms,
+            "whatsapp" => NotificationChannel.WhatsApp,
             _ => null
         };
 

@@ -154,7 +154,7 @@ internal static class NotificationEndpoints
 
         NotificationChannel? channelFilter = null;
         if (channel is not null && (channelFilter = ParseChannel(channel)) is null)
-            return Results.ValidationProblem(new Dictionary<string, string[]> { ["channel"] = ["Channel must be one of: email, push, sms."] });
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["channel"] = ["Channel must be one of: email, push, sms, whatsapp."] });
 
         DateTimeOffset? cursorCreatedAt = null;
         Guid? cursorId = null;
@@ -230,10 +230,10 @@ internal static class NotificationEndpoints
         var errors = new Dictionary<string, string[]>();
 
         if (channel is null)
-            errors[nameof(request.Channel)] = ["Channel must be one of: email, push, sms."];
+            errors[nameof(request.Channel)] = ["Channel must be one of: email, push, sms, whatsapp."];
         if (string.IsNullOrWhiteSpace(request.Recipient))
             errors[nameof(request.Recipient)] = ["Recipient is required."];
-        else if (channel == NotificationChannel.Sms && !PhoneNumber.IsE164(request.Recipient))
+        else if (channel is NotificationChannel.Sms or NotificationChannel.WhatsApp && !PhoneNumber.IsE164(request.Recipient))
             errors[nameof(request.Recipient)] = ["Recipient must be a phone number in E.164 format, such as +5511999999999."];
 
         var hasTemplate = !string.IsNullOrWhiteSpace(request.Template);
@@ -260,6 +260,7 @@ internal static class NotificationEndpoints
             "email" => NotificationChannel.Email,
             "push" => NotificationChannel.Push,
             "sms" => NotificationChannel.Sms,
+            "whatsapp" => NotificationChannel.WhatsApp,
             _ => null
         };
 

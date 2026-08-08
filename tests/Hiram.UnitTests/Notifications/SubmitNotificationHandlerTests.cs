@@ -198,18 +198,19 @@ public class SubmitNotificationHandlerTests
             harness.Handler.SubmitAsync(ValidCommand("evt-1"), CancellationToken.None));
     }
 
-    // WhatsApp remains only as a compatibility tombstone for historical rows, never as an accepted route.
     [Fact]
-    public async Task Submit_ThrowsForWhatsApp_UntilTheChannelIsWired()
+    public async Task Submit_RoutesWhatsAppToItsOwnOutboxType()
     {
         var harness = Build();
         var command = new SubmitNotificationCommand(
-            DevTenant, NotificationChannel.WhatsApp, "+5511999990000", "hello", "body", null);
+            DevTenant, NotificationChannel.WhatsApp, "+5511999990000", null, "body", null);
 
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
-            harness.Handler.SubmitAsync(command, CancellationToken.None));
+        await harness.Handler.SubmitAsync(command, CancellationToken.None);
 
-        // Fail loudly means route nowhere: nothing was persisted for the unwired channel.
-        Assert.Equal(0, harness.Store.SaveCalls);
+        // The routing key is what the dispatcher switches on, so a channel that lands under the wrong
+        // type is poison rather than a delivery.
+        Assert.Equal("whatsapp", harness.Store.SavedOutbox!.Type);
+        Assert.Equal(NotificationChannel.WhatsApp, harness.Store.SavedRequest!.Channel);
+        Assert.Null(harness.Store.SavedRequest.Subject);
     }
 }
