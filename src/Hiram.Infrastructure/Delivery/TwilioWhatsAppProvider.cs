@@ -4,20 +4,24 @@ using Hiram.Application.Delivery;
 
 namespace Hiram.Infrastructure.Delivery;
 
-public sealed class TwilioSmsProvider : ISmsProvider
+public sealed class TwilioWhatsAppProvider : IWhatsAppProvider
 {
-    private const string Channel = "Twilio SMS";
+    private const string Channel = "Twilio WhatsApp";
+
+    // The Messages resource tells WhatsApp from SMS by the address prefix alone. It lives here and
+    // nowhere else, so notification_requests, the fan-out and the E.164 rule all keep the bare number.
+    private const string AddressPrefix = "whatsapp:";
 
     private readonly HttpClient _http;
 
-    public TwilioSmsProvider(HttpClient http)
+    public TwilioWhatsAppProvider(HttpClient http)
     {
         _http = http;
     }
 
-    public string Name => "twilio-sms";
+    public string Name => "twilio-whatsapp";
 
-    public async Task<SendOutcome> SendAsync(SmsMessage message, SmsProviderSettings settings, CancellationToken cancellationToken)
+    public async Task<SendOutcome> SendAsync(WhatsAppMessage message, WhatsAppProviderSettings settings, CancellationToken cancellationToken)
     {
         var accountSid = settings.Values.GetValueOrDefault("account_sid");
         var from = settings.Values.GetValueOrDefault("from");
@@ -28,19 +32,18 @@ public sealed class TwilioSmsProvider : ISmsProvider
             || string.IsNullOrWhiteSpace(apiKeySid)
             || string.IsNullOrWhiteSpace(apiKeySecret))
             return new SendOutcome.PermanentFailure(
-                "Twilio SMS requires account_sid, from, api_key_sid and an api key secret.");
+                "Twilio WhatsApp requires account_sid, from, api_key_sid and an api key secret.");
 
-        var body = BodyFor(message, settings);
-        if (body is null)
-            return new SendOutcome.PermanentFailure("Trial mode requires trial_template in the provider settings.");
-
+        // The notification body goes out as written. Unlike SMS and email, the sandbox accepts free text
+        // inside the 24h session the recipient opens by joining; outside it Twilio answers 63016, which
+        // classifies as permanent and names itself in the dead letter, so a replay after a rejoin works.
         using var request = new HttpRequestMessage(HttpMethod.Post, $"2010-04-01/Accounts/{accountSid}/Messages.json")
         {
             Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
-                ["To"] = message.Recipient,
-                ["From"] = from,
-                ["Body"] = body
+                ["To"] = AddressPrefix + message.Recipient,
+                ["From"] = AddressPrefix + from,
+                ["Body"] = message.Body
             })
         };
         request.Headers.Authorization = new AuthenticationHeaderValue(
@@ -60,16 +63,5 @@ public sealed class TwilioSmsProvider : ISmsProvider
             // Transport failures and timeouts are worth another attempt.
             return new SendOutcome.TransientFailure($"{Channel} request failed: {ex.Message}");
         }
-    }
-
-    // A trial account rejects free text and accepts only the key of one of its canned messages, which it
-    // expands into the final text on its side. The notification body stays persisted either way (ADR-028).
-    private static string? BodyFor(SmsMessage message, SmsProviderSettings settings)
-    {
-        if (!string.Equals(settings.Values.GetValueOrDefault("trial_mode"), "true", StringComparison.OrdinalIgnoreCase))
-            return message.Body;
-
-        var template = settings.Values.GetValueOrDefault("trial_template");
-        return string.IsNullOrWhiteSpace(template) ? null : template;
     }
 }

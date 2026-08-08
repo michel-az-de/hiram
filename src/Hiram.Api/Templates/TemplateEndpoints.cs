@@ -33,7 +33,7 @@ internal static class TemplateEndpoints
         var channel = ParseChannel(request.Channel);
         var errors = new Dictionary<string, string[]>();
         if (channel is null)
-            errors[nameof(request.Channel)] = ["Channel must be one of: email, sms."];
+            errors[nameof(request.Channel)] = ["Channel must be one of: email, sms, whatsapp."];
         else
             ValidateSubject(renderer, channel.Value, request.Subject, errors);
         if (string.IsNullOrWhiteSpace(request.Name))
@@ -123,7 +123,8 @@ internal static class TemplateEndpoints
     }
 
     // The channel decides whether a subject belongs here at all: email renders one as the subject line,
-    // SMS has nowhere to put it, so accepting one there would store a value that never reaches anyone.
+    // SMS and WhatsApp have nowhere to put it, so accepting one there would store a value that never
+    // reaches anyone.
     private static void ValidateSubject(
         ITemplateRenderer renderer, NotificationChannel channel, string? subject, Dictionary<string, string[]> errors)
     {
@@ -163,6 +164,7 @@ internal static class TemplateEndpoints
         {
             "email" => NotificationChannel.Email,
             "sms" => NotificationChannel.Sms,
+            "whatsapp" => NotificationChannel.WhatsApp,
             _ => null
         };
 

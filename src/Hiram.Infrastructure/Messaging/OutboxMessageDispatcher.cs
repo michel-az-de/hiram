@@ -9,6 +9,7 @@ public sealed class OutboxMessageDispatcher
     private readonly EmailChannelDelivery _email;
     private readonly PushChannelDelivery _push;
     private readonly SmsChannelDelivery _sms;
+    private readonly WhatsAppChannelDelivery _whatsApp;
     private readonly EventMessageProcessor _event;
     private readonly WebhookDeliveryProcessor _webhook;
 
@@ -17,6 +18,7 @@ public sealed class OutboxMessageDispatcher
         EmailChannelDelivery email,
         PushChannelDelivery push,
         SmsChannelDelivery sms,
+        WhatsAppChannelDelivery whatsApp,
         EventMessageProcessor @event,
         WebhookDeliveryProcessor webhook)
     {
@@ -24,6 +26,7 @@ public sealed class OutboxMessageDispatcher
         _email = email;
         _push = push;
         _sms = sms;
+        _whatsApp = whatsApp;
         _event = @event;
         _webhook = webhook;
     }
@@ -38,6 +41,7 @@ public sealed class OutboxMessageDispatcher
             "push" => _delivery.ProcessAsync(_push, body, cancellationToken),
             "sms" => _delivery.ProcessAsync(_sms, body, cancellationToken),
             "webhook" => _webhook.ProcessAsync(body, cancellationToken),
+            "whatsapp" => _delivery.ProcessAsync(_whatsApp, body, cancellationToken),
             _ => throw new PoisonMessageException($"Outbox message type '{message.Type}' is not supported.")
         };
     }

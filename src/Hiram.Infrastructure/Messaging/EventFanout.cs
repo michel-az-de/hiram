@@ -94,6 +94,8 @@ public sealed class EventFanout
                 await FanOutEmailAsync(@event, item, cancellationToken);
             else if (item.Channel == NotificationChannel.Sms)
                 await FanOutSmsAsync(@event, item, cancellationToken);
+            else if (item.Channel == NotificationChannel.WhatsApp)
+                await FanOutWhatsAppAsync(@event, item, cancellationToken);
         }
     }
 
@@ -190,6 +192,54 @@ public sealed class EventFanout
         // An SMS has no subject line, so none is rendered and none is stored.
         await SaveFanoutAsync(
             @event, NotificationChannel.Sms, recipient.Trim(), subject: null, body, template.Version, cancellationToken);
+    }
+
+    private async Task FanOutWhatsAppAsync(OutboxEventPayload @event, FanoutItem item, CancellationToken cancellationToken)
+    {
+        // Consent already decided this channel above, and on WhatsApp that gate is fail-closed in every
+        // category: reaching here means an explicit opt-in exists, so nothing is re-checked.
+        var recipient = @event.Payload.RecipientPhone;
+        if (string.IsNullOrWhiteSpace(recipient))
+        {
+            // The routine wants WhatsApp but the emission carried no number: a retry cannot fix a missing contact.
+            _logger.LogWarning("Event {EventId} routed to whatsapp without a recipient phone, skipping", @event.EventId);
+            return;
+        }
+
+        if (!PhoneNumber.IsE164(recipient))
+        {
+            // The provider refuses anything else, so writing the row would only buy a guaranteed failure
+            // and a dead letter. The same rule the direct submit applies at the border.
+            _logger.LogWarning(
+                "Event {EventId} routed to whatsapp with a recipient that is not E.164, skipping", @event.EventId);
+            return;
+        }
+
+        var template = await _templates.FindByNameAsync(@event.TenantId, NotificationChannel.WhatsApp, item.TemplateName, cancellationToken);
+        if (template is null)
+        {
+            // Approval said the template existed; a delete between resolve and render lands here, not a send.
+            _logger.LogWarning(
+                "Template {Template} vanished before rendering event {EventId}, skipping", item.TemplateName, @event.EventId);
+            return;
+        }
+
+        string body;
+        try
+        {
+            body = _renderer.Render(template.Body, @event.Payload.Data ?? EmptyData);
+        }
+        catch (TemplateRenderException ex)
+        {
+            _logger.LogWarning(
+                ex, "Template {Template} failed to render for event {EventId}, skipping", item.TemplateName, @event.EventId);
+            return;
+        }
+
+        // A WhatsApp message has no subject line, so none is rendered and none is stored. The recipient
+        // stays a bare number: the "whatsapp:" prefix is assembled by the adapter at send time.
+        await SaveFanoutAsync(
+            @event, NotificationChannel.WhatsApp, recipient.Trim(), subject: null, body, template.Version, cancellationToken);
     }
 
     // The rendered message becomes a request and its outbox row in one transaction, the founding

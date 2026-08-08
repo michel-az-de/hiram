@@ -69,7 +69,8 @@ public class ProviderConfigEndpointsTests : IAsyncLifetime
     {
         var (client, _) = await NewTenant();
 
-        var response = await client.PutAsJsonAsync("/v1/providers/whatsapp",
+        // Push has subscriptions, not a provider config, so there is nothing here to read a row back.
+        var response = await client.PutAsJsonAsync("/v1/providers/push",
             new SetProviderConfigRequest("smtp", new Dictionary<string, string>(), null));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);

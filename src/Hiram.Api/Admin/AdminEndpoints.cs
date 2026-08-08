@@ -36,7 +36,7 @@ internal static class AdminEndpoints
 
         var channels = ParseChannels(request.Channels);
         if (channels.Count == 0)
-            errors[nameof(request.Channels)] = ["At least one valid channel is required (email, push, sms)."];
+            errors[nameof(request.Channels)] = ["At least one valid channel is required (email, push, sms, whatsapp)."];
 
         var category = ParseCategory(request.Category);
         if (category is null)
@@ -91,6 +91,9 @@ internal static class AdminEndpoints
                     break;
                 case "sms":
                     parsed.Add(NotificationChannel.Sms);
+                    break;
+                case "whatsapp":
+                    parsed.Add(NotificationChannel.WhatsApp);
                     break;
                 default:
                     return [];
