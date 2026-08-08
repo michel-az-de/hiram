@@ -67,6 +67,8 @@ public static class DependencyInjection
             client.BaseAddress = new Uri("https://comms.twilio.com/v1/"));
         services.AddHttpClient<ISmsProvider, TwilioSmsProvider>(client =>
             client.BaseAddress = new Uri("https://api.twilio.com/"));
+        services.AddHttpClient<IWhatsAppProvider, TwilioWhatsAppProvider>(client =>
+            client.BaseAddress = new Uri("https://api.twilio.com/"));
 
         return services;
     }

@@ -13,7 +13,8 @@ public interface ITemplateStore
 
     Task<IReadOnlyList<Template>> ListAsync(Guid tenantId, CancellationToken cancellationToken);
 
-    Task<bool> UpdateAsync(Guid tenantId, Guid id, string subject, string body, DateTimeOffset updatedAtUtc, CancellationToken cancellationToken);
+    // Subject is null on channels that render no subject line; the entity enforces the per-channel rule.
+    Task<bool> UpdateAsync(Guid tenantId, Guid id, string? subject, string body, DateTimeOffset updatedAtUtc, CancellationToken cancellationToken);
 
     Task<bool> ApproveAsync(Guid tenantId, Guid id, CancellationToken cancellationToken);
 

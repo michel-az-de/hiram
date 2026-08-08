@@ -97,6 +97,35 @@ public class ConsentTests
         Assert.Equal(expected, allowed);
     }
 
+    // Opening the sms surfaces does not give sms a policy of its own: it keeps the legitimate-interest
+    // default that email has, so transactional and operational pass without a record and marketing does not.
+    [Theory]
+    [InlineData(NotificationCategory.Transactional, true)]
+    [InlineData(NotificationCategory.Operational, true)]
+    [InlineData(NotificationCategory.Marketing, false)]
+    public async Task Sms_WithoutConsentRecord_KeepsLegitimateInterestDefault(NotificationCategory category, bool expected)
+    {
+        var policy = new ConsentPolicy(new FakeConsentStore { Current = null });
+
+        var allowed = await policy.IsAllowedAsync(Tenant, User, NotificationChannel.Sms, category, CancellationToken.None);
+
+        Assert.Equal(expected, allowed);
+    }
+
+    [Fact]
+    public async Task Sms_WithOptOutRecord_IsDenied()
+    {
+        var store = new FakeConsentStore
+        {
+            Current = new Consent(Guid.NewGuid(), Tenant, User, NotificationChannel.Sms, NotificationCategory.Operational, optIn: false, DateTimeOffset.UtcNow)
+        };
+        var policy = new ConsentPolicy(store);
+
+        var allowed = await policy.IsAllowedAsync(Tenant, User, NotificationChannel.Sms, NotificationCategory.Operational, CancellationToken.None);
+
+        Assert.False(allowed);
+    }
+
     [Fact]
     public async Task ConsentDualWrite_ReconcilesDrift()
     {

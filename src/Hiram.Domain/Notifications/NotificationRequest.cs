@@ -58,8 +58,9 @@ public sealed class NotificationRequest
         Status = NotificationStatus.Accepted;
     }
 
-    // An email carries a subject line and push renders one as the notification title. SMS has neither,
-    // so demanding one there would force callers to invent a value that never leaves the database.
+    // An email carries a subject line and push renders one as the notification title. SMS and WhatsApp
+    // have neither, so demanding one there would force callers to invent a value that never leaves the
+    // database.
     public static bool RequiresSubject(NotificationChannel channel) =>
         channel is NotificationChannel.Email or NotificationChannel.Push;
 

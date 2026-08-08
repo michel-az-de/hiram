@@ -15,7 +15,7 @@ internal sealed class TemplateConfiguration : IEntityTypeConfiguration<Template>
         builder.Property(x => x.TenantId).HasColumnName("tenant_id").IsRequired();
         builder.Property(x => x.Channel).HasColumnName("channel").HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(x => x.Name).HasColumnName("name").HasMaxLength(200).IsRequired();
-        builder.Property(x => x.Subject).HasColumnName("subject").IsRequired();
+        builder.Property(x => x.Subject).HasColumnName("subject");
         builder.Property(x => x.Body).HasColumnName("body").IsRequired();
         builder.Property(x => x.Approved).HasColumnName("approved").HasDefaultValue(false).IsRequired();
         builder.Property(x => x.Version).HasColumnName("version").HasDefaultValue(1).IsRequired();

@@ -53,9 +53,13 @@ public sealed class EventFanout
 
         if (decision.NoRoute)
         {
-            // No routine matched the event type: nothing to send, recorded and acked, not an error.
+            // No routine matched the event type: nothing to send, recorded and acked, not an error. The
+            // counter is what makes it visible: an emitter sending a type nobody routes looks exactly like
+            // a healthy system from the outside, and the log alone never reaches a dashboard.
             _logger.LogInformation(
                 "Event {EventId} of type {EventType} matched no routine", @event.EventId, @event.EventType);
+            HiramDiagnostics.EventsWithoutRoute.Add(
+                1, new KeyValuePair<string, object?>("hiram.event_type", @event.EventType));
             return;
         }
 
@@ -86,9 +90,12 @@ public sealed class EventFanout
                 continue;
             }
 
-            // Only email is wired in this slice; the other channels fan out in their own waves.
             if (item.Channel == NotificationChannel.Email)
                 await FanOutEmailAsync(@event, item, cancellationToken);
+            else if (item.Channel == NotificationChannel.Sms)
+                await FanOutSmsAsync(@event, item, cancellationToken);
+            else if (item.Channel == NotificationChannel.WhatsApp)
+                await FanOutWhatsAppAsync(@event, item, cancellationToken);
         }
     }
 
@@ -111,6 +118,16 @@ public sealed class EventFanout
             return;
         }
 
+        if (template.Subject is null)
+        {
+            // Email renders the subject as the subject line and the domain refuses to create an email
+            // template without one, so only a row written around the entity lands here. Deterministic, so
+            // it is skipped like a failed render instead of retried forever.
+            _logger.LogWarning(
+                "Template {Template} carries no subject for event {EventId}, skipping", item.TemplateName, @event.EventId);
+            return;
+        }
+
         string subject;
         string body;
         try
@@ -128,18 +145,128 @@ public sealed class EventFanout
             return;
         }
 
-        var messageKey = MessageKey(@event.EventId, NotificationChannel.Email, recipient, template.Version);
+        await SaveFanoutAsync(
+            @event, NotificationChannel.Email, recipient, subject, body, template.Version, cancellationToken);
+    }
+
+    private async Task FanOutSmsAsync(OutboxEventPayload @event, FanoutItem item, CancellationToken cancellationToken)
+    {
+        var recipient = @event.Payload.RecipientPhone;
+        if (string.IsNullOrWhiteSpace(recipient))
+        {
+            // The routine wants SMS but the emission carried no number: a retry cannot fix a missing contact.
+            _logger.LogWarning("Event {EventId} routed to sms without a recipient phone, skipping", @event.EventId);
+            return;
+        }
+
+        if (!PhoneNumber.IsE164(recipient))
+        {
+            // The carrier refuses anything else, so writing the row would only buy a guaranteed failure
+            // and a dead letter. The same rule the direct submit applies at the border.
+            _logger.LogWarning(
+                "Event {EventId} routed to sms with a recipient that is not E.164, skipping", @event.EventId);
+            return;
+        }
+
+        var template = await _templates.FindByNameAsync(@event.TenantId, NotificationChannel.Sms, item.TemplateName, cancellationToken);
+        if (template is null)
+        {
+            // Approval said the template existed; a delete between resolve and render lands here, not a send.
+            _logger.LogWarning(
+                "Template {Template} vanished before rendering event {EventId}, skipping", item.TemplateName, @event.EventId);
+            return;
+        }
+
+        string body;
+        try
+        {
+            body = _renderer.Render(template.Body, @event.Payload.Data ?? EmptyData);
+        }
+        catch (TemplateRenderException ex)
+        {
+            _logger.LogWarning(
+                ex, "Template {Template} failed to render for event {EventId}, skipping", item.TemplateName, @event.EventId);
+            return;
+        }
+
+        // An SMS has no subject line, so none is rendered and none is stored.
+        await SaveFanoutAsync(
+            @event, NotificationChannel.Sms, recipient.Trim(), subject: null, body, template.Version, cancellationToken);
+    }
+
+    private async Task FanOutWhatsAppAsync(OutboxEventPayload @event, FanoutItem item, CancellationToken cancellationToken)
+    {
+        // Consent already decided this channel above, and on WhatsApp that gate is fail-closed in every
+        // category: reaching here means an explicit opt-in exists, so nothing is re-checked.
+        var recipient = @event.Payload.RecipientPhone;
+        if (string.IsNullOrWhiteSpace(recipient))
+        {
+            // The routine wants WhatsApp but the emission carried no number: a retry cannot fix a missing contact.
+            _logger.LogWarning("Event {EventId} routed to whatsapp without a recipient phone, skipping", @event.EventId);
+            return;
+        }
+
+        if (!PhoneNumber.IsE164(recipient))
+        {
+            // The provider refuses anything else, so writing the row would only buy a guaranteed failure
+            // and a dead letter. The same rule the direct submit applies at the border.
+            _logger.LogWarning(
+                "Event {EventId} routed to whatsapp with a recipient that is not E.164, skipping", @event.EventId);
+            return;
+        }
+
+        var template = await _templates.FindByNameAsync(@event.TenantId, NotificationChannel.WhatsApp, item.TemplateName, cancellationToken);
+        if (template is null)
+        {
+            // Approval said the template existed; a delete between resolve and render lands here, not a send.
+            _logger.LogWarning(
+                "Template {Template} vanished before rendering event {EventId}, skipping", item.TemplateName, @event.EventId);
+            return;
+        }
+
+        string body;
+        try
+        {
+            body = _renderer.Render(template.Body, @event.Payload.Data ?? EmptyData);
+        }
+        catch (TemplateRenderException ex)
+        {
+            _logger.LogWarning(
+                ex, "Template {Template} failed to render for event {EventId}, skipping", item.TemplateName, @event.EventId);
+            return;
+        }
+
+        // A WhatsApp message has no subject line, so none is rendered and none is stored. The recipient
+        // stays a bare number: the "whatsapp:" prefix is assembled by the adapter at send time.
+        await SaveFanoutAsync(
+            @event, NotificationChannel.WhatsApp, recipient.Trim(), subject: null, body, template.Version, cancellationToken);
+    }
+
+    // The rendered message becomes a request and its outbox row in one transaction, the founding
+    // invariant. Every channel lands here, so the message key, the payload and the routing key stay
+    // identical across them and only the rendering above differs.
+    private async Task SaveFanoutAsync(
+        OutboxEventPayload @event,
+        NotificationChannel channel,
+        string recipient,
+        string? subject,
+        string body,
+        int templateVersion,
+        CancellationToken cancellationToken)
+    {
+        var messageKey = MessageKey(@event.EventId, channel, recipient, templateVersion);
         var now = _clock.UtcNow;
         var notificationId = Guid.NewGuid();
 
         var request = new NotificationRequest(
-            notificationId, @event.TenantId, NotificationChannel.Email, recipient, subject, body, now, messageKey);
+            notificationId, @event.TenantId, channel, recipient, subject, body, now, messageKey);
 
         var payload = new OutboxNotificationPayload(
-            notificationId, @event.TenantId, NotificationChannel.Email.ToString(), recipient, subject, body);
+            notificationId, @event.TenantId, channel.ToString(), recipient, subject, body);
 
+        // The outbox type is what OutboxMessageDispatcher routes on, and it keys on the lowercase name.
         var outbox = new OutboxMessage(
-            Guid.NewGuid(), @event.TenantId, "email", JsonSerializer.Serialize(payload), now, Activity.Current?.Id);
+            Guid.NewGuid(), @event.TenantId, Wire(channel), JsonSerializer.Serialize(payload), now, Activity.Current?.Id);
 
         try
         {
@@ -150,16 +277,19 @@ public sealed class EventFanout
             // The deterministic message key already produced this exact message: a redelivery or replay of
             // the event, not a new send. The unique index is the arbiter, so drop it and let the worker ack.
             _logger.LogInformation(
-                "Event {EventId} email to {Recipient} already fanned out, skipping", @event.EventId, recipient);
+                "Event {EventId} {Channel} to {Recipient} already fanned out, skipping",
+                @event.EventId, Wire(channel), recipient);
         }
     }
+
+    private static string Wire(NotificationChannel channel) => channel.ToString().ToLowerInvariant();
 
     // ADR-017 message key: hash(event_id, channel, recipient, template_version). Transactional events have
     // no schedule slot, so the slot collapses and the key degenerates to these four fields. Frozen with the
     // message, never recomputed at delivery, so a redelivery or replay resolves to the same row.
     private static string MessageKey(string eventId, NotificationChannel channel, string recipient, int templateVersion)
     {
-        var canonical = $"{eventId}\n{channel.ToString().ToLowerInvariant()}\n{recipient}\n{templateVersion}";
+        var canonical = $"{eventId}\n{Wire(channel)}\n{recipient}\n{templateVersion}";
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
     }
 }
