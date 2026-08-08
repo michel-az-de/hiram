@@ -6,6 +6,8 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Superficies de configuracao abertas ao canal `sms`: `POST /v1/templates`, o campo `channels` de
+  `POST /v1/admin/routines` e `POST /v1/consent`. Sem elas nao havia o que um evento entregar por SMS.
 - Canal SMS entregue pela Twilio: porta `ISmsProvider`, adapter `twilio-sms` sobre o recurso Messages
   e `PUT /v1/providers/sms` para o tenant configurar a propria conta de operadora. Sem provider
   configurado o envio falha como permanente, sem chamar a rede, porque o credito e do tenant.
@@ -20,6 +22,8 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 ### Changed
 - Torna `subject` opcional por canal. A coluna passa a aceitar nulo por migration e a obrigatoriedade
   vive no dominio, exigida em email e push, ausente em SMS.
+- Estende a mesma regra a `templates.subject`, por migration nova. Um template de email continua
+  exigindo subject e um de SMS recusa qualquer subject, porque ele nunca seria renderizado.
 - Extrai a mecanica comum de entrega (claim, bloqueio, modo shadow, tentativa, dead letter e webhook)
   do processor de email para um processor de canal reutilizavel. Cada canal contribui apenas com a
   montagem da mensagem e a chamada ao adapter.

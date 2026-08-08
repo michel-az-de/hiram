@@ -90,7 +90,8 @@ internal static class NotificationEndpoints
             try
             {
                 // Rendered at submit and stored, so the worker, dead letter and replay stay template unaware.
-                subject = renderer.Render(template.Subject, request.Data ?? EmptyData);
+                // A template for a channel with no subject line carries none, and none is rendered.
+                subject = template.Subject is null ? null : renderer.Render(template.Subject, request.Data ?? EmptyData);
                 body = renderer.Render(template.Body, request.Data ?? EmptyData);
             }
             catch (TemplateRenderException ex)

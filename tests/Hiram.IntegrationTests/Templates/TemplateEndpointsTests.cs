@@ -151,6 +151,89 @@ public class TemplateEndpointsTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Create_AcceptsAnSmsTemplate_WithoutASubject()
+    {
+        var client = await NewTenantClient();
+
+        var created = await client.PostAsJsonAsync("/v1/templates",
+            new CreateTemplateRequest("sms", "entrega", Subject: null, "Seu pedido saiu, {{ name }}"));
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var body = (await created.Content.ReadFromJsonAsync<TemplateDto>())!;
+        Assert.Equal("sms", body.Channel);
+        Assert.Null(body.Subject);
+    }
+
+    [Fact]
+    public async Task Create_RejectsASubject_OnTheSmsChannel()
+    {
+        var client = await NewTenantClient();
+
+        // An SMS carries no subject line, so a stored subject would be a value that never reaches anyone.
+        var response = await client.PostAsJsonAsync("/v1/templates",
+            new CreateTemplateRequest("sms", "entrega", "Nao deveria existir", "corpo"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_StillRequiresASubject_OnTheEmailChannel()
+    {
+        var client = await NewTenantClient();
+
+        var response = await client.PostAsJsonAsync("/v1/templates",
+            new CreateTemplateRequest("email", "welcome", Subject: null, "Welcome"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_AllowsTheSameName_OnEmailAndSms()
+    {
+        var client = await NewTenantClient();
+
+        var email = await client.PostAsJsonAsync("/v1/templates",
+            new CreateTemplateRequest("email", "pedido", "Seu pedido", "Corpo"));
+        Assert.Equal(HttpStatusCode.Created, email.StatusCode);
+
+        // The unique index is per tenant and channel, so one routine name can fan out to both channels.
+        var sms = await client.PostAsJsonAsync("/v1/templates",
+            new CreateTemplateRequest("sms", "pedido", Subject: null, "Corpo"));
+        Assert.Equal(HttpStatusCode.Created, sms.StatusCode);
+    }
+
+    [Fact]
+    public async Task Approve_AcceptsAnSmsTemplate()
+    {
+        var client = await NewTenantClient();
+        var created = await client.PostAsJsonAsync("/v1/templates",
+            new CreateTemplateRequest("sms", "entrega", Subject: null, "Seu pedido saiu"));
+        var id = (await created.Content.ReadFromJsonAsync<TemplateDto>())!.Id;
+
+        // Without approval the routine engine suppresses the channel, so this is on the fan-out path.
+        var approved = await client.PostAsync($"/v1/templates/{id}/approve", null);
+
+        Assert.Equal(HttpStatusCode.NoContent, approved.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_AcceptsANullSubject_OnTheSmsChannel()
+    {
+        var client = await NewTenantClient();
+        var created = await client.PostAsJsonAsync("/v1/templates",
+            new CreateTemplateRequest("sms", "entrega", Subject: null, "Corpo"));
+        var id = (await created.Content.ReadFromJsonAsync<TemplateDto>())!.Id;
+
+        var updated = await client.PutAsJsonAsync($"/v1/templates/{id}",
+            new UpdateTemplateRequest(Subject: null, "Outro corpo"));
+
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        var body = (await updated.Content.ReadFromJsonAsync<TemplateDto>())!;
+        Assert.Null(body.Subject);
+        Assert.Equal("Outro corpo", body.Body);
+    }
+
     private async Task<HttpClient> NewTenantClient()
     {
         var admin = _factory!.CreateClient();
@@ -173,5 +256,5 @@ public class TemplateEndpointsTests : IAsyncLifetime
 
     private sealed record ApiKeyCreatedDto(Guid Id, Guid TenantId, string Name, string Key, string Prefix);
 
-    private sealed record TemplateDto(Guid Id, string Channel, string Name, string Subject, string Body);
+    private sealed record TemplateDto(Guid Id, string Channel, string Name, string? Subject, string Body);
 }

@@ -31,7 +31,7 @@ internal static class ConsentEndpoints
         if (request.UserId == Guid.Empty)
             errors[nameof(request.UserId)] = ["userId is required."];
         if (channel is null)
-            errors[nameof(request.Channel)] = ["channel must be one of: email, push."];
+            errors[nameof(request.Channel)] = ["channel must be one of: email, push, sms."];
         if (category is null)
             errors[nameof(request.Category)] = ["category must be one of: transactional, operational, marketing."];
         if (errors.Count > 0)
@@ -49,6 +49,7 @@ internal static class ConsentEndpoints
         {
             "email" => NotificationChannel.Email,
             "push" => NotificationChannel.Push,
+            "sms" => NotificationChannel.Sms,
             _ => null
         };
 
