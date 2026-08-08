@@ -304,6 +304,12 @@ namespace Hiram.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<bool>("TrialContent")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("trial_content");
+
                     b.HasKey("Id");
 
                     b.HasIndex("NotificationId")
@@ -576,7 +582,6 @@ namespace Hiram.Infrastructure.Persistence.Migrations
                         .HasColumnName("name");
 
                     b.Property<string>("Subject")
-                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("subject");
 

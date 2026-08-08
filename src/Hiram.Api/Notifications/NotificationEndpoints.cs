@@ -90,7 +90,8 @@ internal static class NotificationEndpoints
             try
             {
                 // Rendered at submit and stored, so the worker, dead letter and replay stay template unaware.
-                subject = renderer.Render(template.Subject, request.Data ?? EmptyData);
+                // A template for a channel with no subject line carries none, and none is rendered.
+                subject = template.Subject is null ? null : renderer.Render(template.Subject, request.Data ?? EmptyData);
                 body = renderer.Render(template.Body, request.Data ?? EmptyData);
             }
             catch (TemplateRenderException ex)
@@ -153,7 +154,7 @@ internal static class NotificationEndpoints
 
         NotificationChannel? channelFilter = null;
         if (channel is not null && (channelFilter = ParseChannel(channel)) is null)
-            return Results.ValidationProblem(new Dictionary<string, string[]> { ["channel"] = ["Channel must be one of: email, push, sms."] });
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["channel"] = ["Channel must be one of: email, push, sms, whatsapp."] });
 
         DateTimeOffset? cursorCreatedAt = null;
         Guid? cursorId = null;
@@ -222,17 +223,18 @@ internal static class NotificationEndpoints
             attempt.Duration.TotalMilliseconds,
             attempt.Shadowed,
             attempt.PayloadHash,
-            attempt.CreatedAtUtc);
+            attempt.CreatedAtUtc,
+            attempt.TrialContent);
 
     private static Dictionary<string, string[]> Validate(SubmitNotificationRequest request, NotificationChannel? channel)
     {
         var errors = new Dictionary<string, string[]>();
 
         if (channel is null)
-            errors[nameof(request.Channel)] = ["Channel must be one of: email, push, sms."];
+            errors[nameof(request.Channel)] = ["Channel must be one of: email, push, sms, whatsapp."];
         if (string.IsNullOrWhiteSpace(request.Recipient))
             errors[nameof(request.Recipient)] = ["Recipient is required."];
-        else if (channel == NotificationChannel.Sms && !IsE164(request.Recipient))
+        else if (channel is NotificationChannel.Sms or NotificationChannel.WhatsApp && !PhoneNumber.IsE164(request.Recipient))
             errors[nameof(request.Recipient)] = ["Recipient must be a phone number in E.164 format, such as +5511999999999."];
 
         var hasTemplate = !string.IsNullOrWhiteSpace(request.Template);
@@ -259,13 +261,9 @@ internal static class NotificationEndpoints
             "email" => NotificationChannel.Email,
             "push" => NotificationChannel.Push,
             "sms" => NotificationChannel.Sms,
+            "whatsapp" => NotificationChannel.WhatsApp,
             _ => null
         };
-
-    // E.164: a plus sign, a country code that cannot start at zero, and at most 15 digits overall. A
-    // carrier rejects anything else, so catching it at submit keeps a guaranteed failure out of the outbox.
-    private static bool IsE164(string recipient) =>
-        System.Text.RegularExpressions.Regex.IsMatch(recipient.Trim(), @"^\+[1-9]\d{7,14}$");
 
     private static NotificationStatus? ParseStatus(string status) =>
         status.Trim().ToLowerInvariant() switch

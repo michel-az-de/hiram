@@ -9,8 +9,10 @@ public abstract record SendOutcome
     }
 
     // ProviderMessageId is the provider's own id for the accepted message, null when the provider returns
-    // none such as SMTP. It is the handle a status callback matches on.
-    public sealed record Sent(string? ProviderMessageId = null) : SendOutcome;
+    // none such as SMTP. It is the handle a status callback matches on. TrialContent is true when the
+    // adapter sent approved content instead of the notification body, which a trial account forces
+    // (ADR-028): without it the history would claim to have delivered a text that never left.
+    public sealed record Sent(string? ProviderMessageId = null, bool TrialContent = false) : SendOutcome;
 
     public sealed record TransientFailure(string Reason) : SendOutcome;
 
