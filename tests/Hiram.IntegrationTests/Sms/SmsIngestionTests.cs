@@ -105,6 +105,38 @@ public class SmsIngestionTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 
+    [Fact]
+    public async Task AdminRoutines_AcceptTheSmsChannel_AlongsideEmail()
+    {
+        var (_, tenantId) = await NewTenant();
+        var admin = _factory!.CreateClient();
+        admin.DefaultRequestHeaders.Add("X-Admin-Key", AdminKey);
+
+        // A routine that names sms is what the event fan-out reads, so the admin surface has to store it.
+        var response = await admin.PostAsJsonAsync("/v1/admin/routines", new
+        {
+            tenantId,
+            eventType = "pedido_enviado",
+            templateName = "entrega",
+            channels = new[] { "email", "sms" },
+            category = "transactional",
+            active = true
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Consent_AcceptsTheSmsChannel()
+    {
+        var (client, _) = await NewTenant();
+
+        var response = await client.PostAsJsonAsync("/v1/consent",
+            new SetConsentRequest(Guid.NewGuid(), "sms", "marketing", OptIn: true));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
     private async Task<(HttpClient Client, Guid TenantId)> NewTenant()
     {
         var admin = _factory!.CreateClient();

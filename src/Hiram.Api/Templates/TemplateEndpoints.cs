@@ -33,15 +33,17 @@ internal static class TemplateEndpoints
         var channel = ParseChannel(request.Channel);
         var errors = new Dictionary<string, string[]>();
         if (channel is null)
-            errors[nameof(request.Channel)] = ["Channel must be one of: email."];
+            errors[nameof(request.Channel)] = ["Channel must be one of: email, sms."];
+        else
+            ValidateSubject(renderer, channel.Value, request.Subject, errors);
         if (string.IsNullOrWhiteSpace(request.Name))
             errors[nameof(request.Name)] = ["Name is required."];
-        ValidateTemplate(renderer, request.Subject, request.Body, errors);
+        ValidateBody(renderer, request.Body, errors);
         if (errors.Count > 0)
             return Results.ValidationProblem(errors);
 
         var template = new Template(
-            Guid.NewGuid(), tenant.TenantId, channel!.Value, request.Name, request.Subject, request.Body, clock.UtcNow);
+            Guid.NewGuid(), tenant.TenantId, channel!.Value, request.Name, Normalize(request.Subject), request.Body, clock.UtcNow);
         try
         {
             await store.AddAsync(template, cancellationToken);
@@ -82,12 +84,19 @@ internal static class TemplateEndpoints
         IClock clock,
         CancellationToken cancellationToken)
     {
+        // Whether a subject is allowed depends on the channel, and only the stored template knows it.
+        var existing = await store.GetAsync(tenant.TenantId, id, cancellationToken);
+        if (existing is null)
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Template not found");
+
         var errors = new Dictionary<string, string[]>();
-        ValidateTemplate(renderer, request.Subject, request.Body, errors);
+        ValidateSubject(renderer, existing.Channel, request.Subject, errors);
+        ValidateBody(renderer, request.Body, errors);
         if (errors.Count > 0)
             return Results.ValidationProblem(errors);
 
-        var updated = await store.UpdateAsync(tenant.TenantId, id, request.Subject, request.Body, clock.UtcNow, cancellationToken);
+        var updated = await store.UpdateAsync(
+            tenant.TenantId, id, Normalize(request.Subject), request.Body, clock.UtcNow, cancellationToken);
         if (!updated)
             return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Template not found");
 
@@ -113,13 +122,26 @@ internal static class TemplateEndpoints
             : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Template not found");
     }
 
-    private static void ValidateTemplate(ITemplateRenderer renderer, string? subject, string body, Dictionary<string, string[]> errors)
+    // The channel decides whether a subject belongs here at all: email renders one as the subject line,
+    // SMS has nowhere to put it, so accepting one there would store a value that never reaches anyone.
+    private static void ValidateSubject(
+        ITemplateRenderer renderer, NotificationChannel channel, string? subject, Dictionary<string, string[]> errors)
     {
+        if (!NotificationRequest.RequiresSubject(channel))
+        {
+            if (!string.IsNullOrWhiteSpace(subject))
+                errors["subject"] = [$"Subject must be omitted on the {Wire(channel)} channel."];
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(subject))
             errors["subject"] = ["Subject is required."];
         else if (!renderer.TryValidate(subject, out var subjectError))
             errors["subject"] = [$"Template syntax error: {subjectError}"];
+    }
 
+    private static void ValidateBody(ITemplateRenderer renderer, string body, Dictionary<string, string[]> errors)
+    {
         if (string.IsNullOrWhiteSpace(body))
             errors["body"] = ["Body is required."];
         else if (!renderer.TryValidate(body, out var bodyError))
@@ -129,7 +151,7 @@ internal static class TemplateEndpoints
     private static TemplateResponse ToResponse(Template template) =>
         new(
             template.Id,
-            template.Channel.ToString().ToLowerInvariant(),
+            Wire(template.Channel),
             template.Name,
             template.Subject,
             template.Body,
@@ -140,6 +162,13 @@ internal static class TemplateEndpoints
         channel?.Trim().ToLowerInvariant() switch
         {
             "email" => NotificationChannel.Email,
+            "sms" => NotificationChannel.Sms,
             _ => null
         };
+
+    private static string Wire(NotificationChannel channel) => channel.ToString().ToLowerInvariant();
+
+    // A blank subject is an absent one. Storing the whitespace instead would leave a value the renderer
+    // would then render onto a channel that has nowhere to put it.
+    private static string? Normalize(string? subject) => string.IsNullOrWhiteSpace(subject) ? null : subject;
 }
