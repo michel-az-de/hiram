@@ -132,14 +132,43 @@ create_template() {
   code=$(tenant_post_code /v1/templates "$payload")
   case "$code" in
     2*) echo "  template $name criado" ;;
-    409) echo "  template $name ja existia" ;;
+    409) ;;
     *) echo "  falha ao criar o template $name (HTTP $code)" >&2; exit 1 ;;
   esac
 
   id=$(template_id "$name" || true)
   [ -n "$id" ] || { echo "  template $name nao apareceu na listagem" >&2; exit 1; }
+  [ "$code" != 409 ] || sync_template "$id" "$name" "$subject" "$body"
+
   curl -fsS -o /dev/null -X POST "$BASE/v1/templates/$id/approve" -H "X-Api-Key: $(api_key)"
   echo "  template $name aprovado ($id)"
+}
+
+# A correction to the content has to reach whoever already ran the script, so an existing template is
+# updated instead of left alone. The update bumps the template version and drops the approval, and the
+# version composes the message key, so it only happens when the content really changed.
+sync_template() {
+  local id="$1" name="$2" subject="$3" body="$4"
+
+  if [ "$(remote_value "$id" subject)" = "$(json_escape "$subject")" ] \
+    && [ "$(remote_value "$id" body)" = "$(json_escape "$body")" ]; then
+    echo "  template $name ja existia com o conteudo atual"
+    return
+  fi
+
+  curl -fsS -o /dev/null -X PUT "$BASE/v1/templates/$id" \
+    -H "X-Api-Key: $(api_key)" -H 'Content-Type: application/json' \
+    -d "$(printf '{"subject":"%s","body":"%s"}' "$(json_escape "$subject")" "$(json_escape "$body")")"
+  echo "  template $name atualizado"
+}
+
+# Compares the value as JSON, which is what both sides already have in hand. Content whose encoding
+# differs from json_escape costs one extra update, never a wrong one.
+remote_value() {
+  curl -fsS "$BASE/v1/templates/$1" -H "X-Api-Key: $(api_key)" \
+    | grep -oE "\"$2\":\"([^\"\\\\]|\\\\.)*\"" \
+    | head -1 \
+    | sed -E "s/^\"$2\":\"//; s/\"\$//"
 }
 
 # Splitting the array on the opening brace isolates each template: id and name are serialized before
@@ -160,45 +189,60 @@ provision_templates() {
 
   create_template "verificacao-de-email" \
     "Confirme seu e-mail na Jornada do Candidato" \
-    "$(cat <<'HTML'
-<p>Ola,</p>
-<p>Recebemos o seu cadastro na Jornada do Candidato. O protocolo desta solicitacao e <strong>{{ Protocolo }}</strong>.</p>
-<p>Para confirmar o seu endereco de e-mail, acesse o endereco abaixo:</p>
-<p><a href='{{ LinkVerificacao }}'>{{ LinkVerificacao }}</a></p>
-<p>O link e valido ate {{ ExpiraEm }}. Depois disso sera necessario solicitar uma nova confirmacao.</p>
-<p>Se voce nao reconhece este cadastro, ignore esta mensagem.</p>
-<p>Confederacao Colunas de Luz, Jornada do Candidato.</p>
-HTML
+    "$(cat <<'TEXTO'
+Ola,
+
+Recebemos o seu cadastro na Jornada do Candidato. O protocolo desta solicitacao e {{ Protocolo }}.
+
+Para confirmar o seu endereco de e-mail, acesse o link abaixo:
+
+{{ LinkVerificacao }}
+
+O link e valido ate {{ ExpiraEm }}. Depois disso sera necessario solicitar uma nova confirmacao.
+
+Se voce nao reconhece este cadastro, ignore esta mensagem.
+
+Confederacao Colunas de Luz, Jornada do Candidato.
+TEXTO
 )"
 
   create_template "candidato-encaminhado" \
     "Sua Jornada avancou: voce foi encaminhado a uma Loja" \
-    "$(cat <<'HTML'
-<p>Ola, {{ Nome }}.</p>
-<p>A sua candidatura de protocolo <strong>{{ Protocolo }}</strong> foi encaminhada a uma Loja, que dara seguimento ao seu processo.</p>
-<p>Voce sera avisado por e-mail a cada nova etapa concluida. Nenhuma acao e necessaria neste momento.</p>
-<p>Confederacao Colunas de Luz, Jornada do Candidato.</p>
-HTML
+    "$(cat <<'TEXTO'
+Ola, {{ Nome }}.
+
+A sua candidatura de protocolo {{ Protocolo }} foi encaminhada a uma Loja, que dara seguimento ao seu processo.
+
+Voce sera avisado por e-mail a cada nova etapa concluida. Nenhuma acao e necessaria neste momento.
+
+Confederacao Colunas de Luz, Jornada do Candidato.
+TEXTO
 )"
 
   create_template "candidato-aprovado" \
     "Sua Jornada foi concluida com sucesso!" \
-    "$(cat <<'HTML'
-<p>Ola, {{ Nome }}.</p>
-<p>A sua candidatura de protocolo <strong>{{ Protocolo }}</strong> foi aprovada pela Loja e a sua Jornada esta concluida.</p>
-<p>A Loja entrara em contato com voce para os proximos passos.</p>
-<p>Confederacao Colunas de Luz, Jornada do Candidato.</p>
-HTML
+    "$(cat <<'TEXTO'
+Ola, {{ Nome }}.
+
+A sua candidatura de protocolo {{ Protocolo }} foi aprovada pela Loja e a sua Jornada esta concluida.
+
+A Loja entrara em contato com voce para os proximos passos.
+
+Confederacao Colunas de Luz, Jornada do Candidato.
+TEXTO
 )"
 
   create_template "candidato-recebido-pela-loja" \
     "A Loja confirmou seu recebimento" \
-    "$(cat <<'HTML'
-<p>Ola, {{ Nome }}.</p>
-<p>A Loja confirmou o recebimento da sua candidatura de protocolo <strong>{{ Protocolo }}</strong>.</p>
-<p>O seu processo segue em analise e voce sera avisado a cada mudanca de etapa.</p>
-<p>Confederacao Colunas de Luz, Jornada do Candidato.</p>
-HTML
+    "$(cat <<'TEXTO'
+Ola, {{ Nome }}.
+
+A Loja confirmou o recebimento da sua candidatura de protocolo {{ Protocolo }}.
+
+O seu processo segue em analise e voce sera avisado a cada mudanca de etapa.
+
+Confederacao Colunas de Luz, Jornada do Candidato.
+TEXTO
 )"
 }
 
