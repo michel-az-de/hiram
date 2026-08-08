@@ -6,6 +6,11 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Registro da substituicao de conteudo em modo trial na tentativa de entrega. Quando o adapter
+  `twilio-sms` ou `twilio-email` envia o conteudo pre-aprovado no lugar do corpo da notificacao, a
+  coluna nova `delivery_attempts.trial_content` marca a tentativa e o detalhe da notificacao passa a
+  expor o campo. Sem isso o historico afirmava ter entregue um texto que nunca saiu. Fecha o item de
+  acao 2.1 do ADR-028.
 - Canal WhatsApp entregue pelo sandbox da Twilio: porta `IWhatsAppProvider`, adapter
   `twilio-whatsapp` sobre o mesmo recurso Messages do SMS e `PUT /v1/providers/whatsapp`. O prefixo
   `whatsapp:` do `To` e do `From` e montado somente no adapter, entao a notificacao guarda o numero em

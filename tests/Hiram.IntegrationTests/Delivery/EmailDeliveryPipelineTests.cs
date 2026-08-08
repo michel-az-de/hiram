@@ -201,6 +201,24 @@ public class EmailDeliveryPipelineTests : IAsyncLifetime
         Assert.Single(attempts);
         Assert.Equal(DeliveryOutcome.Sent, attempts[0].Outcome);
         Assert.Equal("re_abc123", attempts[0].ProviderMessageId);
+
+        // A normal send delivered the notification itself, so nothing marks it as substituted.
+        Assert.False(attempts[0].TrialContent);
+    }
+
+    [Fact]
+    public async Task Process_PersistsTrialContent_WhenTheProviderSentApprovedContent()
+    {
+        var (tenantId, notificationId) = await Seed(DeliveryMode.Live);
+        var provider = new ScriptedProvider("fake", [new SendOutcome.Sent("re_abc123", TrialContent: true)]);
+
+        await using (var context = NewContext())
+            await Process(context, provider, PayloadFor(notificationId, tenantId));
+
+        // The notification keeps the body it was submitted with, and that body never left. Without this
+        // column the history would show a plain send and nothing would contradict it (ADR-028 item 2.1).
+        var attempts = await AttemptsFor(notificationId);
+        Assert.True(Assert.Single(attempts).TrialContent);
     }
 
     [Fact]

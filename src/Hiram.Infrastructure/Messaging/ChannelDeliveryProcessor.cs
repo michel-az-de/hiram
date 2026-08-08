@@ -257,7 +257,8 @@ public sealed class ChannelDeliveryProcessor
             error,
             duration,
             createdAtUtc,
-            providerMessageId: ProviderMessageId(outcome));
+            providerMessageId: ProviderMessageId(outcome),
+            trialContent: IsTrialContent(outcome));
 
         _context.DeliveryAttempts.Add(attempt);
         await _context.SaveChangesAsync(cancellationToken);
@@ -265,6 +266,9 @@ public sealed class ChannelDeliveryProcessor
 
     private static string? ProviderMessageId(SendOutcome outcome) =>
         outcome is SendOutcome.Sent sent ? sent.ProviderMessageId : null;
+
+    private static bool IsTrialContent(SendOutcome outcome) =>
+        outcome is SendOutcome.Sent { TrialContent: true };
 
     private static (DeliveryOutcome Outcome, string? Error) Map(SendOutcome outcome) => outcome switch
     {
