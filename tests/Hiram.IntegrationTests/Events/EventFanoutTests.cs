@@ -23,6 +23,7 @@ namespace Hiram.IntegrationTests.Events;
 public class EventFanoutTests
 {
     private static readonly Guid Tenant = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid Recipient = Guid.Parse("00000000-0000-0000-0000-0000000000aa");
     private static readonly DateTimeOffset Now = new(2026, 8, 8, 12, 0, 0, TimeSpan.Zero);
 
     private const string Phone = "+5511982254398";
@@ -81,6 +82,15 @@ public class EventFanoutTests
         public Task UpsertAsync(Consent consent, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
+    private sealed class ConsentRecords(params Consent[] consents) : IConsentStore
+    {
+        public Task<Consent?> GetAsync(Guid tenantId, Guid userId, NotificationChannel channel, NotificationCategory category, CancellationToken cancellationToken) =>
+            Task.FromResult(consents.FirstOrDefault(consent =>
+                consent.UserId == userId && consent.Channel == channel && consent.Category == category));
+
+        public Task UpsertAsync(Consent consent, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
     private sealed class NoBlocks : IBlockStore
     {
         public Task<IReadOnlyList<Block>> ActiveBlocksAsync(Guid tenantId, DateTimeOffset now, CancellationToken cancellationToken) =>
@@ -101,16 +111,23 @@ public class EventFanoutTests
     private static Template EmailTemplate(string name = "entrega") =>
         Approved(new Template(Guid.NewGuid(), Tenant, NotificationChannel.Email, name, "Pedido de {{ name }}", "Ola {{ name }}", Now));
 
+    private static Template WhatsAppTemplate(string name = "entrega") =>
+        Approved(new Template(Guid.NewGuid(), Tenant, NotificationChannel.WhatsApp, name, subject: null, "Ola {{ name }}, seu pedido saiu", Now));
+
     private static Template Approved(Template template)
     {
         template.Approve();
         return template;
     }
 
+    private static Consent OptIn(NotificationChannel channel, NotificationCategory category) =>
+        new(Guid.NewGuid(), Tenant, Recipient, channel, category, optIn: true, Now);
+
     private static Routine Routine(NotificationCategory category, params NotificationChannel[] channels) =>
         new(Guid.NewGuid(), Tenant, "pedido_enviado", "entrega", channels, category, active: true);
 
-    private static OutboxEventPayload Event(string? phone = Phone, string? email = Email, string eventId = "evt-1") =>
+    private static OutboxEventPayload Event(
+        string? phone = Phone, string? email = Email, string eventId = "evt-1", string? recipientUserId = null) =>
         new(
             Guid.NewGuid(),
             Tenant,
@@ -118,21 +135,25 @@ public class EventFanoutTests
             eventId,
             EmissionSeq: 1,
             new EventPayload(
-                RecipientUserId: null,
+                RecipientUserId: recipientUserId,
                 RecipientEmail: email,
                 RecipientPhone: phone,
                 LogicalAlertId: null,
                 Timezone: null,
                 new Dictionary<string, object?> { ["name"] = "Ada" }));
 
-    private static EventFanout Fanout(RecordingStore store, Routine routine, params Template[] templates)
+    private static EventFanout Fanout(RecordingStore store, Routine routine, params Template[] templates) =>
+        Fanout(store, new NoConsentRecords(), routine, templates);
+
+    private static EventFanout Fanout(
+        RecordingStore store, IConsentStore consents, Routine routine, params Template[] templates)
     {
         var catalog = new FakeRoutineCatalog(routine);
         var approvals = new ApprovedTemplates(templates);
 
         return new EventFanout(
             new RoutineResolver(catalog, approvals),
-            new ChannelResolver(new ConsentPolicy(new NoConsentRecords()), new BlockGate(new NoBlocks())),
+            new ChannelResolver(new ConsentPolicy(consents), new BlockGate(new NoBlocks())),
             approvals,
             new ScribanTemplateRenderer(),
             store,
@@ -247,6 +268,77 @@ public class EventFanoutTests
         var fanout = Fanout(store, Routine(NotificationCategory.Transactional, NotificationChannel.Sms), unapproved);
 
         await fanout.FanOutAsync(Event(), CancellationToken.None);
+
+        Assert.Empty(store.Saved);
+    }
+
+    [Fact]
+    public async Task WhatsAppRoute_WithoutAConsentRecord_WritesNothing()
+    {
+        var store = new RecordingStore();
+        var fanout = Fanout(
+            store, Routine(NotificationCategory.Transactional, NotificationChannel.WhatsApp), WhatsAppTemplate());
+
+        // WhatsApp is fail-closed in every category, transactional included: no record means no send.
+        // This is the load bearing property of the channel, and the reason the consent surface exists.
+        await fanout.FanOutAsync(Event(recipientUserId: Recipient.ToString()), CancellationToken.None);
+
+        Assert.Empty(store.Saved);
+    }
+
+    [Fact]
+    public async Task WhatsAppRoute_WithAnOptIn_WritesTheRequestAndAWhatsAppOutboxRow()
+    {
+        var store = new RecordingStore();
+        var fanout = Fanout(
+            store,
+            new ConsentRecords(OptIn(NotificationChannel.WhatsApp, NotificationCategory.Transactional)),
+            Routine(NotificationCategory.Transactional, NotificationChannel.WhatsApp),
+            WhatsAppTemplate());
+
+        await fanout.FanOutAsync(Event(recipientUserId: Recipient.ToString()), CancellationToken.None);
+
+        var (request, outbox) = Assert.Single(store.Saved);
+        Assert.Equal(NotificationChannel.WhatsApp, request.Channel);
+
+        // Stored bare: the "whatsapp:" prefix is assembled by the adapter, so a replay of this row does
+        // not depend on how the provider spells an address.
+        Assert.Equal(Phone, request.Recipient);
+        Assert.Null(request.Subject);
+        Assert.Equal("Ola Ada, seu pedido saiu", request.Body);
+        Assert.Equal("whatsapp", outbox.Type);
+        Assert.Equal(Tenant, outbox.TenantId);
+    }
+
+    [Fact]
+    public async Task WhatsAppRoute_WithoutAParseableRecipientUserId_WritesNothing()
+    {
+        var store = new RecordingStore();
+        var fanout = Fanout(
+            store,
+            new ConsentRecords(OptIn(NotificationChannel.WhatsApp, NotificationCategory.Transactional)),
+            Routine(NotificationCategory.Transactional, NotificationChannel.WhatsApp),
+            WhatsAppTemplate());
+
+        // With no user to look up there is no record to find, and an absent record denies on this channel.
+        // An emission that forgets the contact id therefore sends nothing rather than falling open.
+        await fanout.FanOutAsync(Event(recipientUserId: "nao-e-um-guid"), CancellationToken.None);
+
+        Assert.Empty(store.Saved);
+    }
+
+    [Fact]
+    public async Task WhatsAppRoute_WithAPhoneThatIsNotE164_WritesNothing()
+    {
+        var store = new RecordingStore();
+        var fanout = Fanout(
+            store,
+            new ConsentRecords(OptIn(NotificationChannel.WhatsApp, NotificationCategory.Transactional)),
+            Routine(NotificationCategory.Transactional, NotificationChannel.WhatsApp),
+            WhatsAppTemplate());
+
+        await fanout.FanOutAsync(
+            Event(phone: "11982254398", recipientUserId: Recipient.ToString()), CancellationToken.None);
 
         Assert.Empty(store.Saved);
     }
