@@ -10,6 +10,7 @@ public static class MessagingDependencyInjection
         services.AddScoped<EmailChannelDelivery>();
         services.AddScoped<PushChannelDelivery>();
         services.AddScoped<SmsChannelDelivery>();
+        services.AddScoped<WhatsAppChannelDelivery>();
         services.AddScoped<EventFanout>();
         services.AddScoped<EventMessageProcessor>();
         services.AddHttpClient<WebhookDeliveryProcessor>();
