@@ -30,7 +30,7 @@ template ja criado e a rotina existente volta como 200 em vez de virar duplicata
 | Subcomando | O que faz |
 |---|---|
 | `tenant` | Cria o tenant live e emite a api key do emissor. Grava `.jornada-tenant` e `.jornada-key` com permissao 600. |
-| `templates` | Cria e aprova os quatro templates de e-mail da jornada. Template ja existente responde 409 e e apenas aprovado de novo. |
+| `templates` | Cria e aprova os quatro templates de e-mail da jornada. Template ja existente tem o conteudo atualizado, quando ele mudou, e e aprovado de novo. |
 | `routines` | Liga cada eventType da jornada ao seu template, na categoria `transactional`. |
 | `consent` | Registra opt-in de e-mail transacional para os guids em `JORNADA_TEST_USER_IDS`. |
 | `all` | Executa os quatro na ordem. |
@@ -81,9 +81,13 @@ backup do ambiente.
   maquina sem restore), esses segredos deixam de descriptografar e precisam ser reconfigurados, mesmo
   com o banco intacto. O procedimento de backup e restore esta em `deploy/dr/` e no
   `docs/operations-runbook.md`.
-- O script nao reescreve conteudo de template ja existente: ele so garante que existe e esta aprovado.
-  Para trocar assunto ou corpo, use `PUT /v1/templates/{id}` e aprove de novo, lembrando que a mudanca
-  incrementa a versao e derruba a aprovacao anterior.
+- **Os corpos sao texto puro, nao HTML.** Nenhum provider de e-mail do Hiram entrega HTML hoje: o
+  `SmtpEmailProvider` monta `TextPart("plain")` e o `ResendEmailProvider` envia o corpo no campo
+  `text`. Um corpo com marcacao chegaria ao candidato com as tags a mostra. A parte `text/html` nos
+  adapters esta proposta na issue #114; quando ela existir, basta trocar o conteudo aqui.
+- Mudar assunto ou corpo no script e o caminho normal de correcao: uma reexecucao atualiza o template
+  que ja existe e o aprova de novo. A atualizacao so acontece quando o conteudo muda de fato, porque
+  ela incrementa a versao do template, e a versao compoe a chave de mensagem do fan-out.
 - O mesmo vale para rotina ja existente: `POST /v1/admin/routines` devolve a que esta la, sem alterar
   canais ou categoria. Nao existe endpoint de atualizacao de rotina, entao mudar o vinculo hoje exige
   desativar a linha antiga direto no banco.
