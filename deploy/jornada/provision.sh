@@ -154,6 +154,8 @@ template_id() {
 
 provision_templates() {
   require_hiram
+  # Resolve the key here so a missing state file says so, instead of surfacing as a 401 per template.
+  api_key > /dev/null
   echo "== templates de email =="
 
   create_template "verificacao-de-email" \
@@ -214,6 +216,8 @@ create_routine() {
 
 provision_routines() {
   require_hiram
+  # Same reason: without the tenant id the admin call would answer 404 instead of naming the cause.
+  tenant_id > /dev/null
   local channels
   channels=$(resolve_channels)
   echo "== rotinas (canais: $channels) =="
@@ -234,6 +238,7 @@ provision_consent() {
     echo "== consentimento: JORNADA_TEST_USER_IDS vazio, nada a registrar =="
     return
   fi
+  api_key > /dev/null
 
   echo "== consentimento de email transacional =="
   for user in $ids; do
