@@ -7,6 +7,13 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 
 ### Added
 - Provisionamento do tenant Jornada do Candidato em `deploy/jornada/`: script idempotente que cria o
+  tenant live, emite a api key do emissor, configura o provider de cada canal, aprova os templates da
+  jornada e liga cada eventType ao seu template. `JORNADA_CHANNELS` escolhe entre e-mail, SMS e
+  WhatsApp; o e-mail de verificacao permanece so no canal de e-mail. Reexecucao reaproveita o que ja
+  existe em vez de duplicar.
+- Onboarding de credencial Twilio por tenant no runbook operacional: o que vai em `settings` e o que vai
+  no segredo protegido, a dependencia do key ring, os limites da conta trial, o sandbox do WhatsApp,
+  rotacao e o roteiro de smoke manual, que fica fora do gate de CI.
   tenant live, emite a api key do emissor, aprova os templates de e-mail da jornada e liga cada
   eventType ao seu template. Reexecucao reaproveita o que ja existe em vez de duplicar.
 - Registro da substituicao de conteudo em modo trial na tentativa de entrega. Quando o adapter

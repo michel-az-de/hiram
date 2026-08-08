@@ -252,19 +252,19 @@ opt-out por STOP ou janela de sessao, que reabrem este ADR.
 
 ## Itens de acao
 
-1. [ ] Extrair a mecanica de entrega do `EmailNotificationProcessor` para um processor de canal
+1. [x] Extrair a mecanica de entrega do `EmailNotificationProcessor` para um processor de canal
    generico, sem mudanca de comportamento observavel.
-2. [ ] Adapter `twilio-email` como terceiro `IEmailProvider`, contra a Twilio Email API, com testes de
+2. [x] Adapter `twilio-email` como terceiro `IEmailProvider`, contra a Twilio Email API, com testes de
    stub, classificacao de erro e conteudo aprovado vindo de configuracao.
-2.1 [ ] Modo trial na configuracao de provider por tenant, com registro no `DeliveryAttempt`.
-3. [ ] `subject` nulo: migration, ajuste da entidade e validacao por canal no endpoint.
-4. [ ] Canal SMS: valor no enum, chave de roteamento, `ISmsProvider`, resolver, adapter Twilio
+2.1 [x] Modo trial na configuracao de provider por tenant, com registro no `DeliveryAttempt`.
+3. [x] `subject` nulo: migration, ajuste da entidade e validacao por canal no endpoint.
+4. [x] Canal SMS: valor no enum, chave de roteamento, `ISmsProvider`, resolver, adapter Twilio
    Messages, normalizacao E.164 e configuracao por tenant.
 5. [ ] Rota de callback de status fora de `/v1`, com verificacao de assinatura por provider.
 6. [ ] Estado de entrega derivado, idempotente por `(provider, message_sid, status)`.
 7. [ ] `ConsentPolicy` no caminho direto de `POST /v1/notifications`.
-8. [ ] Canal WhatsApp pelo sandbox do Twilio, com template de conteudo e consentimento obrigatorio.
-9. [ ] Documentar onboarding de credencial por tenant no runbook de operacao.
+8. [x] Canal WhatsApp pelo sandbox do Twilio, com template de conteudo e consentimento obrigatorio.
+9. [x] Documentar onboarding de credencial por tenant no runbook de operacao.
 
 ## Criterio de conclusao
 
@@ -272,3 +272,51 @@ Uma notificacao submetida em cada um dos tres canais e aceita, persistida, entre
 correlacionada pelo callback de status e visivel no detalhe da notificacao com a tentativa e o estado
 derivado. Build Release e suite completa verdes, sem credencial no repositorio e sem teste de rede no
 gate de merge.
+
+## Adendo de 2026-08-08: o que a onda entregou e o que ficou
+
+Esta e a segunda onda do ADR, depois da fatia de email que entrou pelos PRs #104, #106 e #109. Ela
+fechou os canais de mensagem e o elo operacional, e deixou o status loop para depois. O criterio de
+conclusao acima **nao esta cumprido**: falta a parte do callback e do estado derivado.
+
+### Entregue
+
+- **SMS no fan-out.** `PhoneNumber` centraliza a regra E.164, `EventFanout` renderiza e grava a
+  requisicao de SMS na mesma transacao do outbox, e template, rotina e consentimento passaram a aceitar
+  o canal. Itens 3 e 4. PRs #116 e #118.
+- **Canal WhatsApp pelo sandbox.** Porta `IWhatsAppProvider`, adapter `twilio-whatsapp`, resolver por
+  tenant e fan-out. O prefixo `whatsapp:` do endereco vive so no adapter, entao a requisicao, o fan-out e
+  a regra de E.164 guardam o numero puro. Item 8. PR #120.
+- **`trial_content` na tentativa.** O adapter informa quando o que saiu foi o conteudo pre-aprovado, e o
+  `DeliveryAttempt` grava isso, para que o historico nao afirme ter entregue um texto que nunca saiu.
+  Item 2.1. PR #122.
+- **Onboarding de credencial no runbook.** Secao 3 do `docs/operations-runbook.md`: o que vai em
+  `settings` e o que vai no `secret`, a dependencia do key ring, os limites do trial, o sandbox do
+  WhatsApp, rotacao e o roteiro de smoke manual, que nao entra no gate de CI. Item 9. PR #124.
+- **Provisionamento multicanal do tenant da Jornada.** `deploy/jornada/provision.sh` ganhou o subcomando
+  `providers` e passou a tratar `JORNADA_CHANNELS` de verdade. PRs #113 e #124.
+
+Nenhum destes PRs estava mergeado quando este adendo foi escrito: os itens estao marcados como
+concluidos porque o trabalho existe e foi verificado de ponta a ponta, e a fila de merge e o que resta.
+
+### Adiado, com a razao
+
+- **Callback de status e estado derivado (itens 5 e 6).** Exige uma rota publica fora de `/v1`, com um
+  terceiro esquema de assinatura no repositorio, e o trial nao oferece caminho alternativo: a consulta
+  individual responde 403 e a listagem vem vazia, entao nao da nem para conferir o resultado por
+  polling enquanto a rota nao existe. Fazer a rota agora seria endurecer superficie publica sem
+  conseguir comprovar o outro lado. Volta quando a conta sair do trial ou quando houver ambiente com
+  entrada publica.
+- **`ConsentPolicy` no caminho direto (item 7).** `POST /v1/notifications` nao carrega `userId` nem
+  `category`, que sao os dois argumentos da politica. Aplica-la ali exigiria acrescentar os dois campos
+  ao contrato publico, e isso muda o contrato de todo emissor existente, incluindo o EasyStok. E uma
+  decisao de contrato, nao um detalhe de implementacao, e merece a sua propria fatia. O gate continua
+  valendo no fan-out, que e por onde a Jornada emite.
+- **Pipeline de resiliencia por canal (borda 11).** Cada canal continua no pipeline comum. Separar os
+  limites hoje seria tuning sem medicao: nao ha volume real de SMS nem de WhatsApp para dizer qual
+  limite esta errado. O gatilho e o primeiro `429` recorrente ou o espacamento exigido pelo WhatsApp
+  aparecer em producao.
+- **Dead letter para evento sem rotina.** Hoje o evento sem rotina e logado, contado em
+  `hiram.events.no_route` e acked. Transformar isso em dead letter mudaria a semantica do ack para os
+  tenants que ja emitem tipos nao roteados de proposito, e o contador ja torna o caso visivel em painel.
+  Fica como decisao consciente, nao como esquecimento (ver issue #32).
