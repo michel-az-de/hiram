@@ -30,24 +30,34 @@ public class DeadLetterReplayTests : IAsyncLifetime
         public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
     }
 
-    private static DeadLetterMessage NewDeadLetter(Guid tenantId, Guid notificationId, string reason, int attempts) => new(
-        Guid.NewGuid(), tenantId, notificationId, NotificationChannel.Email,
-        JsonSerializer.Serialize(new OutboxNotificationPayload(notificationId, tenantId, "email", "ops@example.com", "s", "b")),
-        reason, attempts, DateTimeOffset.UtcNow);
+    private static string RecipientFor(NotificationChannel channel) =>
+        channel is NotificationChannel.Sms or NotificationChannel.WhatsApp ? "+5511999990000" : "ops@example.com";
 
-    private async Task<(Guid TenantId, Guid NotificationId)> SeedDeadLettered()
+    private static DeadLetterMessage NewDeadLetter(
+        Guid tenantId, Guid notificationId, string reason, int attempts, NotificationChannel channel = NotificationChannel.Email)
+    {
+        var recipient = RecipientFor(channel);
+        return new DeadLetterMessage(
+            Guid.NewGuid(), tenantId, notificationId, channel,
+            JsonSerializer.Serialize(new OutboxNotificationPayload(
+                notificationId, tenantId, channel.ToString().ToLowerInvariant(), recipient, "s", "b")),
+            reason, attempts, DateTimeOffset.UtcNow);
+    }
+
+    private async Task<(Guid TenantId, Guid NotificationId)> SeedDeadLettered(
+        NotificationChannel channel = NotificationChannel.Email)
     {
         var tenantId = Guid.NewGuid();
         var notificationId = Guid.NewGuid();
         await using var context = NewContext();
 
         var notification = new NotificationRequest(
-            notificationId, tenantId, NotificationChannel.Email, "ops@example.com", "s", "b", DateTimeOffset.UtcNow);
+            notificationId, tenantId, channel, RecipientFor(channel), "s", "b", DateTimeOffset.UtcNow);
         notification.MarkSending();
         notification.MarkDeadLettered();
 
         context.NotificationRequests.Add(notification);
-        context.DeadLetterMessages.Add(NewDeadLetter(tenantId, notificationId, "exhausted_transient:timeout", 3));
+        context.DeadLetterMessages.Add(NewDeadLetter(tenantId, notificationId, "exhausted_transient:timeout", 3, channel));
         await context.SaveChangesAsync();
         return (tenantId, notificationId);
     }
@@ -89,6 +99,29 @@ public class DeadLetterReplayTests : IAsyncLifetime
         var deadLetter = await verify.DeadLetterMessages.SingleAsync(d => d.NotificationId == notificationId);
         Assert.True(deadLetter.IsReplayed);
         Assert.Equal(NotificationStatus.Queued, (await verify.NotificationRequests.FindAsync(notificationId))!.Status);
+    }
+
+    // The routing key has to survive the trip back to the outbox, or the dispatcher never reaches the
+    // channel adapter. WhatsApp is the case that shows up in practice: the sandbox window closes and the
+    // only way back is a replay.
+    [Theory]
+    [InlineData(NotificationChannel.Email, "email")]
+    [InlineData(NotificationChannel.Push, "push")]
+    [InlineData(NotificationChannel.Sms, "sms")]
+    [InlineData(NotificationChannel.WhatsApp, "whatsapp")]
+    public async Task Replay_WritesOutbox_WithTheRoutingKeyOfTheChannel(NotificationChannel channel, string expectedType)
+    {
+        var (tenantId, notificationId) = await SeedDeadLettered(channel);
+
+        await using (var context = NewContext())
+        {
+            var outcome = await new DeadLetterReplay(context, new TestClock()).ReplayAsync(tenantId, notificationId, CancellationToken.None);
+            Assert.Equal(ReplayOutcome.Replayed, outcome);
+        }
+
+        await using var verify = NewContext();
+        var outbox = await verify.OutboxMessages.SingleAsync(o => o.TenantId == tenantId);
+        Assert.Equal(expectedType, outbox.Type);
     }
 
     [Fact]
