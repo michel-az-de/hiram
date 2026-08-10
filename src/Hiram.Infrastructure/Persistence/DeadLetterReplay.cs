@@ -64,10 +64,14 @@ public sealed class DeadLetterReplay : IDeadLetterReplay
         return ReplayOutcome.Replayed;
     }
 
+    // Every value of NotificationChannel belongs here: the key has to match what OutboxMessageDispatcher
+    // accepts, and a channel missing from this map makes its dead letters unrecoverable by replay.
     private static string RoutingKeyFor(NotificationChannel channel) => channel switch
     {
         NotificationChannel.Email => "email",
         NotificationChannel.Push => "push",
+        NotificationChannel.Sms => "sms",
+        NotificationChannel.WhatsApp => "whatsapp",
         _ => throw new ArgumentOutOfRangeException(nameof(channel), channel, "No routing key for channel.")
     };
 }
