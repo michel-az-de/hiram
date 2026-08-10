@@ -80,3 +80,10 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 - Remove RabbitMQ, o relay intermediario, consumers AMQP e o Testcontainer do broker. Processadores
   reivindicam o outbox diretamente no PostgreSQL.
 - Remove o projeto, processo e imagem Hiram.Dispatcher.
+
+### Fixed
+- Replay de dead letter volta a funcionar em SMS e WhatsApp. `DeadLetterReplay` mapeava a chave de
+  roteamento apenas de e-mail e push, entao `POST /v1/notifications/{id}/replay` respondia 500 nos dois
+  canais da ADR-028 e a mensagem ficava sem caminho de volta. A transacao ja fazia rollback, entao
+  nenhum estado corrompeu: o efeito era a recuperacao prometida nunca acontecer. E o caso normal do
+  sandbox do WhatsApp, onde a janela de 24 h fecha e o replay depois do join novo e a unica saida.
