@@ -100,6 +100,20 @@ decisiva. Não conflita com o fluxo async: tarefa clara segue sem bloquear; ambi
 **R14 (mantida).** Comunicação SEMPRE em pt-BR com o usuário. Código/identificadores/commits seguem o padrão do repo
 (ver PROJETO: código e mensagens de commit em inglês; ADRs, planos e docs em pt-BR; nunca travessão/em dash).
 
+**R20 (canônica, 2026-08-10).** **PR conflitante não se entrega ao autor.** Antes de reportar, de
+pedir a label `aprovado` ou de dizer que a tarefa está pronta, conferir
+`gh pr view <N> --json mergeable,mergeStateStatus` e exigir `MERGEABLE`. `CONFLICTING` significa que
+o trunk andou: trazer com `git merge origin/<TRUNK>`, resolver mantendo os dois lados quando a
+mudança for aditiva, revalidar pelo R4 e empurrar. **A conferência vale no instante do relatório,
+não no da abertura da PR.** Com mais de uma sessão na máquina o trunk anda entre uma coisa e outra:
+medido em 2026-08-10 no `atlas`, a PR #41 ficou conflitante três vezes dentro da mesma tarefa, e nas
+três o conflito nasceu depois de o CI já ter fechado verde. **CI verde não é portão completo**,
+porque ele testa a branch e não a integração dela com o trunk de agora.
+
+> As regras R15 a R19 da 4.1 ainda não foram propagadas para este repositório. A R20 mantém o número
+> canônico de propósito: o número identifica a regra em todos os projetos do autor, e o vão aqui é
+> deliberado, não erro.
+
 ## 2. CICLO DE VIDA DA TAREFA
 
 1. **ISSUE** (`gh issue create`, não-bloqueante) — título imperativo; body Contexto/Escopo/**Aceite (checkboxes)**;
@@ -110,6 +124,7 @@ decisiva. Não conflita com o fluxo async: tarefa clara segue sem bloquear; ambi
 5. **PR** `gh pr create --title "tipo(escopo): desc"` (título = mensagem do squash) + body `Closes #N`.
 6. **GATE** — detectar checks (`gh pr view --json statusCheckRollup`): se houver, `gh pr checks --watch`; senão,
    gate = `/verify` local + review (`/code-review` + `pr-review-toolkit:review-pr`).
+   **E** `gh pr view <N> --json mergeable` exigindo `MERGEABLE` (R20), reconferido imediatamente antes de reportar.
 7. **ACEITE** — recusar merge se `## Aceite` da issue tem item não-marcado.
 8. **MERGE por tier:** baixo + verde → `git switch main` + tree limpo → `gh pr merge --squash --delete-branch`.
    Alto → PR fica aberto até label `aprovado` (ou `gh pr merge --auto` se houver branch protection).
