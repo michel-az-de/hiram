@@ -1,3 +1,4 @@
+using System.Diagnostics.Metrics;
 using System.Text.Json;
 using Hiram.Application.Abstractions;
 using Hiram.Application.Blocks;
@@ -13,7 +14,9 @@ using Hiram.Domain.Outbox;
 using Hiram.Domain.Routines;
 using Hiram.Domain.Templates;
 using Hiram.Infrastructure.Messaging;
+using Hiram.Infrastructure.Telemetry;
 using Hiram.Infrastructure.Templates;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Hiram.IntegrationTests.Events;
@@ -105,6 +108,26 @@ public class EventFanoutTests
         public DateTimeOffset UtcNow => Now;
     }
 
+    // The other tests read the outcome off the store, but a channel with no sender writes nothing by
+    // design: "recorded" and "silently dropped" both leave the store empty. The log and the counter are
+    // the only difference between them, so they are what this fake makes observable.
+    private sealed class RecordingLogger : ILogger<EventFanout>
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter) =>
+            Entries.Add((logLevel, formatter(state, exception)));
+    }
+
     private static Template SmsTemplate(string name = "entrega") =>
         Approved(new Template(Guid.NewGuid(), Tenant, NotificationChannel.Sms, name, subject: null, "Ola {{ name }}, seu pedido saiu", Now));
 
@@ -113,6 +136,10 @@ public class EventFanoutTests
 
     private static Template WhatsAppTemplate(string name = "entrega") =>
         Approved(new Template(Guid.NewGuid(), Tenant, NotificationChannel.WhatsApp, name, subject: null, "Ola {{ name }}, seu pedido saiu", Now));
+
+    // Push renders a subject, as the title of the notification, so the domain refuses a template without one.
+    private static Template PushTemplate(string name = "entrega") =>
+        Approved(new Template(Guid.NewGuid(), Tenant, NotificationChannel.Push, name, "Pedido de {{ name }}", "Ola {{ name }}, seu pedido saiu", Now));
 
     private static Template Approved(Template template)
     {
@@ -146,7 +173,15 @@ public class EventFanoutTests
         Fanout(store, new NoConsentRecords(), routine, templates);
 
     private static EventFanout Fanout(
-        RecordingStore store, IConsentStore consents, Routine routine, params Template[] templates)
+        RecordingStore store, IConsentStore consents, Routine routine, params Template[] templates) =>
+        Fanout(store, consents, NullLogger<EventFanout>.Instance, routine, templates);
+
+    private static EventFanout Fanout(
+        RecordingStore store,
+        IConsentStore consents,
+        ILogger<EventFanout> logger,
+        Routine routine,
+        params Template[] templates)
     {
         var catalog = new FakeRoutineCatalog(routine);
         var approvals = new ApprovedTemplates(templates);
@@ -158,7 +193,59 @@ public class EventFanoutTests
             new ScribanTemplateRenderer(),
             store,
             new FixedClock(),
-            NullLogger<EventFanout>.Instance);
+            logger);
+    }
+
+    [Fact]
+    public async Task UnsupportedChannel_IsRecordedNotSilentlyDropped()
+    {
+        var store = new RecordingStore();
+        var logger = new RecordingLogger();
+
+        // Push clears every gate before the fan-out: the admin API accepts it as a routine channel, the
+        // template exists and is approved, and transactional consent falls open without a recipient user
+        // id (ADR-024). It only dies at the last step, which is the drop this asserts is now visible.
+        var fanout = Fanout(
+            store,
+            new NoConsentRecords(),
+            logger,
+            Routine(NotificationCategory.Transactional, NotificationChannel.Push),
+            PushTemplate());
+
+        var counted = new List<string?>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, subscribed) =>
+        {
+            if (instrument.Name == "hiram.fanout.channel_unsupported")
+                subscribed.EnableMeasurementEvents(instrument);
+        };
+        listener.SetMeasurementEventCallback<long>((_, _, tags, _) =>
+        {
+            string? channel = null;
+            foreach (var tag in tags)
+                if (tag.Key == "hiram.channel")
+                    channel = tag.Value?.ToString();
+
+            lock (counted)
+                counted.Add(channel);
+        });
+        listener.Start();
+
+        await fanout.FanOutAsync(Event(), CancellationToken.None);
+        listener.Dispose();
+
+        // Nothing was sent, which is correct and is also what a silent drop looks like. The log and the
+        // counter are what tell the two apart, so both are asserted.
+        Assert.Empty(store.Saved);
+
+        string?[] snapshot;
+        lock (counted)
+            snapshot = [.. counted];
+        Assert.Contains("push", snapshot);
+
+        var warning = Assert.Single(logger.Entries, entry => entry.Level == LogLevel.Warning);
+        Assert.Contains("Push", warning.Message);
+        Assert.Contains("no fan-out", warning.Message);
     }
 
     [Fact]

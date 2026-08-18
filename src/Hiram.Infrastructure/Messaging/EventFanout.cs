@@ -90,13 +90,34 @@ public sealed class EventFanout
                 continue;
             }
 
-            if (item.Channel == NotificationChannel.Email)
-                await FanOutEmailAsync(@event, item, cancellationToken);
-            else if (item.Channel == NotificationChannel.Sms)
-                await FanOutSmsAsync(@event, item, cancellationToken);
-            else if (item.Channel == NotificationChannel.WhatsApp)
-                await FanOutWhatsAppAsync(@event, item, cancellationToken);
+            // Every resolved channel has to land on an arm, including the ones with no sender. The chain
+            // this replaces had no fallback, so push, which the admin API accepts and consent can allow,
+            // fell through and produced nothing that any log or dashboard could show.
+            await (item.Channel switch
+            {
+                NotificationChannel.Email => FanOutEmailAsync(@event, item, cancellationToken),
+                NotificationChannel.Sms => FanOutSmsAsync(@event, item, cancellationToken),
+                NotificationChannel.WhatsApp => FanOutWhatsAppAsync(@event, item, cancellationToken),
+                _ => RecordUnsupportedChannel(@event, item.Channel),
+            });
         }
+    }
+
+    // Not an error and not a retry: the event is acked either way, exactly like the no-route case above.
+    // What changes is that the drop becomes countable, so the shadow parity stops disagreeing for a
+    // reason nobody can see. The discard arm keeps a value outside the named members, which a stale
+    // routine row can still carry, on this same recorded path instead of throwing mid fan-out.
+    private Task RecordUnsupportedChannel(OutboxEventPayload @event, NotificationChannel channel)
+    {
+        _logger.LogWarning(
+            "Event {EventId} routed to channel {Channel}, which has no fan-out, recorded and skipped",
+            @event.EventId, channel);
+        HiramDiagnostics.FanoutChannelUnsupported.Add(
+            1,
+            new KeyValuePair<string, object?>("hiram.channel", channel.ToString().ToLowerInvariant()),
+            new KeyValuePair<string, object?>("hiram.event_type", @event.EventType));
+
+        return Task.CompletedTask;
     }
 
     private async Task FanOutEmailAsync(OutboxEventPayload @event, FanoutItem item, CancellationToken cancellationToken)
