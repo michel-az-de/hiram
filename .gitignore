@@ -431,3 +431,6 @@ FodyWeavers.xsd
 # Self-hosted MTA (ADR-026): DKIM private keys never get committed; the real .env is covered by *.env
 deploy/mta/**/*.key
 deploy/mta/**/*.pem
+
+# graphify knowledge graph: regenerated locally from the AST, never reviewed as source
+graphify-out/
