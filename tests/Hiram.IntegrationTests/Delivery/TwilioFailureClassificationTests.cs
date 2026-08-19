@@ -123,4 +123,18 @@ public class TwilioFailureClassificationTests
         var failure = Assert.IsType<SendOutcome.PermanentFailure>(outcome);
         Assert.Equal(DeliveryFailureKind.Provider, failure.Kind);
     }
+
+    [Theory]
+    // A closed WhatsApp session was measured answering 21654 six times out of six in 2026-08-10, where the
+    // documentation predicts 63016 (issue #133). Both mean the same thing for delivery: free text will not
+    // go, an approved template will, and no retry changes that.
+    [InlineData(21654, "ContentSid Required")]
+    [InlineData(63016, "Failed to send freeform message because you are outside the allowed window")]
+    public async Task FreeTextWhereATemplateIsRequired_IsPermanent_AndReadsAsConfiguration(int code, string message)
+    {
+        var outcome = await RejectedAsync(code, message);
+
+        var failure = Assert.IsType<SendOutcome.PermanentFailure>(outcome);
+        Assert.Equal(DeliveryFailureKind.Configuration, failure.Kind);
+    }
 }

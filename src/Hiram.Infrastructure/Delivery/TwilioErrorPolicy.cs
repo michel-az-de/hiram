@@ -26,6 +26,12 @@ internal static class TwilioErrorPolicy
             // permissions, or the US campaign registration.
             21408 or 30034 => new SendOutcome.PermanentFailure(describe, DeliveryFailureKind.Configuration),
 
+            // Free text where an approved template is required. This is what a closed WhatsApp session
+            // actually answers: measured six times against the sandbox in 2026-08-10 with the window
+            // verifiably shut, always 21654 and never the 63016 the documentation predicts (issue #133).
+            // Both are mapped because they mean the same thing for delivery and only one was observed.
+            21654 or 63016 => new SendOutcome.PermanentFailure(describe, DeliveryFailureKind.Configuration),
+
             // The recipient replied STOP to the carrier.
             21610 => new SendOutcome.PermanentFailure(describe, DeliveryFailureKind.RecipientOptedOut),
 
