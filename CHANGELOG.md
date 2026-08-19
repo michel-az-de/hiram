@@ -6,6 +6,13 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Contagem de segmento de SMS na resposta de ingestao. `POST /v1/notifications` devolve `segments` no
+  canal SMS e `null` nos demais. GSM-7 cabe 160 caracteres em mensagem avulsa e UCS-2 apenas 70, e em
+  portugues as vogais com til e circunflexo estao fora do GSM-7 enquanto o e agudo e a cedilha estao
+  dentro: 148 caracteres custam 3 segmentos com elas e 1 sem. Aspas curvas sao normalizadas na criacao da
+  requisicao, em qualquer caminho, porque aspa colada de editor de texto e ruido de digitacao que dobrava
+  a conta; acento e preservado, porque carrega significado.
+
 - Simulador de providers em `tools/Hiram.Simulator` (ADR-029). Ele sobe um duplo HTTP da Twilio, que
   responde `Messages.json` e `Emails` nos mesmos formatos que os adapters ja classificam, e conduz um
   roteiro de tres atos contra a API publica do Hiram: uma entrega aceita, uma recusada e uma pelo
@@ -92,6 +99,21 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 - Remove o projeto, processo e imagem Hiram.Dispatcher.
 
 ### Fixed
+- Erro de provider passa a ser classificado pelo codigo, nao pela faixa de status. O caso caro e o
+  `30007`, filtragem por spam da operadora, que chega como `201` com status terminal: uma regra por faixa
+  que o lesse como retentavel faria o Hiram piorar a propria reputacao de remetente a cada tentativa. O
+  `30003` e o oposto e volta a ser retentavel. `TwilioMessagesApi` passa a ler `error_code`, sem o qual os
+  vereditos de operadora eram invisiveis, e uma falha permanente carrega um `DeliveryFailureKind`, entao
+  regiao fora das geo permissions da conta e destinatario que respondeu STOP deixam de ser o mesmo
+  registro de dead letter.
+  Uma janela fechada de WhatsApp responde `21654` e nao o `63016` que a documentacao preve, medido seis
+  vezes contra a sandbox em 2026-08-10 (issue #133), e os dois passam a ler como erro de configuracao,
+  assim como o `30034` de numero dos EUA sem campanha 10DLC registrada. Cada um desses codigos tem
+  cenario proprio no simulador, entao o caminho ruim se reproduz sem conta paga.
+- Endereco de provider exige URL absoluta em `http` ou `https`, e nao apenas absoluta. No Linux o parser
+  de URI aceita um caminho puro como URI absoluto de arquivo, entao `/twilio/` passava la e falhava no
+  Windows.
+
 - Cada adapter de provider passa a ter o seu proprio cliente HTTP nomeado. `AddHttpClient<TClient,
   TImplementation>` deriva o nome logico de `TClient`, entao os dois adapters registrados atras de
   `IEmailProvider` compartilhavam um `HttpClient` e o ultimo endereco configurado valia para os dois.
