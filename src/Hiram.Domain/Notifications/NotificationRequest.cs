@@ -52,7 +52,10 @@ public sealed class NotificationRequest
         Channel = channel;
         Recipient = recipient;
         Subject = subject;
-        Body = body;
+        // On SMS the alphabet decides the bill, and a curly quote pasted out of a word processor moves the
+        // whole message to UCS-2 for no reason anyone intended. Normalising here rather than at the edge
+        // keeps every creation path, direct submit, fan-out and replay, storing the text that is delivered.
+        Body = channel is NotificationChannel.Sms ? SmsBody.From(body).Text : body;
         CreatedAtUtc = createdAtUtc;
         IdempotencyKey = idempotencyKey;
         Status = NotificationStatus.Accepted;

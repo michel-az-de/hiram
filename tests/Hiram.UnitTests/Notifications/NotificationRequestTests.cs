@@ -230,4 +230,38 @@ public class NotificationRequestTests
 
         Assert.Throws<InvalidOperationException>(request.MarkSuppressed);
     }
+
+    [Fact]
+    public void Sms_StoresTheNormalisedBody()
+    {
+        // Counting segments on one string and delivering another would report a cost the invoice does not
+        // agree with, so the normalisation belongs to the request and not to whoever reads it later.
+        var request = new NotificationRequest(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            NotificationChannel.Sms,
+            "+5511999990000",
+            null,
+            "O “pedido” chegou",
+            DateTimeOffset.UtcNow);
+
+        Assert.Equal("O \"pedido\" chegou", request.Body);
+    }
+
+    [Fact]
+    public void Email_KeepsItsBodyExactlyAsWritten()
+    {
+        const string body = "O “pedido” chegou";
+
+        var request = new NotificationRequest(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            NotificationChannel.Email,
+            "felipe@example.com",
+            "hello",
+            body,
+            DateTimeOffset.UtcNow);
+
+        Assert.Equal(body, request.Body);
+    }
 }
