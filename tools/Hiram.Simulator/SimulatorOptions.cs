@@ -51,7 +51,7 @@ public sealed record SimulatorOptions(
                 case "--scenario":
                     var requested = Next(args, ref i, argument);
                     if (!ProviderScenarios.TryParse(requested, out scenario))
-                        throw new ArgumentException($"Unknown scenario '{requested}'. Try accept, 21408, 21610, 30007, 63016, 429 or 500.");
+                        throw new ArgumentException($"Unknown scenario '{requested}'. Try {ProviderScenarios.Codes}.");
                     break;
                 case "--live":
                     live = true;
@@ -71,7 +71,7 @@ public sealed record SimulatorOptions(
     }
 
     public static string Usage =>
-        """
+        $"""
         Hiram.Simulator [serve|walkthrough] [options]
 
           serve         run only the provider double
@@ -80,7 +80,7 @@ public sealed record SimulatorOptions(
           --double <url>      where the double listens (default http://localhost:4010/)
           --hiram <url>       the Hiram under test (default http://localhost:3357/)
           --admin-key <key>   X-Admin-Key, or the HIRAM_ADMIN_KEY environment variable
-          --scenario <name>   accept | 21408 | 21610 | 30007 | 63016 | 429 | 500
+          --scenario <name>   {ProviderScenarios.Codes}
           --live              talk to the real provider instead of the double, and spend real money
         """;
 

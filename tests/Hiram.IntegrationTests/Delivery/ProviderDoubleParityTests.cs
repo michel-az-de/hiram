@@ -68,6 +68,8 @@ public class ProviderDoubleParityTests
     [InlineData(ProviderScenario.GeoPermissionDenied, "21408")]
     [InlineData(ProviderScenario.RecipientOptedOut, "21610")]
     [InlineData(ProviderScenario.OutsideSessionWindow, "63016")]
+    [InlineData(ProviderScenario.TemplateRequired, "21654")]
+    [InlineData(ProviderScenario.CampaignNotRegistered, "30034")]
     public async Task RefusedMessage_ClassifiesAsPermanent_AndNamesTheProviderCode(ProviderScenario scenario, string code)
     {
         var outcome = await SendSmsAsync(MessagesResource.For(scenario, "SM1"));

@@ -32,11 +32,22 @@ public static class MessagesResource
         ProviderScenario.GeoPermissionDenied =>
             new(400, Serialize(new Error(21408, "Permission to send an SMS has not been enabled for the region indicated by the To number."))),
 
+        // The US sender is not registered in a 10DLC campaign, which is an account level step and says
+        // nothing about this recipient. Failing early beats paying for what no carrier will take.
+        ProviderScenario.CampaignNotRegistered =>
+            new(400, Serialize(new Error(30034, "Message From an Unregistered Number."))),
+
         ProviderScenario.RecipientOptedOut =>
             new(400, Serialize(new Error(21610, "Attempt to send to unsubscribed recipient."))),
 
         ProviderScenario.OutsideSessionWindow =>
             new(400, Serialize(new Error(63016, "Failed to send freeform message because you are outside the allowed window."))),
+
+        // What a closed WhatsApp session was actually measured answering, six times out of six, where the
+        // documentation predicts 63016 (issue #133). The double can produce both because only one of them
+        // has ever been observed and the other is still in the provider's error table.
+        ProviderScenario.TemplateRequired =>
+            new(400, Serialize(new Error(21654, "ContentSid Required."))),
 
         ProviderScenario.RateLimited =>
             new(429, Serialize(new Error(20429, "Too Many Requests."))),

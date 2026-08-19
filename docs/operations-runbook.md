@@ -225,9 +225,13 @@ dead letter e portanto o que se tem em mãos ao reproduzir um incidente:
 |---|---|
 | `accept` | `201` com `queued` |
 | `21408` | região não habilitada em Geo Permissions |
+| `30034` | número dos EUA sem campanha 10DLC registrada, erro de configuração da conta |
 | `21610` | destinatário respondeu STOP |
 | `30007` | aceito e depois reportado `failed` pela operadora |
-| `63016` | texto livre fora da janela de 24h do WhatsApp |
+| `63016` | texto livre fora da janela de 24h do WhatsApp, como a documentação prevê |
+| `21654` | `ContentSid Required`, que é o que uma janela fechada realmente respondeu (issue #133) |
+| `30003` | aparelho inalcançável, classificado como transitório |
+| `30005` | o número não existe |
 | `429` | rate limit, classificado como transitório |
 | `500` | erro do provider, classificado como transitório |
 
