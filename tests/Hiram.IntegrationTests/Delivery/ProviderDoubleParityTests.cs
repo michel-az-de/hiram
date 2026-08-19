@@ -77,14 +77,31 @@ public class ProviderDoubleParityTests
     }
 
     [Fact]
-    public async Task MessageAcceptedThenReportedFailed_ClassifiesAsPermanent()
+    public async Task MessageAcceptedThenFilteredByTheCarrier_ClassifiesAsPermanent()
     {
-        // Twilio can answer 201 and still carry a terminal status on the message itself. The double has to
-        // be able to produce that, because the adapter has a branch for it that nothing else exercises.
+        // Twilio answers 201 and carries the verdict on the message itself. The double has to produce that,
+        // because it is the only way the carrier codes ever arrive.
         var outcome = await SendSmsAsync(MessagesResource.For(ProviderScenario.CarrierFiltered, "SM1"));
 
         var failure = Assert.IsType<SendOutcome.PermanentFailure>(outcome);
-        Assert.Contains("failed", failure.Reason, StringComparison.Ordinal);
+        Assert.Contains("30007", failure.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MessageAcceptedThenReportedUnreachable_ClassifiesAsTransient()
+    {
+        var outcome = await SendSmsAsync(MessagesResource.For(ProviderScenario.UnreachableHandset, "SM1"));
+
+        Assert.IsType<SendOutcome.TransientFailure>(outcome);
+    }
+
+    [Fact]
+    public async Task MessageAcceptedThenReportedUnknownNumber_NamesTheDestinationAsInvalid()
+    {
+        var outcome = await SendSmsAsync(MessagesResource.For(ProviderScenario.UnknownHandset, "SM1"));
+
+        var failure = Assert.IsType<SendOutcome.PermanentFailure>(outcome);
+        Assert.Equal(DeliveryFailureKind.InvalidDestination, failure.Kind);
     }
 
     [Theory]

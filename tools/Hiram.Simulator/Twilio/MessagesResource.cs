@@ -16,12 +16,18 @@ public static class MessagesResource
     public static ProviderResponse For(ProviderScenario scenario, string sid) => scenario switch
     {
         ProviderScenario.Accept =>
-            new(201, Serialize(new Message(sid, "queued", null))),
+            new(201, Serialize(new Message(sid, "queued", null, null))),
 
-        // Accepted, then reported terminal on the message itself. Twilio does this, and the adapter has a
-        // branch for it, so the double has to be able to produce it.
+        // Accepted, then reported terminal on the message itself, with the code that decides what the
+        // failure means. Carrier verdicts arrive this way and never as a rejected request.
         ProviderScenario.CarrierFiltered =>
-            new(201, Serialize(new Message(sid, "failed", "Message filtered by the carrier."))),
+            new(201, Serialize(new Message(sid, "undelivered", 30007, "Message filtered by the carrier."))),
+
+        ProviderScenario.UnreachableHandset =>
+            new(201, Serialize(new Message(sid, "undelivered", 30003, "Unreachable destination handset."))),
+
+        ProviderScenario.UnknownHandset =>
+            new(201, Serialize(new Message(sid, "undelivered", 30005, "Unknown destination handset."))),
 
         ProviderScenario.GeoPermissionDenied =>
             new(400, Serialize(new Error(21408, "Permission to send an SMS has not been enabled for the region indicated by the To number."))),
@@ -49,6 +55,7 @@ public static class MessagesResource
     private sealed record Message(
         [property: JsonPropertyName("sid")] string Sid,
         [property: JsonPropertyName("status")] string Status,
+        [property: JsonPropertyName("error_code")] int? ErrorCode,
         [property: JsonPropertyName("error_message")] string? ErrorMessage);
 
     private sealed record Error(

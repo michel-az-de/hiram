@@ -8,6 +8,8 @@ public enum ProviderScenario
     GeoPermissionDenied,
     RecipientOptedOut,
     CarrierFiltered,
+    UnreachableHandset,
+    UnknownHandset,
     OutsideSessionWindow,
     RateLimited,
     ServerError
@@ -41,6 +43,14 @@ public static class ProviderScenarios
             case "filtered":
                 scenario = ProviderScenario.CarrierFiltered;
                 return true;
+            case "30003":
+            case "unreachable":
+                scenario = ProviderScenario.UnreachableHandset;
+                return true;
+            case "30005":
+            case "unknown":
+                scenario = ProviderScenario.UnknownHandset;
+                return true;
             case "63016":
             case "window":
                 scenario = ProviderScenario.OutsideSessionWindow;
@@ -63,7 +73,9 @@ public static class ProviderScenarios
         ProviderScenario.Accept => "accept (201 queued)",
         ProviderScenario.GeoPermissionDenied => "21408, region not enabled in geo permissions",
         ProviderScenario.RecipientOptedOut => "21610, recipient replied STOP",
-        ProviderScenario.CarrierFiltered => "30007, accepted then reported failed by the carrier",
+        ProviderScenario.CarrierFiltered => "30007, accepted then filtered as spam by the carrier",
+        ProviderScenario.UnreachableHandset => "30003, handset unreachable, worth another attempt",
+        ProviderScenario.UnknownHandset => "30005, the number does not exist",
         ProviderScenario.OutsideSessionWindow => "63016, free form outside the 24h WhatsApp window",
         ProviderScenario.RateLimited => "429, rate limited",
         ProviderScenario.ServerError => "500, provider side error",
