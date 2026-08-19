@@ -187,8 +187,12 @@ nada continua falando com a Twilio de verdade:
 | `Hiram:Providers:Endpoints:TwilioEmail` | `https://comms.twilio.com/v1/` |
 | `Hiram:Providers:Endpoints:Resend` | `https://api.resend.com/` |
 
-Um valor relativo é recusado no startup, com o nome da chave na mensagem. Falhar ali é melhor do que
-falhar na entrega, onde o sintoma apareceria como erro de transporte.
+O valor precisa ser uma URL absoluta em `http` ou `https`. Qualquer outra coisa é recusada no startup, com
+o nome da chave na mensagem. Falhar ali é melhor do que falhar na entrega, onde o sintoma apareceria como
+erro de transporte e mandaria quem está de plantão olhar o provider em vez da configuração.
+
+O esquema faz parte da checagem por um motivo concreto: no Linux o parser de URI aceita um caminho puro
+como URI absoluto de arquivo, então `/twilio/` passaria em uma verificação que só exige "absoluto".
 
 **Rodar.** Com um PostgreSQL disponível, suba o Hiram apontado para o duplo e execute o roteiro:
 

@@ -115,17 +115,22 @@ public static class DependencyInjection
     private static HttpClient ClientFor(this IServiceProvider services, string providerName) =>
         services.GetRequiredService<IHttpClientFactory>().CreateClient(providerName);
 
-    // A relative address turns every send into a request against nothing, and the failure would surface as
-    // a transport error at delivery time. Failing at startup names the offending key instead.
+    // A bad address turns every send into a request against nothing, and the failure would surface as a
+    // transport error at delivery time. Failing at startup names the offending key instead.
+    //
+    // The scheme is part of the check, not decoration: on Unix the Uri parser accepts a bare path as an
+    // absolute file URI, so "/twilio/" passes an absolute-only test there and fails it on Windows. A
+    // provider endpoint is reached over HTTP, and nothing else is a valid answer on any platform.
     private static Uri Absolute(IConfigurationSection endpoints, string key, Uri fallback)
     {
         var configured = endpoints[key];
         if (string.IsNullOrWhiteSpace(configured))
             return fallback;
 
-        if (!Uri.TryCreate(configured, UriKind.Absolute, out var address))
+        if (!Uri.TryCreate(configured, UriKind.Absolute, out var address)
+            || (address.Scheme != Uri.UriSchemeHttp && address.Scheme != Uri.UriSchemeHttps))
             throw new InvalidOperationException(
-                $"{endpoints.Path}:{key} must be an absolute URI, and '{configured}' is not.");
+                $"{endpoints.Path}:{key} must be an absolute http or https URI, and '{configured}' is not.");
 
         return address;
     }

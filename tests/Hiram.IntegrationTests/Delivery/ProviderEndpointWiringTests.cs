@@ -78,13 +78,20 @@ public class ProviderEndpointWiringTests
         Assert.Equal(new Uri("http://localhost:4010/twilio/"), factory.CreateClient("twilio-whatsapp").BaseAddress);
     }
 
-    [Fact]
-    public void Endpoints_RejectARelativeAddress()
+    [Theory]
+    // A bare path is the accident to catch. It is not an absolute URI on Windows, and on Unix the parser
+    // accepts it as an absolute file URI, so checking only for absoluteness passes on one platform and
+    // fails on the other while both end up with a base address that reaches no provider.
+    [InlineData("/twilio/")]
+    [InlineData("localhost:4010")]
+    [InlineData("file:///tmp/twilio/")]
+    [InlineData("ftp://provider.invalid/")]
+    public void Endpoints_RejectAnAddressThatIsNotHttp(string configured)
     {
-        var configuration = Configuration(("Hiram:Providers:Endpoints:TwilioApi", "/twilio/"));
+        var configuration = Configuration(("Hiram:Providers:Endpoints:TwilioApi", configured));
 
-        // A relative base address silently turns every send into a request against nothing. Failing at
-        // startup names the offending key; failing at delivery time would name a transport error instead.
+        // Failing at startup names the offending key; failing at delivery time would name a transport
+        // error and send whoever is on call looking at the provider instead of at the configuration.
         var error = Assert.Throws<InvalidOperationException>(() => Build(configuration));
         Assert.Contains("Hiram:Providers:Endpoints:TwilioApi", error.Message, StringComparison.Ordinal);
     }
