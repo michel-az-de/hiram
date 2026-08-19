@@ -46,8 +46,9 @@ duplo HTTP dos providers e conduz um roteiro de ponta a ponta contra a API real 
    autorização, form encoding, timeout e o pipeline de resiliência inteiro.
 4. **O simulador fala com o Hiram só pela API pública.** Nenhum atalho pelo banco. O que o roteiro prova é
    o que um emissor real veria.
-5. **Dois modos.** `--fake` aponta o Hiram para o duplo por configuração; `--live` roda o mesmo roteiro
-   contra a Twilio real, com credencial vinda de user-secrets ou do ambiente.
+5. **Dois modos, e o seguro é o padrão.** Sem argumento, o duplo sobe e o roteiro roda contra ele.
+   `--live` desliga o duplo e conduz o mesmo roteiro contra a Twilio real, com credencial vinda de
+   user-secrets ou do ambiente. Gastar dinheiro exige um argumento explícito, nunca um esquecimento.
 
 ## Decisões de borda cravadas
 
@@ -137,11 +138,11 @@ duplo inteiro se a Twilio publicar um simulador oficial que cubra status callbac
 
 1. [x] `ProviderEndpoints` e `ProviderNames` na Application, com os valores de produção como padrão.
 2. [x] Um cliente HTTP nomeado por adapter, corrigindo a issue #139, com teste de regressão.
-3. [ ] Projeto `tools/Hiram.Simulator` na solution, sem referência de produção para ele.
-4. [ ] Duplo HTTP de `Messages.json` e de `Emails`, nos formatos que os classificadores já consomem.
-5. [ ] Cenários de falha selecionáveis por argumento.
-6. [ ] Roteiro de console que dispara evento e acompanha aceite, tentativa e desfecho.
-7. [ ] Seção no runbook explicando como rodar os dois modos.
+3. [x] Projeto `tools/Hiram.Simulator` na solution, sem referência de produção para ele.
+4. [x] Duplo HTTP de `Messages.json` e de `Emails`, nos formatos que os classificadores já consomem.
+5. [x] Cenários de falha selecionáveis por argumento.
+6. [x] Roteiro de console que dispara evento e acompanha aceite, tentativa e desfecho.
+7. [x] Seção no runbook explicando como rodar os dois modos.
 
 ## Critério de conclusão
 

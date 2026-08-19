@@ -6,6 +6,16 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Simulador de providers em `tools/Hiram.Simulator` (ADR-029). Ele sobe um duplo HTTP da Twilio, que
+  responde `Messages.json` e `Emails` nos mesmos formatos que os adapters ja classificam, e conduz um
+  roteiro de tres atos contra a API publica do Hiram: uma entrega aceita, uma recusada e uma pelo
+  fan-out de eventos. O cenario de falha e escolhido por argumento (`21408`, `21610`, `30007`, `63016`,
+  `429`, `500`), porque provocar o caminho ruim e o que um stub de handler cobre pior. O duplo nao entra
+  no gate de CI; o que o CI cobre e a paridade entre o que ele responde e o que os adapters classificam.
+- Endereco de cada provider por configuracao, na secao `Hiram:Providers:Endpoints`, com os valores de
+  producao como padrao. Um valor relativo e recusado no startup, nomeando a chave, em vez de virar erro
+  de transporte na hora da entrega.
+
 - Provisionamento do tenant Jornada do Candidato em `deploy/jornada/`: script idempotente que cria o
   tenant live, emite a api key do emissor, configura o provider de cada canal, aprova os templates da
   jornada e liga cada eventType ao seu template. `JORNADA_CHANNELS` escolhe entre e-mail, SMS e
@@ -82,6 +92,14 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 - Remove o projeto, processo e imagem Hiram.Dispatcher.
 
 ### Fixed
+- Cada adapter de provider passa a ter o seu proprio cliente HTTP nomeado. `AddHttpClient<TClient,
+  TImplementation>` deriva o nome logico de `TClient`, entao os dois adapters registrados atras de
+  `IEmailProvider` compartilhavam um `HttpClient` e o ultimo endereco configurado valia para os dois.
+  Medido contra o container real, o cliente de `IEmailProvider` respondia `https://comms.twilio.com/v1/`,
+  o que fazia todo tenant configurado com `resend` enviar para o host da Twilio com credencial do
+  Resend. O nome do cliente passa a ser o identificador que o adapter ja expoe em `Name` e que
+  `tenant_provider_configs` guarda.
+
 - Replay de dead letter volta a funcionar em SMS e WhatsApp. `DeadLetterReplay` mapeava a chave de
   roteamento apenas de e-mail e push, entao `POST /v1/notifications/{id}/replay` respondia 500 nos dois
   canais da ADR-028 e a mensagem ficava sem caminho de volta. A transacao ja fazia rollback, entao
