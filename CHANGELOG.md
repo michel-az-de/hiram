@@ -6,6 +6,17 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- ADR-030: o canal WhatsApp passa a ter a Cloud API da Meta como segunda implementacao de
+  `IWhatsAppProvider`, com o nome estavel `meta-whatsapp`, ao lado de `twilio-whatsapp` e nao no lugar
+  dela. A Twilio fica como plano B ate a Meta estar em producao, e o ADR crava o gatilho de remocao para
+  que ficar seja decisao e nao esquecimento. A mudanca real nao e de transporte: fora da janela de 24h a
+  Meta so entrega template pre-aprovado com parametros posicionais, entao `WhatsAppMessage` deixa de ser
+  so corpo livre e a tabela `whatsapp_templates`, dormente desde a migration `20260713181535`, sai da
+  dormencia. O ganho colateral e o status loop: a Meta reporta `sent`, `delivered`, `read` e `failed` com
+  categoria e preco, o que torna realizaveis os itens 5 e 6 do ADR-028, adiados desde 2026-08-08 porque o
+  trial da Twilio nao tinha contraparte para comprovar. Nenhuma dependencia nova: adapter proprio sobre
+  `HttpClient`, e a biblioteca `WhatsappBusiness.CloudApi` fica como referencia de leitura, nao como
+  pacote. Supersede o ADR-023.
 - Provisionamento do tenant Jornada do Candidato em `deploy/jornada/`: script idempotente que cria o
   tenant live, emite a api key do emissor, configura o provider de cada canal, aprova os templates da
   jornada e liga cada eventType ao seu template. `JORNADA_CHANNELS` escolhe entre e-mail, SMS e
