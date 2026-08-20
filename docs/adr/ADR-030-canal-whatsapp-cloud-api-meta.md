@@ -404,8 +404,12 @@ Registradas para que ninguém as leia como fato.
 9. [ ] Gravar o BSUID na tentativa quando ele vier, sem usá-lo para correlacionar.
 10. [ ] Onboarding de credencial da Meta no `docs/operations-runbook.md`, ao lado da seção da Twilio.
 11. [ ] Medir e registrar a tarifa real de `utility` no Brasil, fechando a lacuna 1.
-12. [ ] Verificar se o canal `twilio-whatsapp`, já em produção, lê telefone de algum payload de provider. Se
-    ler, o BSUID o atinge antes de atingir a Meta, e o conserto não espera este ADR.
+12. [x] Verificar se o canal `twilio-whatsapp`, já em produção, lê telefone de algum payload de provider.
+    **Medido em 2026-08-20: não lê, e o BSUID não o atinge hoje.** Não existe rota de callback de provider
+    no `Hiram.Api`, e as únicas ocorrências de `To` e `From` nos adapters montam o request de saída, em
+    `TwilioSmsProvider.cs:42` e `TwilioWhatsAppProvider.cs:44`. O produto nunca lê telefone de um payload
+    que o provider devolve, porque ainda não recebe payload nenhum. O risco nasce junto com a fatia 5, e é
+    lá que a borda 15 precisa valer, não antes.
 
 ## Critério de conclusão
 
