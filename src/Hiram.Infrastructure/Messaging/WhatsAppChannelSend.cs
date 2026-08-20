@@ -9,7 +9,7 @@ public sealed class WhatsAppChannelSend : ChannelSend
     private readonly WhatsAppProviderSettings _settings;
 
     public WhatsAppChannelSend(IWhatsAppProvider provider, WhatsAppMessage message, WhatsAppProviderSettings settings)
-        : base(provider.Name, $"{message.Recipient}\n{message.Body}")
+        : base(provider.Name, message.Canonical)
     {
         _provider = provider;
         _message = message;

@@ -94,7 +94,10 @@ public class WhatsAppChannelDeliveryTests
         // The "whatsapp:" prefix is the adapter's business. What crosses this boundary is the number as
         // it was stored, so the resolver and the adapter cannot end up prefixing it twice.
         Assert.Equal("+5511982254398", provider.LastMessage!.Recipient);
-        Assert.Equal("corpo", provider.LastMessage.Body);
+
+        // Still free form after the shape opened up: turning a notification into an approved template is a
+        // later slice, and this assertion is what would catch that flipping by accident.
+        Assert.Equal("corpo", Assert.IsType<WhatsAppMessage.FreeForm>(provider.LastMessage).Body);
         Assert.Equal("unprotected:protected-secret", provider.LastSettings!.Secret);
         Assert.Equal("+14155238886", provider.LastSettings.Values["from"]);
     }
