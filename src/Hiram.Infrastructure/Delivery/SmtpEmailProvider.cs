@@ -15,7 +15,7 @@ public sealed class SmtpEmailProvider : IEmailProvider
         _destinations = destinations;
     }
 
-    public string Name => "smtp";
+    public string Name => ProviderNames.Smtp;
 
     public async Task<SendOutcome> SendAsync(EmailMessage message, EmailProviderSettings settings, CancellationToken cancellationToken)
     {

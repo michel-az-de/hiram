@@ -22,6 +22,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Hiram.Infrastructure;
 
@@ -61,16 +62,77 @@ public static class DependencyInjection
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<ISmtpDestinationPolicy, SmtpDestinationPolicy>();
         services.AddSingleton<IEmailProvider, SmtpEmailProvider>();
-        services.AddHttpClient<IEmailProvider, ResendEmailProvider>(client =>
-            client.BaseAddress = new Uri("https://api.resend.com/"));
-        services.AddHttpClient<IEmailProvider, TwilioEmailProvider>(client =>
-            client.BaseAddress = new Uri("https://comms.twilio.com/v1/"));
-        services.AddHttpClient<ISmsProvider, TwilioSmsProvider>(client =>
-            client.BaseAddress = new Uri("https://api.twilio.com/"));
-        services.AddHttpClient<IWhatsAppProvider, TwilioWhatsAppProvider>(client =>
-            client.BaseAddress = new Uri("https://api.twilio.com/"));
+
+        // Whoever composes the host may have configured the endpoints already; production values stand in
+        // otherwise, so an environment that configures nothing still talks to the real providers.
+        services.TryAddSingleton(ProviderEndpoints.Production);
+
+        // One named client per adapter, never per port. AddHttpClient<TClient, TImplementation> derives the
+        // logical name from TClient, so two adapters behind one port share a client and the last base
+        // address configured wins for both: that is how the Resend adapter ended up posting to Twilio's
+        // host (issue #139).
+        services.AddProviderClient(ProviderNames.Resend);
+        services.AddProviderClient(ProviderNames.TwilioEmail);
+        services.AddProviderClient(ProviderNames.TwilioSms);
+        services.AddProviderClient(ProviderNames.TwilioWhatsApp);
+
+        services.AddTransient<IEmailProvider>(provider => new ResendEmailProvider(provider.ClientFor(ProviderNames.Resend)));
+        services.AddTransient<IEmailProvider>(provider => new TwilioEmailProvider(provider.ClientFor(ProviderNames.TwilioEmail)));
+        services.AddTransient<ISmsProvider>(provider => new TwilioSmsProvider(provider.ClientFor(ProviderNames.TwilioSms)));
+        services.AddTransient<IWhatsAppProvider>(provider => new TwilioWhatsAppProvider(provider.ClientFor(ProviderNames.TwilioWhatsApp)));
 
         return services;
+    }
+
+    // Reads the provider endpoints from configuration, falling back to production per key. Call it before
+    // AddHiramInfrastructure: the infrastructure registration only fills in what is still missing.
+    public static IServiceCollection AddHiramProviderEndpoints(this IServiceCollection services, IConfiguration configuration)
+    {
+        var endpoints = configuration.GetSection("Hiram:Providers:Endpoints");
+        services.AddSingleton(new ProviderEndpoints(
+            Absolute(endpoints, "Resend", ProviderEndpoints.Production.Resend),
+            Absolute(endpoints, "TwilioEmail", ProviderEndpoints.Production.TwilioEmail),
+            Absolute(endpoints, "TwilioApi", ProviderEndpoints.Production.TwilioApi)));
+
+        return services;
+    }
+
+    private static IServiceCollection AddProviderClient(this IServiceCollection services, string providerName) =>
+        services.AddHttpClient(
+            providerName,
+            (provider, client) => client.BaseAddress = AddressFor(provider.GetRequiredService<ProviderEndpoints>(), providerName))
+            .Services;
+
+    // One place maps a provider name to a host, so a new adapter cannot quietly inherit another one's.
+    private static Uri AddressFor(ProviderEndpoints endpoints, string providerName) => providerName switch
+    {
+        ProviderNames.Resend => endpoints.Resend,
+        ProviderNames.TwilioEmail => endpoints.TwilioEmail,
+        ProviderNames.TwilioSms or ProviderNames.TwilioWhatsApp => endpoints.TwilioApi,
+        _ => throw new InvalidOperationException($"No endpoint is mapped for the provider '{providerName}'.")
+    };
+
+    private static HttpClient ClientFor(this IServiceProvider services, string providerName) =>
+        services.GetRequiredService<IHttpClientFactory>().CreateClient(providerName);
+
+    // A bad address turns every send into a request against nothing, and the failure would surface as a
+    // transport error at delivery time. Failing at startup names the offending key instead.
+    //
+    // The scheme is part of the check, not decoration: on Unix the Uri parser accepts a bare path as an
+    // absolute file URI, so "/twilio/" passes an absolute-only test there and fails it on Windows. A
+    // provider endpoint is reached over HTTP, and nothing else is a valid answer on any platform.
+    private static Uri Absolute(IConfigurationSection endpoints, string key, Uri fallback)
+    {
+        var configured = endpoints[key];
+        if (string.IsNullOrWhiteSpace(configured))
+            return fallback;
+
+        if (!Uri.TryCreate(configured, UriKind.Absolute, out var address)
+            || (address.Scheme != Uri.UriSchemeHttp && address.Scheme != Uri.UriSchemeHttps))
+            throw new InvalidOperationException(
+                $"{endpoints.Path}:{key} must be an absolute http or https URI, and '{configured}' is not.");
+
+        return address;
     }
 
     public static IServiceCollection AddHiramDataProtection(this IServiceCollection services, string? keyRingPath = null)

@@ -45,13 +45,15 @@ public sealed class SubmitNotificationHandler : ISubmitNotification
             now,
             key);
 
+        // Built from the request, not from the command: the request is what normalised the body, and a
+        // payload carrying the raw text would deliver something other than what was persisted and counted.
         var payload = new OutboxNotificationPayload(
             notificationId,
             command.TenantId,
             command.Channel.ToString(),
             command.Recipient,
             command.Subject,
-            command.Body);
+            request.Body);
 
         var outbox = new OutboxMessage(
             Guid.NewGuid(),
@@ -76,8 +78,12 @@ public sealed class SubmitNotificationHandler : ISubmitNotification
             return Replay(replayId);
         }
 
-        return new SubmitNotificationResult(notificationId, NotificationStatus.Accepted);
+        return new SubmitNotificationResult(
+            notificationId, NotificationStatus.Accepted, Segments: SegmentsFor(request));
     }
+
+    private static int? SegmentsFor(NotificationRequest request) =>
+        request.Channel is NotificationChannel.Sms ? SmsBody.From(request.Body).Segments : null;
 
     private static SubmitNotificationResult Replay(Guid notificationId) =>
         new(notificationId, NotificationStatus.Accepted, Replayed: true);

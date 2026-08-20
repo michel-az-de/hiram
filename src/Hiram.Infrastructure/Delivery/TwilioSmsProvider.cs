@@ -15,7 +15,7 @@ public sealed class TwilioSmsProvider : ISmsProvider
         _http = http;
     }
 
-    public string Name => "twilio-sms";
+    public string Name => ProviderNames.TwilioSms;
 
     public async Task<SendOutcome> SendAsync(SmsMessage message, SmsProviderSettings settings, CancellationToken cancellationToken)
     {

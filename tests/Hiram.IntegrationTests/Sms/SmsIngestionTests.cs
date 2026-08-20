@@ -158,4 +158,31 @@ public class SmsIngestionTests : IAsyncLifetime
     private sealed record TenantCreatedDto(Guid Id, string Name, string DeliveryMode);
 
     private sealed record ApiKeyCreatedDto(Guid Id, Guid TenantId, string Name, string Key, string Prefix);
+
+    [Fact]
+    public async Task Submit_ReportsHowManySegmentsTheSmsCosts()
+    {
+        var (client, _) = await NewTenant();
+
+        // 148 characters of a vowel that GSM-7 does not carry: the limit drops from 160 to 70 and the
+        // carrier bills three times. Learning that from the response beats learning it from the invoice.
+        var expensive = await client.PostAsJsonAsync("/v1/notifications",
+            new SubmitNotificationRequest("sms", "+5511982254398", Body: new string('á', 148)));
+        var cheap = await client.PostAsJsonAsync("/v1/notifications",
+            new SubmitNotificationRequest("sms", "+5511982254398", Body: new string('a', 148)));
+
+        Assert.Equal(3, (await expensive.Content.ReadFromJsonAsync<NotificationAccepted>())!.Segments);
+        Assert.Equal(1, (await cheap.Content.ReadFromJsonAsync<NotificationAccepted>())!.Segments);
+    }
+
+    [Fact]
+    public async Task Submit_ReportsNoSegments_OnAChannelThatIsNotSms()
+    {
+        var (client, _) = await NewTenant();
+
+        var response = await client.PostAsJsonAsync("/v1/notifications",
+            new SubmitNotificationRequest("email", "alguem@example.test", Subject: "Pedido", Body: "Seu pedido saiu."));
+
+        Assert.Null((await response.Content.ReadFromJsonAsync<NotificationAccepted>())!.Segments);
+    }
 }

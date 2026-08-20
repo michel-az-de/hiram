@@ -133,7 +133,7 @@ internal static class NotificationEndpoints
             HiramDiagnostics.NotificationsAccepted.Add(1);
         }
 
-        var accepted = new NotificationAccepted(result.NotificationId, ToWire(result.Status));
+        var accepted = new NotificationAccepted(result.NotificationId, ToWire(result.Status), result.Segments);
         return Results.Accepted($"/v1/notifications/{result.NotificationId}", accepted);
     }
 
