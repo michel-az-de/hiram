@@ -19,7 +19,7 @@ public sealed class TwilioWhatsAppProvider : IWhatsAppProvider
         _http = http;
     }
 
-    public string Name => "twilio-whatsapp";
+    public string Name => ProviderNames.TwilioWhatsApp;
 
     public async Task<SendOutcome> SendAsync(WhatsAppMessage message, WhatsAppProviderSettings settings, CancellationToken cancellationToken)
     {

@@ -16,5 +16,9 @@ public abstract record SendOutcome
 
     public sealed record TransientFailure(string Reason) : SendOutcome;
 
-    public sealed record PermanentFailure(string Reason) : SendOutcome;
+    // Kind is what an operator acts on: a misconfigured account and a recipient who opted out both land
+    // here, and nothing but the provider's own code tells them apart. Adapters that cannot tell leave the
+    // default rather than guessing.
+    public sealed record PermanentFailure(string Reason, DeliveryFailureKind Kind = DeliveryFailureKind.Provider)
+        : SendOutcome;
 }

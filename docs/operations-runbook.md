@@ -172,6 +172,81 @@ a credencial vinda de user-secrets ou do cofre do ambiente.
    nomeados no motivo do dead letter. `20003` significa credencial inválida, não limitação de trial.
 7. Não faça replay antes de entender o motivo (seções 7 e 8).
 
+### 3.8 Simulador de providers, para provar sem gastar
+
+O roteiro de 3.7 exige conta, crédito e número verificado. O `tools/Hiram.Simulator` (ADR-029) prova o
+mesmo caminho sem nada disso: ele sobe um duplo HTTP da Twilio, aponta o Hiram para ele por configuração
+e conduz três atos, uma entrega aceita, uma recusada e uma pelo fan-out de eventos.
+
+**O endereço de cada provider é configuração.** Os padrões são os de produção, então quem não configura
+nada continua falando com a Twilio de verdade:
+
+| Chave | Padrão |
+|---|---|
+| `Hiram:Providers:Endpoints:TwilioApi` | `https://api.twilio.com/` |
+| `Hiram:Providers:Endpoints:TwilioEmail` | `https://comms.twilio.com/v1/` |
+| `Hiram:Providers:Endpoints:Resend` | `https://api.resend.com/` |
+
+O valor precisa ser uma URL absoluta em `http` ou `https`. Qualquer outra coisa é recusada no startup, com
+o nome da chave na mensagem. Falhar ali é melhor do que falhar na entrega, onde o sintoma apareceria como
+erro de transporte e mandaria quem está de plantão olhar o provider em vez da configuração.
+
+O esquema faz parte da checagem por um motivo concreto: no Linux o parser de URI aceita um caminho puro
+como URI absoluto de arquivo, então `/twilio/` passaria em uma verificação que só exige "absoluto".
+
+**Rodar.** Com um PostgreSQL disponível, suba o Hiram apontado para o duplo e execute o roteiro:
+
+```bash
+ASPNETCORE_URLS=http://localhost:3357 \
+ConnectionStrings__Hiram="Host=localhost;Port=5433;Database=hiram;Username=hiram;Password=hiram" \
+Hiram__AdminKey=admin-dev-local \
+Hiram__MigrateOnStartup=true \
+Hiram__Workers__Enabled=true \
+Hiram__Providers__Endpoints__TwilioApi=http://localhost:4010/ \
+Hiram__Providers__Endpoints__TwilioEmail=http://localhost:4010/v1/ \
+dotnet run --project src/Hiram.Api
+```
+
+```bash
+dotnet run --project tools/Hiram.Simulator -- walkthrough
+```
+
+O roteiro devolve `0` quando a entrega aceita termina em `sent`, a recusada termina em `dead_lettered` e o
+fan-out termina em `sent`. Qualquer outro desfecho é falha, e o console mostra a tentativa, o motivo e o
+que o duplo respondeu a cada chamada.
+
+**Se o Hiram roda em contêiner e o duplo no host**, o endereço não é `localhost` e sim
+`http://host.docker.internal:4010/`, senão o contêiner procura o duplo dentro de si mesmo.
+
+**Provocar o caminho ruim.** `--scenario` aceita o nome ou o código do provider, que é o que aparece no
+dead letter e portanto o que se tem em mãos ao reproduzir um incidente:
+
+| Valor | O que o duplo responde |
+|---|---|
+| `accept` | `201` com `queued` |
+| `21408` | região não habilitada em Geo Permissions |
+| `30034` | número dos EUA sem campanha 10DLC registrada, erro de configuração da conta |
+| `21610` | destinatário respondeu STOP |
+| `30007` | aceito e depois reportado `failed` pela operadora |
+| `63016` | texto livre fora da janela de 24h do WhatsApp, como a documentação prevê |
+| `21654` | `ContentSid Required`, que é o que uma janela fechada realmente respondeu (issue #133) |
+| `30003` | aparelho inalcançável, classificado como transitório |
+| `30005` | o número não existe |
+| `429` | rate limit, classificado como transitório |
+| `500` | erro do provider, classificado como transitório |
+
+No roteiro, `--scenario` escolhe **como o ato 2 recusa**, porque os atos 1 e 3 precisam ter sucesso para a
+execução provar alguma coisa. Sem o argumento, a recusa é o `21610`.
+
+`serve` sobe só o duplo, sem roteiro, para exercitar o Hiram por outro caminho. `POST /_control/scenario`
+troca a resposta sem reiniciar o processo.
+
+**`--live` gasta dinheiro.** Ele não sobe duplo: o Hiram mantém os endereços de produção e o roteiro dispara
+contra a conta real. Use apenas com a credencial do ambiente e sabendo que a mensagem sai.
+
+O duplo não entra no gate de CI. O que o CI cobre é a paridade entre o que ele responde e o que os adapters
+classificam (`ProviderDoubleParityTests`), sem abrir porta e sem rede.
+
 ## 4. Rotação de API key
 
 1. Emita uma segunda chave com nome identificável.

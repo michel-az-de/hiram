@@ -48,6 +48,7 @@ builder.AddHiramTelemetry("hiram", tracing => tracing
 
 builder.Services.AddProblemDetails();
 builder.Services.AddHiramOpenApi();
+builder.Services.AddHiramProviderEndpoints(builder.Configuration);
 builder.Services.AddHiramInfrastructure(connectionString, builder.Configuration["DataProtection:KeysPath"]);
 builder.Services.AddHiramWorkers(builder.Configuration);
 builder.Services.AddScoped<ISubmitNotification, SubmitNotificationHandler>();

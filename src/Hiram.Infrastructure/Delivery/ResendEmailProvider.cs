@@ -16,7 +16,7 @@ public sealed class ResendEmailProvider : IEmailProvider
         _http = http;
     }
 
-    public string Name => "resend";
+    public string Name => ProviderNames.Resend;
 
     public async Task<SendOutcome> SendAsync(EmailMessage message, EmailProviderSettings settings, CancellationToken cancellationToken)
     {

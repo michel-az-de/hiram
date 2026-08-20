@@ -22,7 +22,7 @@ public sealed class TwilioEmailProvider : IEmailProvider
         _http = http;
     }
 
-    public string Name => "twilio-email";
+    public string Name => ProviderNames.TwilioEmail;
 
     public async Task<SendOutcome> SendAsync(EmailMessage message, EmailProviderSettings settings, CancellationToken cancellationToken)
     {

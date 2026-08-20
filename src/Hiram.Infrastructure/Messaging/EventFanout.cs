@@ -282,8 +282,10 @@ public sealed class EventFanout
         var request = new NotificationRequest(
             notificationId, @event.TenantId, channel, recipient, subject, body, now, messageKey);
 
+        // From the request, not from the local variable: the request normalised the body, and a payload
+        // carrying the raw text would deliver something other than what was persisted.
         var payload = new OutboxNotificationPayload(
-            notificationId, @event.TenantId, channel.ToString(), recipient, subject, body);
+            notificationId, @event.TenantId, channel.ToString(), recipient, subject, request.Body);
 
         // The outbox type is what OutboxMessageDispatcher routes on, and it keys on the lowercase name.
         var outbox = new OutboxMessage(

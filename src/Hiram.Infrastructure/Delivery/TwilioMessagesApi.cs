@@ -20,23 +20,37 @@ internal static class TwilioMessagesApi
         {
             var message = Parse<MessageResource>(body);
 
-            // Twilio can accept the request and still report a terminal status on the message itself.
+            // Twilio can accept the request and still report a terminal status on the message itself. This
+            // is how the carrier verdicts arrive, so the code has to be read here and not only on a 4xx.
             if (message?.Status is "failed" or "undelivered")
-                return new SendOutcome.PermanentFailure(
-                    Describe($"{channel} reported {message.Status}.", null, message.ErrorMessage));
+            {
+                var reported = Describe($"{channel} reported {message.Status}.", message.ErrorCode, message.ErrorMessage);
+                return Decide(message.ErrorCode, reported)
+                    ?? new SendOutcome.PermanentFailure(reported);
+            }
 
             return new SendOutcome.Sent(message?.Sid);
         }
 
-        if (response.StatusCode == HttpStatusCode.TooManyRequests || code >= 500)
-            return new SendOutcome.TransientFailure($"{channel} returned {code}.");
-
         // Carrying the provider's own message makes the dead letter name the cause, such as an unverified
         // recipient or free text refused outside the session window, instead of only the status code.
         var error = Parse<ErrorResponse>(body);
-        return new SendOutcome.PermanentFailure(
-            Describe($"{channel} rejected the request with {code}.", error?.Code, error?.Message));
+        var rejected = Describe($"{channel} rejected the request with {code}.", error?.Code, error?.Message);
+
+        // The policy reads the code, which is the only thing that says what happened. The status range is
+        // the fallback for a code nobody mapped, and for a body that did not parse at all.
+        var decided = Decide(error?.Code, rejected);
+        if (decided is not null)
+            return decided;
+
+        if (response.StatusCode == HttpStatusCode.TooManyRequests || code >= 500)
+            return new SendOutcome.TransientFailure($"{channel} returned {code}.");
+
+        return new SendOutcome.PermanentFailure(rejected);
     }
+
+    private static SendOutcome? Decide(int? errorCode, string describe) =>
+        errorCode is { } code ? TwilioErrorPolicy.For(code, describe) : null;
 
     private static string Describe(string fallback, int? errorCode, string? detail)
     {
@@ -66,6 +80,7 @@ internal static class TwilioMessagesApi
     private sealed record MessageResource(
         [property: JsonPropertyName("sid")] string? Sid,
         [property: JsonPropertyName("status")] string? Status,
+        [property: JsonPropertyName("error_code")] int? ErrorCode,
         [property: JsonPropertyName("error_message")] string? ErrorMessage);
 
     private sealed record ErrorResponse(
