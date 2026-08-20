@@ -6,6 +6,16 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Adapter `meta-whatsapp`, a Cloud API da Meta como segunda implementacao de `IWhatsAppProvider`, ao lado
+  de `twilio-whatsapp` e nao no lugar dela (ADR-030, itens 2 e 3). Envia corpo livre como `type: text` e
+  template como `type: template` com os parametros nas posicoes, e devolve o `wamid` de `messages[0].id`
+  como `provider_message_id`, que e a chave que o callback de status vai correlacionar. A versao da Graph
+  API e configuracao, com padrao em `Hiram:Providers:Endpoints:MetaGraphVersion` e sobrescrita por tenant
+  em `settings.graph_version`: a Meta poe a versao no caminho e forca upgrade de quem fica para tras, e em
+  2026-08-20 tres fontes deram tres respostas sobre qual usar. `MetaErrorPolicy` classifica pelo codigo da
+  Meta e nao pela faixa de status, porque a faixa erra nos dois sentidos: 131000 chega como 500 e merece
+  outra tentativa, enquanto 131047 e todo erro de template chegam como 400 e nenhuma repeticao resolve.
+  Codigo nao mapeado cai na faixa, entao codigo novo da Meta fica generico em vez de mal rotulado.
 - ADR-030: o canal WhatsApp passa a ter a Cloud API da Meta como segunda implementacao de
   `IWhatsAppProvider`, com o nome estavel `meta-whatsapp`, ao lado de `twilio-whatsapp` e nao no lugar
   dela. A Twilio fica como plano B ate a Meta estar em producao, e o ADR crava o gatilho de remocao para

@@ -38,6 +38,10 @@ public class ProviderEndpointWiringTests
         Assert.Equal(new Uri("https://comms.twilio.com/v1/"), factory.CreateClient("twilio-email").BaseAddress);
         Assert.Equal(new Uri("https://api.twilio.com/"), factory.CreateClient("twilio-sms").BaseAddress);
         Assert.Equal(new Uri("https://api.twilio.com/"), factory.CreateClient("twilio-whatsapp").BaseAddress);
+
+        // Two adapters behind IWhatsAppProvider, on two different hosts. This is the assertion that would
+        // have caught issue #139 before production did.
+        Assert.Equal(new Uri("https://graph.facebook.com/"), factory.CreateClient("meta-whatsapp").BaseAddress);
     }
 
     [Fact]
@@ -67,7 +71,8 @@ public class ProviderEndpointWiringTests
         var configuration = Configuration(
             ("Hiram:Providers:Endpoints:Resend", "http://localhost:4010/resend/"),
             ("Hiram:Providers:Endpoints:TwilioEmail", "http://localhost:4010/comms/v1/"),
-            ("Hiram:Providers:Endpoints:TwilioApi", "http://localhost:4010/twilio/"));
+            ("Hiram:Providers:Endpoints:TwilioApi", "http://localhost:4010/twilio/"),
+            ("Hiram:Providers:Endpoints:MetaGraph", "http://localhost:4010/meta/"));
 
         using var provider = Build(configuration);
         var factory = provider.GetRequiredService<IHttpClientFactory>();
@@ -76,6 +81,7 @@ public class ProviderEndpointWiringTests
         Assert.Equal(new Uri("http://localhost:4010/comms/v1/"), factory.CreateClient("twilio-email").BaseAddress);
         Assert.Equal(new Uri("http://localhost:4010/twilio/"), factory.CreateClient("twilio-sms").BaseAddress);
         Assert.Equal(new Uri("http://localhost:4010/twilio/"), factory.CreateClient("twilio-whatsapp").BaseAddress);
+        Assert.Equal(new Uri("http://localhost:4010/meta/"), factory.CreateClient("meta-whatsapp").BaseAddress);
     }
 
     [Theory]
@@ -94,5 +100,17 @@ public class ProviderEndpointWiringTests
         // error and send whoever is on call looking at the provider instead of at the configuration.
         var error = Assert.Throws<InvalidOperationException>(() => Build(configuration));
         Assert.Contains("Hiram:Providers:Endpoints:TwilioApi", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GraphVersion_FallsBackToProduction_AndCanBeConfigured()
+    {
+        using var byDefault = Build(Configuration());
+        Assert.Equal("v23.0", byDefault.GetRequiredService<ProviderEndpoints>().MetaGraphVersion);
+
+        // Meta puts the version in the path and force-upgrades anything pinned to a version it stops
+        // serving. Moving it has to be a configuration change, never a deploy.
+        using var configured = Build(Configuration(("Hiram:Providers:Endpoints:MetaGraphVersion", "v26.0")));
+        Assert.Equal("v26.0", configured.GetRequiredService<ProviderEndpoints>().MetaGraphVersion);
     }
 }

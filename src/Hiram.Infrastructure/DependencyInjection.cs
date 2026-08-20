@@ -75,11 +75,15 @@ public static class DependencyInjection
         services.AddProviderClient(ProviderNames.TwilioEmail);
         services.AddProviderClient(ProviderNames.TwilioSms);
         services.AddProviderClient(ProviderNames.TwilioWhatsApp);
+        services.AddProviderClient(ProviderNames.MetaWhatsApp);
 
         services.AddTransient<IEmailProvider>(provider => new ResendEmailProvider(provider.ClientFor(ProviderNames.Resend)));
         services.AddTransient<IEmailProvider>(provider => new TwilioEmailProvider(provider.ClientFor(ProviderNames.TwilioEmail)));
         services.AddTransient<ISmsProvider>(provider => new TwilioSmsProvider(provider.ClientFor(ProviderNames.TwilioSms)));
         services.AddTransient<IWhatsAppProvider>(provider => new TwilioWhatsAppProvider(provider.ClientFor(ProviderNames.TwilioWhatsApp)));
+        services.AddTransient<IWhatsAppProvider>(provider => new MetaWhatsAppProvider(
+            provider.ClientFor(ProviderNames.MetaWhatsApp),
+            provider.GetRequiredService<ProviderEndpoints>().MetaGraphVersion));
 
         return services;
     }
@@ -92,7 +96,11 @@ public static class DependencyInjection
         services.AddSingleton(new ProviderEndpoints(
             Absolute(endpoints, "Resend", ProviderEndpoints.Production.Resend),
             Absolute(endpoints, "TwilioEmail", ProviderEndpoints.Production.TwilioEmail),
-            Absolute(endpoints, "TwilioApi", ProviderEndpoints.Production.TwilioApi)));
+            Absolute(endpoints, "TwilioApi", ProviderEndpoints.Production.TwilioApi),
+            Absolute(endpoints, "MetaGraph", ProviderEndpoints.Production.MetaGraph),
+            endpoints["MetaGraphVersion"] is { Length: > 0 } version
+                ? version
+                : ProviderEndpoints.Production.MetaGraphVersion));
 
         return services;
     }
@@ -109,6 +117,7 @@ public static class DependencyInjection
         ProviderNames.Resend => endpoints.Resend,
         ProviderNames.TwilioEmail => endpoints.TwilioEmail,
         ProviderNames.TwilioSms or ProviderNames.TwilioWhatsApp => endpoints.TwilioApi,
+        ProviderNames.MetaWhatsApp => endpoints.MetaGraph,
         _ => throw new InvalidOperationException($"No endpoint is mapped for the provider '{providerName}'.")
     };
 
