@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Hiram.Application.Delivery;
 using Hiram.Infrastructure.Delivery;
+using Hiram.Simulator.Providers;
 using Hiram.Simulator.Twilio;
 
 namespace Hiram.IntegrationTests.Delivery;

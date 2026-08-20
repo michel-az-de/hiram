@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Hiram.Simulator.Twilio;
+namespace Hiram.Simulator.Providers;
 
 // Identifiers a run can be compared against the previous one. A random SID would make two executions of
 // the same script produce logs that cannot be diffed, which is most of the value of a local double.
