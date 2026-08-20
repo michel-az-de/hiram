@@ -1,6 +1,6 @@
 # ADR-023: Canal WhatsApp via Cloud API direta, template outbound com status loop
 
-**Status:** Supersedido pelo ADR-027
+**Status:** Supersedido pelo ADR-027, e o canal foi redecidido pelo ADR-030
 **Data:** 2026-07-13
 **Decisores:** Felipe (arquiteto)
 
