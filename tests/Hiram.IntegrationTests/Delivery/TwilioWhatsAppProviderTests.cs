@@ -57,7 +57,11 @@ public class TwilioWhatsAppProviderTests
         return new WhatsAppProviderSettings(values, secret, ProviderConfigOrigin.Tenant);
     }
 
-    private static WhatsAppMessage Message() => new("+5511982254398", "Seu pedido 42 saiu para entrega.");
+    private static WhatsAppMessage Message() =>
+        new WhatsAppMessage.FreeForm("+5511982254398", "Seu pedido 42 saiu para entrega.");
+
+    private static WhatsAppMessage TemplateMessage() =>
+        new WhatsAppMessage.Template("+5511982254398", "order_shipped", "pt_BR", ["42"]);
 
     private static TwilioWhatsAppProvider Provider(HttpMessageHandler handler)
     {
@@ -188,5 +192,23 @@ public class TwilioWhatsAppProviderTests
             .SendAsync(Message(), Settings(), CancellationToken.None);
 
         Assert.IsType<SendOutcome.TransientFailure>(outcome);
+    }
+
+    [Fact]
+    public async Task Send_RefusesATemplate_BecauseThisAdapterOnlySendsFreeForm()
+    {
+        var handler = new CapturingHandler(_ => Queued("SM1"));
+
+        var outcome = await Provider(handler).SendAsync(TemplateMessage(), Settings(), CancellationToken.None);
+
+        // Configuration, not Provider: the tenant asked for a shape this adapter cannot send, and the fix is
+        // to point the tenant at the Meta adapter, not to retry or to blame the recipient.
+        var failure = Assert.IsType<SendOutcome.PermanentFailure>(outcome);
+        Assert.Equal(DeliveryFailureKind.Configuration, failure.Kind);
+        Assert.Contains("template", failure.Reason, StringComparison.OrdinalIgnoreCase);
+
+        // Nothing left for the provider. Flattening the template into text would have delivered either raw
+        // placeholders or wording nobody approved, and a request that never happened cannot do either.
+        Assert.Equal(0, handler.Calls);
     }
 }

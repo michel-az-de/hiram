@@ -34,6 +34,14 @@ public sealed class TwilioWhatsAppProvider : IWhatsAppProvider
             return new SendOutcome.PermanentFailure(
                 "Twilio WhatsApp requires account_sid, from, api_key_sid and an api key secret.");
 
+        // A template belongs to the Meta adapter, which sends it by name, and to Twilio's own ContentSid,
+        // which this adapter does not implement. Refusing by name beats flattening the template into text:
+        // that would deliver either raw placeholders or wording nobody approved (ADR-030, edge 2 of slice 1).
+        if (message is not WhatsAppMessage.FreeForm freeForm)
+            return new SendOutcome.PermanentFailure(
+                $"{Channel} sends free form messages only, and this notification carries a template.",
+                DeliveryFailureKind.Configuration);
+
         // The notification body goes out as written. Unlike SMS and email, the sandbox accepts free text
         // inside the 24h session the recipient opens by joining; outside it Twilio answers 63016, which
         // classifies as permanent and names itself in the dead letter, so a replay after a rejoin works.
@@ -41,9 +49,9 @@ public sealed class TwilioWhatsAppProvider : IWhatsAppProvider
         {
             Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
-                ["To"] = AddressPrefix + message.Recipient,
+                ["To"] = AddressPrefix + freeForm.Recipient,
                 ["From"] = AddressPrefix + from,
-                ["Body"] = message.Body
+                ["Body"] = freeForm.Body
             })
         };
         request.Headers.Authorization = new AuthenticationHeaderValue(
