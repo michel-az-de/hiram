@@ -96,20 +96,50 @@ multi-target de net472 e netstandard2.0 até net10.
 
 **Prós:** cobertura ampla, inclusive mídia, interativas, flows e um helper de assinatura de webhook.
 Manutenção ativa e recente.
-**Contras:** arrasta `Microsoft.Extensions.Http.Polly` e `Polly` próprios, e o repositório já tem seu
-pipeline; o DI dele registra por tipo, o que é exatamente o padrão que causou a issue #139 aqui; e o
-multi-target até net472 impõe um denominador comum abaixo do que o repo usa. Rejeitada como dependência e
-**adotada como referência de leitura** para o cálculo de assinatura e o mapa de erro.
+**Contras:** dois deles vieram da leitura do código, não do README, e são fatais para um gateway
+multi-tenant. O endereço base é estado estático de processo,
+`public static Uri BaseAddress { get; private set; } = new Uri("https://graph.facebook.com/v25.0/")`,
+então a versão da Graph API passaria a ser global e não por tenant, que é a mesma classe de falha da issue
+#139. E `WhatsAppBusinessClientFactory.Create(config)` devolve `new WhatsAppBusinessClient(config)` a cada
+chamada, sem `IHttpClientFactory`, o que num caminho que resolve credencial por tenant a cada envio esgota
+socket. Somam-se a isso o `Polly` próprio, redundante com o pipeline do repo, o multi-target até net472
+impondo um denominador comum abaixo do que o repo usa, e a superfície de erro por exceção
+(`WhatsappBusinessCloudAPIException`), quando o `SendOutcome` existe justamente para não decidir retry
+dentro de um `catch`. Rejeitada como dependência e **adotada como referência de leitura** para o cálculo
+de assinatura e o mapa de erro.
 
 #### Opção C: SDK gerado (`apimatic/whatsapp-dotnet-sdk`)
 
+Medido em 2026-08-20: 5 estrelas, 3 commits, versão padrão da Graph API `v13.0`.
+
 **Prós:** cobertura derivada do OpenAPI da Meta.
-**Contras:** superfície gerada, sem opinião sobre resiliência nem sobre o que é transiente. Rejeitada.
+**Contras:** abandonado, e o padrão treze versões atrás do que a Meta serve hoje. Rejeitada.
 
 #### Opção D: bibliotecas sobre WhatsApp Web (Baileys, WAHA)
 
 **Rejeitada por política, não por técnica.** São engenharia reversa do cliente, violam os termos da Meta e
 custam o número.
+
+#### Opção E: Azure Communication Services Advanced Messaging
+
+A alternativa mais séria que a pesquisa encontrou, e a única com código pronto de qualidade industrial.
+SDK .NET mantido pela Microsoft, conecta uma WABA existente ou cria uma nova, entrega relatório de `sent`,
+`delivered` e `read` por Event Grid, e já documenta o suporte a BSUID.
+
+**Prós:** muito menos código próprio, SDK mantido por terceiro com SLA, e a conta Azure já existe.
+**Contras:** é um BSP, exatamente o papel que este ADR foi aberto para remover do caminho. Troca a
+dependência da Twilio pela dependência do Azure, soma o preço do serviço ao preço por mensagem da Meta, e
+acopla um gateway que hoje roda em qualquer lugar a um provedor de nuvem específico. Rejeitada pelo motivo
+declarado do ADR, não por qualidade. Fica registrada como o caminho de menor esforço caso a decisão de
+operar a WABA diretamente se mostre cara demais em compliance.
+
+#### Nota sobre a ausência de SDK oficial
+
+Não existe SDK oficial da Meta para .NET, e nunca existiu. O único oficial foi
+`WhatsApp/WhatsApp-Nodejs-SDK`, **arquivado pela própria Meta em 2023-06-07**. Os exemplos oficiais em
+`fbsamples/whatsapp-api-examples` cobrem Node, Python e Java, e não C#. Isso não é lacuna de mercado a
+preencher: é a Meta afirmando que a Cloud API é HTTP simples o bastante para não justificar SDK, e é o
+argumento mais forte a favor da opção A.
 
 ### O que fazer com o adapter `twilio-whatsapp`
 
@@ -185,7 +215,9 @@ da Meta no ADR-023.
    | não mapeado | 429 e 5xx transiente, resto permanente | fallback por faixa |
 
 6. **`wamid` é o identificador de entrega.** A resposta de aceite traz `messages[0].id`, e é ele que vai para
-   `provider_message_id` no `DeliveryAttempt`. É a chave que o callback de status correlaciona.
+   `provider_message_id` no `DeliveryAttempt`. É a chave que o callback de status correlaciona, e correlacionar
+   por ela e nunca pelo telefone é o que torna este canal imune ao BSUID da borda 15. Isso deixa de ser
+   coincidência e passa a ser razão declarada.
 
 7. **Webhook de status fora de `/v1`.** Mesma razão da borda 10 do ADR-028: a Meta não carrega `X-Api-Key`, e
    abrir exceção dentro do prefixo protegido enfraqueceria o `ApiKeyMiddleware` para toda a superfície.
@@ -223,6 +255,37 @@ da Meta no ADR-023.
 14. **Testes sem rede no gate.** Stub de `HttpMessageHandler` no CI e duplo HTTP no simulador. Verificação
     contra a Meta real é local, com user-secrets, e nunca condiciona merge. Mesmo padrão do ADR-028 e do
     ADR-029.
+
+15. **Identidade do destinatário e o BSUID.** A Meta está lançando usernames no WhatsApp, e criou o
+    business-scoped user ID para continuar identificando quem é quem quando o telefone deixar de aparecer.
+    Formato `{ISO 3166 alpha-2}.{até 128 alfanuméricos}`, por exemplo `US.13491208655302741918`, opaco,
+    estável quando o usuário troca de username, regenerado quando troca de telefone, e **escopado por
+    business portfolio**, ou seja, o mesmo usuário tem BSUID diferente para cada empresa. Linha do tempo
+    medida em 2026-08-20, com os três marcos já vencidos: BSUIDs em webhook de produção desde 2026-03-31,
+    Contact Book desde o início de abril, e envio para BSUID desde junho.
+
+    O que isso significa aqui, sem dramatizar. **O escopo Nível 1 é outbound puro, e o outbound não quebra:**
+    o tenant continua fornecendo E.164 e o campo `to` continua aceitando telefone. **O status loop também
+    não quebra**, porque a correlação é por `wamid` e não por telefone, conforme a borda 6. O impacto real é
+    menor do que a primeira leitura sugere, e este parágrafo existe para que ninguém redescubra isso com
+    susto.
+
+    O que muda de fato, e é o que fica cravado:
+
+    - No callback, `statuses[].recipient_user_id` sempre traz o BSUID, enquanto `contacts[].wa_id`
+      **pode vir ausente**. Nenhum código do webhook pode ler telefone e presumir que ele existe.
+    - Quando o BSUID vier, ele é **gravado** junto da tentativa. Não é usado para correlacionar, mas
+      descartá-lo agora custaria uma migração de dados no dia em que o Nível 2 abrir.
+    - `PhoneNumber`, que centraliza a regra E.164, passa a valer para o endereço que o tenant fornece e
+      não para o que o provider devolve. A validação de saída continua; a de entrada não presume formato.
+    - **Templates de autenticação one-tap, zero-tap e copy-code exigem telefone e não aceitam BSUID.**
+      Se um tenant pedir esse tipo de template, o BSUID não é substituto e o envio depende do número.
+    - O telefone continua aparecendo no webhook se houve interação nos últimos 30 dias **por aquele número
+      de origem**, não por portfolio, ou se o usuário está no Contact Book. Depender disso seria depender
+      de um estado que expira, então o produto não depende.
+
+    Inbound, resposta a usuário que só tem username, e uso de BSUID como destinatário são Nível 2 e reabrem
+    este ADR. O que o Nível 1 assume é a obrigação de não jogar fora o identificador que já chega.
 
 ## Onboarding, e por que o número novo não entra primeiro
 
@@ -283,6 +346,9 @@ configuração e o `tools/Hiram.Simulator`, que estão nos PRs #140 e #142 e ain
   pelo produto reabre este ADR.
 - **Embedded Signup:** quando houver mais de um tenant por onboarding manual.
 - **Volume:** primeiro `429` recorrente reabre a borda 11 do ADR-028, pipeline de resiliência por canal.
+- **BSUID:** primeiro callback observado sem `wa_id`, ou primeira demanda de responder a usuário que só tem
+  username, reabre a borda 15 e provavelmente exige uma decisão própria sobre identidade de destinatário,
+  que vale para todos os canais e não só para este.
 
 ## Lacunas conhecidas, não medidas
 
@@ -291,11 +357,20 @@ Registradas para que ninguém as leia como fato.
 1. A tarifa de `utility` no Brasil não foi confirmada em fonte primária da Meta. Sabe-se que desde
    2026-07-01 a cobrança é por mensagem entregue e não mais por conversa de 24 horas, e que a faixa global de
    `utility` vai de USD 0,004 a USD 0,0456. O valor do Brasil deve ser medido no painel da própria WABA.
-2. A versão da Graph API a fixar deve ser confirmada no painel do app no momento da fatia 2. A divergência
-   entre `v23.0` da documentação e `v26.0` do changelog não foi resolvida por fonte primária.
+2. A versão da Graph API a fixar deve ser confirmada no painel do app no momento da fatia 2. Três valores
+   diferentes foram observados em 2026-08-20 e nenhum é fonte primária de qual usar: `v23.0` na
+   documentação de get-started, `v26.0` no changelog do Graph API, e `v25.0` como padrão da biblioteca
+   `WhatsappBusiness.CloudApi`. A divergência é em si o argumento da borda 2, versão como configuração.
 3. O comportamento do número de teste e do `hello_world` foi lido na documentação, não medido contra a API.
    O ADR-028 mediu a documentação da Twilio divergindo da realidade em pelo menos dois pontos, e a issue
    #133 registra um deles. Presumir que a Meta é diferente seria ingenuidade. A fatia 2 mede antes de cravar.
+4. O BSUID da borda 15 foi levantado na documentação da Meta e na do Azure Communication Services, que
+   concordam entre si, e **não** foi observado num payload real. A afirmação de que o Nível 1 não quebra é
+   raciocínio sobre o desenho, correlação por `wamid`, e não medição. A fatia 5 confirma contra o webhook
+   real antes de fechar o critério de conclusão.
+5. O custo do Azure Communication Services, alternativa E, não foi levantado. A rejeição dele é por
+   arquitetura, manter um intermediário, e não por preço. Se a decisão voltar a ser discutida por custo, o
+   número precisa ser medido primeiro.
 
 ## ADRs afetados
 
@@ -324,9 +399,13 @@ Registradas para que ninguém as leia como fato.
 6. [ ] Resolução de template na ingestão e no fan-out, com mapeamento de `data` nomeado para parâmetros
    posicionais e fan-out só com template aprovado na Meta.
 7. [ ] Endpoints de template e provider do WhatsApp, fechando a issue #53.
-8. [ ] Rota de callback com handshake, assinatura sobre corpo cru e estado derivado idempotente.
-9. [ ] Onboarding de credencial da Meta no `docs/operations-runbook.md`, ao lado da seção da Twilio.
-10. [ ] Medir e registrar a tarifa real de `utility` no Brasil, fechando a lacuna 1.
+8. [ ] Rota de callback com handshake, assinatura sobre corpo cru e estado derivado idempotente, lendo
+   `statuses[].recipient_user_id` sem presumir que `contacts[].wa_id` existe (borda 15).
+9. [ ] Gravar o BSUID na tentativa quando ele vier, sem usá-lo para correlacionar.
+10. [ ] Onboarding de credencial da Meta no `docs/operations-runbook.md`, ao lado da seção da Twilio.
+11. [ ] Medir e registrar a tarifa real de `utility` no Brasil, fechando a lacuna 1.
+12. [ ] Verificar se o canal `twilio-whatsapp`, já em produção, lê telefone de algum payload de provider. Se
+    ler, o BSUID o atinge antes de atingir a Meta, e o conserto não espera este ADR.
 
 ## Critério de conclusão
 

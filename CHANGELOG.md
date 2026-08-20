@@ -16,7 +16,13 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
   categoria e preco, o que torna realizaveis os itens 5 e 6 do ADR-028, adiados desde 2026-08-08 porque o
   trial da Twilio nao tinha contraparte para comprovar. Nenhuma dependencia nova: adapter proprio sobre
   `HttpClient`, e a biblioteca `WhatsappBusiness.CloudApi` fica como referencia de leitura, nao como
-  pacote. Supersede o ADR-023.
+  pacote: o endereco base dela e estado estatico de processo e a factory devolve um cliente novo por
+  chamada, dois padroes que um gateway multi-tenant nao suporta. Nao existe SDK oficial da Meta para .NET,
+  e o unico oficial que existiu, o de Node, foi arquivado pela propria Meta em 2023. O Azure Communication
+  Services foi avaliado e rejeitado por manter um intermediario, nao por qualidade. O ADR tambem crava o
+  tratamento do BSUID, o identificador que a Meta passou a emitir em webhook desde 2026-03-31 no lugar do
+  telefone: o Nivel 1 nao quebra porque a correlacao e por `wamid`, e isso passa a ser razao declarada em
+  vez de coincidencia. Supersede o ADR-023.
 - Contagem de segmento de SMS na resposta de ingestao. `POST /v1/notifications` devolve `segments` no
   canal SMS e `null` nos demais. GSM-7 cabe 160 caracteres em mensagem avulsa e UCS-2 apenas 70, e em
   portugues as vogais com til e circunflexo estao fora do GSM-7 enquanto o e agudo e a cedilha estao
