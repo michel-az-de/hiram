@@ -1,5 +1,5 @@
 using Hiram.Contracts;
-using Hiram.Simulator.Twilio;
+using Hiram.Simulator.Providers;
 
 namespace Hiram.Simulator.Walkthrough;
 
@@ -8,25 +8,21 @@ namespace Hiram.Simulator.Walkthrough;
 // the outbox, the worker, the durable claim, the attempt record and the dead letter.
 public sealed class DeliveryWalkthrough
 {
-    // The value a tenant writes in PUT /v1/providers/{channel}. It is a public contract value, so the
-    // simulator carries its own copy rather than reaching into the product for it.
-    private const string TwilioSms = "twilio-sms";
-    private const string TwilioWhatsApp = "twilio-whatsapp";
     private const string Destination = "+5511999990000";
 
     private static readonly TimeSpan SettlementBudget = TimeSpan.FromSeconds(30);
 
     private readonly HiramApi _hiram;
-    private readonly TwilioDouble? _twilio;
+    private readonly IProviderDouble? _double;
     private readonly Uri _doubleAddress;
     private readonly Transcript _transcript;
     private readonly ProviderScenario _refusal;
 
     public DeliveryWalkthrough(
-        HiramApi hiram, TwilioDouble? twilio, Uri doubleAddress, Transcript transcript, ProviderScenario refusal)
+        HiramApi hiram, IProviderDouble? provider, Uri doubleAddress, Transcript transcript, ProviderScenario refusal)
     {
         _hiram = hiram;
-        _twilio = twilio;
+        _double = provider;
         _doubleAddress = doubleAddress;
         _transcript = transcript;
         _refusal = refusal;
@@ -47,10 +43,10 @@ public sealed class DeliveryWalkthrough
         var refused = await DeliverAsync("act 2, the provider refuses", _refusal, cancellationToken);
         var routed = await FanOutAsync(tenant, cancellationToken);
 
-        if (_twilio is not null)
+        if (_double is not null)
         {
             _transcript.Section("what the double saw");
-            foreach (var line in _twilio.Log)
+            foreach (var line in _double.Log)
                 _transcript.Detail(line);
         }
 
@@ -82,23 +78,16 @@ public sealed class DeliveryWalkthrough
 
         // Placeholders on purpose: the double never checks the secret, and a walkthrough that needed a real
         // credential would stop being runnable offline.
-        var settings = new Dictionary<string, string>
-        {
-            ["account_sid"] = "AC00000000000000000000000000000000",
-            ["api_key_sid"] = "SK00000000000000000000000000000000",
-            ["from"] = "+15005550006"
-        };
+        // Which channels exist and what each one is called comes from the double, so pointing the run at
+        // another provider does not mean editing the script.
+        foreach (var config in Configs)
+            await _hiram.SetProviderAsync(
+                config.Channel,
+                new SetProviderConfigRequest(config.Provider, new Dictionary<string, string>(config.Settings), "simulator"),
+                cancellationToken);
 
-        await _hiram.SetProviderAsync(
-            "sms",
-            new SetProviderConfigRequest(TwilioSms, new Dictionary<string, string>(settings), "simulator"),
-            cancellationToken);
-        await _hiram.SetProviderAsync(
-            "whatsapp",
-            new SetProviderConfigRequest(TwilioWhatsApp, new Dictionary<string, string>(settings), "simulator"),
-            cancellationToken);
-
-        _transcript.Detail($"sms and whatsapp configured, provider host is {_doubleAddress}");
+        _transcript.Detail(
+            $"{string.Join(" and ", Configs.Select(config => config.Channel))} configured, provider host is {_doubleAddress}");
         return tenant;
     }
 
@@ -109,7 +98,7 @@ public sealed class DeliveryWalkthrough
         _transcript.Detail($"double answering {ProviderScenarios.Describe(scenario)}");
 
         var id = await _hiram.SubmitNotificationAsync(
-            new SubmitNotificationRequest("sms", Destination, Body: "Seu pedido 42 saiu para entrega."),
+            new SubmitNotificationRequest(Channel, Destination, Body: "Seu pedido 42 saiu para entrega."),
             cancellationToken);
         _transcript.Detail($"accepted as {id}");
 
@@ -127,12 +116,12 @@ public sealed class DeliveryWalkthrough
         const string eventType = "SimulatorOrderShipped";
 
         await _hiram.EnsureTemplateAsync(
-            new CreateTemplateRequest("sms", templateName, null, "Pedido {{ order }} saiu para entrega."),
+            new CreateTemplateRequest(Channel, templateName, null, "Pedido {{ order }} saiu para entrega."),
             cancellationToken);
-        await _hiram.CreateRoutineAsync(tenant, eventType, templateName, ["sms"], cancellationToken);
+        await _hiram.CreateRoutineAsync(tenant, eventType, templateName, [Channel], cancellationToken);
 
         var user = Guid.NewGuid();
-        await _hiram.SetConsentAsync(new SetConsentRequest(user, "sms", "transactional", true), cancellationToken);
+        await _hiram.SetConsentAsync(new SetConsentRequest(user, Channel, "transactional", true), cancellationToken);
         _transcript.Detail($"template, routine and opt-in ready for user {user}");
 
         var before = await KnownIdsAsync(cancellationToken);
@@ -159,19 +148,25 @@ public sealed class DeliveryWalkthrough
 
     private void SetScenario(ProviderScenario scenario)
     {
-        if (_twilio is not null)
-            _twilio.Scenario = scenario;
+        if (_double is not null)
+            _double.Scenario = scenario;
     }
 
+    // Live mode has no double to ask, and the values it would provide are the ones a real account already
+    // has configured, so there is nothing to provision and nothing to name.
+    private IReadOnlyList<ProviderConfig> Configs => _double?.Configs ?? [];
+
+    private string Channel => _double?.WalkthroughChannel ?? "sms";
+
     private async Task<HashSet<Guid>> KnownIdsAsync(CancellationToken cancellationToken) =>
-        (await _hiram.ListNotificationsAsync("sms", cancellationToken)).Select(item => item.Id).ToHashSet();
+        (await _hiram.ListNotificationsAsync(Channel, cancellationToken)).Select(item => item.Id).ToHashSet();
 
     private async Task<Guid?> AwaitNewNotificationAsync(HashSet<Guid> before, CancellationToken cancellationToken)
     {
         var deadline = DateTimeOffset.UtcNow + SettlementBudget;
         while (DateTimeOffset.UtcNow < deadline)
         {
-            var fresh = (await _hiram.ListNotificationsAsync("sms", cancellationToken))
+            var fresh = (await _hiram.ListNotificationsAsync(Channel, cancellationToken))
                 .FirstOrDefault(item => !before.Contains(item.Id));
             if (fresh is not null)
                 return fresh.Id;

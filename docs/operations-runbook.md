@@ -221,22 +221,31 @@ que o duplo respondeu a cada chamada.
 **Provocar o caminho ruim.** `--scenario` aceita o nome ou o código do provider, que é o que aparece no
 dead letter e portanto o que se tem em mãos ao reproduzir um incidente:
 
-| Valor | O que o duplo responde |
-|---|---|
-| `accept` | `201` com `queued` |
-| `21408` | região não habilitada em Geo Permissions |
-| `30034` | número dos EUA sem campanha 10DLC registrada, erro de configuração da conta |
-| `21610` | destinatário respondeu STOP |
-| `30007` | aceito e depois reportado `failed` pela operadora |
-| `63016` | texto livre fora da janela de 24h do WhatsApp, como a documentação prevê |
-| `21654` | `ContentSid Required`, que é o que uma janela fechada realmente respondeu (issue #133) |
-| `30003` | aparelho inalcançável, classificado como transitório |
-| `30005` | o número não existe |
-| `429` | rate limit, classificado como transitório |
-| `500` | erro do provider, classificado como transitório |
+| Nome | Twilio | Meta | O que representa |
+|---|---|---|---|
+| `accept` | `201 queued` | `200` com `wamid` | entrega aceita |
+| `geo` | `21408` | não tem | região fora das Geo Permissions |
+| `10dlc` | `30034` | não tem | número dos EUA sem campanha 10DLC |
+| `optout` | `21610` | não tem | destinatário respondeu STOP |
+| `filtered` | `30007` | não tem | aceito e depois filtrado pela operadora |
+| `unreachable` | `30003` | não tem | aparelho inalcançável, transitório |
+| `unknown` | `30005` | `131026` | o destinatário não existe ou não está no WhatsApp |
+| `window` | `63016` | `131047` | texto livre fora da janela de 24h |
+| `template` | `21654` | `132001` | exige template, e ele não serve ou não existe |
+| `parameters` | não tem | `132000` | o template espera outra quantidade de valores |
+| `token` | não tem | `190` | token de acesso expirado |
+| `restricted` | não tem | `131031` | conta restrita por violação de política |
+| `ratelimited` | `429` | `130429` | rate limit, transitório |
+| `servererror` | `500` | `131000` | erro do lado do provider, transitório |
+
+O mesmo nome vale nos dois providers, e o código de qualquer um dos dois também: `--scenario 63016` e
+`--scenario 131047` chegam ao mesmo cenário, e cada duplo responde no seu dialeto. Um cenário que o
+provider escolhido não tem **falha na linha de comando**, nomeando os que existem. Um duplo que inventasse
+um erro que a API real nunca devolve seria pior que nenhum duplo.
 
 No roteiro, `--scenario` escolhe **como o ato 2 recusa**, porque os atos 1 e 3 precisam ter sucesso para a
-execução provar alguma coisa. Sem o argumento, a recusa é o `21610`.
+execução provar alguma coisa. Sem o argumento, a recusa é o `optout` na Twilio e o `window` na Meta, que é
+o que ela tem de mais próximo.
 
 `serve` sobe só o duplo, sem roteiro, para exercitar o Hiram por outro caminho. `POST /_control/scenario`
 troca a resposta sem reiniciar o processo.
@@ -245,7 +254,32 @@ troca a resposta sem reiniciar o processo.
 contra a conta real. Use apenas com a credencial do ambiente e sabendo que a mensagem sai.
 
 O duplo não entra no gate de CI. O que o CI cobre é a paridade entre o que ele responde e o que os adapters
-classificam (`ProviderDoubleParityTests`), sem abrir porta e sem rede.
+classificam (`ProviderDoubleParityTests` e `MetaDoubleParityTests`), sem abrir porta e sem rede.
+
+### 3.8.1 Escolher o provider
+
+`--provider twilio` é o padrão e não mudou. `--provider meta` sobe o duplo da Cloud API em vez do da
+Twilio:
+
+```bash
+dotnet run --project tools/Hiram.Simulator -- serve --provider meta
+```
+
+O Hiram aponta para ele por uma variável só, porque a Cloud API é um host só:
+
+```bash
+Hiram__Providers__Endpoints__MetaGraph=http://localhost:4010/ dotnet run --project src/Hiram.Api
+```
+
+Duas diferenças de comportamento, ambas por limite real do provider e não por escolha:
+
+1. **O roteiro da Meta corre em WhatsApp, não em SMS.** A Cloud API não tem SMS, então os três atos usam o
+   canal que existe. O da Twilio continua em SMS, como sempre foi.
+2. **A Meta configura um canal só.** O tenant recebe `meta-whatsapp` em `whatsapp` e nada mais.
+
+O tenant do roteiro recebe `phone_number_id` de teste, e a versão da Graph API vem do padrão do host, para
+que a execução exercite o valor que produção usaria. Um tenant pode fixar a sua em
+`settings.graph_version`.
 
 ## 4. Rotação de API key
 

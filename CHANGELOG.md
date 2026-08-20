@@ -6,6 +6,16 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Duplo da Meta no `tools/Hiram.Simulator`, escolhido por `--provider meta` (ADR-030, item 4). Ele serve
+  `POST /{versao}/{phone_number_id}/messages` com `Bearer` exigido, nos formatos que o
+  `MetaWhatsAppProvider` ja classifica, e o roteiro de tres atos corre em WhatsApp porque a Cloud API nao
+  tem SMS. Stub de handler prova o adapter; um processo HTTP real prova a composicao em volta dele, que e
+  onde vivia o defeito da issue #139. Cenario passa a ter nome neutro de provider e aceita o codigo de
+  qualquer um dos dois: `--scenario 63016` e `--scenario 131047` chegam ao mesmo lugar e cada duplo
+  responde no seu dialeto. Cenarios novos para falhas que so a Cloud API produz: `132000` parametro em
+  quantidade errada, `190` token expirado e `131031` conta restrita. Cenario que o provider escolhido nao
+  tem falha na linha de comando nomeando os que existem, porque um duplo que inventa erro que a API real
+  nunca devolve e pior que nenhum duplo. `--provider twilio` continua o padrao e sem mudanca.
 - Adapter `meta-whatsapp`, a Cloud API da Meta como segunda implementacao de `IWhatsAppProvider`, ao lado
   de `twilio-whatsapp` e nao no lugar dela (ADR-030, itens 2 e 3). Envia corpo livre como `type: text` e
   template como `type: template` com os parametros nas posicoes, e devolve o `wamid` de `messages[0].id`

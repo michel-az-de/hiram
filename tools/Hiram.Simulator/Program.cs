@@ -1,3 +1,5 @@
+using Hiram.Simulator.Meta;
+using Hiram.Simulator.Providers;
 using Hiram.Simulator.Twilio;
 using Hiram.Simulator.Walkthrough;
 
@@ -31,15 +33,31 @@ internal static class EntryPoint
 
         // In live mode there is no double: the Hiram under test keeps its production endpoints and the
         // money is real. The mode exists so the same script can confirm a paid account, never as default.
-        var twilio = options.Live ? null : new TwilioDouble(options.Scenario);
-        var host = twilio?.Build(options.DoubleAddress);
+        IProviderDouble? provider = options.Live
+            ? null
+            : options.Provider is SimulatedProvider.Meta
+                ? new MetaDouble(options.Scenario)
+                : new TwilioDouble(options.Scenario);
 
-        if (host is not null)
+        // Refusing here beats answering an error the real API never returns: a run that proves a
+        // classification which cannot happen is worse than a run that did not happen.
+        if (provider is not null && !provider.Supports(options.Scenario))
+        {
+            Console.Error.WriteLine(
+                $"{provider.Name} has no equivalent of '{ProviderScenarios.Describe(options.Scenario)}'.");
+            Console.Error.WriteLine($"It answers: {string.Join(", ", Supported(provider))}.");
+            return 2;
+        }
+
+        var host = provider is null ? null : ProviderDoubleHost.Build(provider, options.DoubleAddress);
+
+        if (host is not null && provider is not null)
         {
             await host.StartAsync(stopping.Token);
-            Console.WriteLine($"provider double listening on {options.DoubleAddress}");
-            Console.WriteLine($"point Hiram at it with Hiram__Providers__Endpoints__TwilioApi={options.DoubleAddress}");
-            Console.WriteLine($"and Hiram__Providers__Endpoints__TwilioEmail={new Uri(options.DoubleAddress, "v1/")}");
+            Console.WriteLine($"{provider.Name} double listening on {options.DoubleAddress}");
+            Console.WriteLine("point Hiram at it with:");
+            foreach (var line in provider.Wiring(options.DoubleAddress))
+                Console.WriteLine($"  {line}");
         }
         else
         {
@@ -57,12 +75,14 @@ internal static class EntryPoint
 
             // In the walkthrough the scenario names how act 2 should be refused, since acts 1 and 3 have to
             // succeed for the run to prove anything. Without one, the refusal is an opt-out reply.
-            var refusal = options.Scenario is ProviderScenario.Accept
-                ? ProviderScenario.RecipientOptedOut
-                : options.Scenario;
+            var refusal = options.Scenario is not ProviderScenario.Accept
+                ? options.Scenario
+                : provider is null || provider.Supports(ProviderScenario.RecipientOptedOut)
+                    ? ProviderScenario.RecipientOptedOut
+                    : ProviderScenario.OutsideSessionWindow;
 
             using var hiram = new HiramApi(options.HiramAddress, options.AdminKey);
-            var walkthrough = new DeliveryWalkthrough(hiram, twilio, options.DoubleAddress, new Transcript(), refusal);
+            var walkthrough = new DeliveryWalkthrough(hiram, provider, options.DoubleAddress, new Transcript(), refusal);
             return await walkthrough.RunAsync(stopping.Token) ? 0 : 1;
         }
         catch (OperationCanceledException)
@@ -78,6 +98,9 @@ internal static class EntryPoint
             }
         }
     }
+
+    private static IEnumerable<string> Supported(IProviderDouble provider) =>
+        Enum.GetValues<ProviderScenario>().Where(provider.Supports).Select(ProviderScenarios.Alias);
 
     private static async Task WaitForCancellationAsync(CancellationToken cancellationToken)
     {

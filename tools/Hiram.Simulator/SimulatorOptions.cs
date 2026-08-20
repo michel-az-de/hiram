@@ -1,4 +1,4 @@
-using Hiram.Simulator.Twilio;
+using Hiram.Simulator.Providers;
 
 namespace Hiram.Simulator;
 
@@ -8,8 +8,15 @@ public enum SimulatorCommand
     Serve
 }
 
+public enum SimulatedProvider
+{
+    Twilio,
+    Meta
+}
+
 public sealed record SimulatorOptions(
     SimulatorCommand Command,
+    SimulatedProvider Provider,
     Uri DoubleAddress,
     Uri HiramAddress,
     string AdminKey,
@@ -22,6 +29,7 @@ public sealed record SimulatorOptions(
     public static SimulatorOptions Parse(string[] args)
     {
         var command = SimulatorCommand.Walkthrough;
+        var provider = SimulatedProvider.Twilio;
         var doubleAddress = DefaultDouble;
         var hiramAddress = DefaultHiram;
         var adminKey = Environment.GetEnvironmentVariable("HIRAM_ADMIN_KEY") ?? "admin-dev-local";
@@ -53,6 +61,11 @@ public sealed record SimulatorOptions(
                     if (!ProviderScenarios.TryParse(requested, out scenario))
                         throw new ArgumentException($"Unknown scenario '{requested}'. Try {ProviderScenarios.Codes}.");
                     break;
+                case "--provider":
+                    var named = Next(args, ref i, argument);
+                    if (!Enum.TryParse(named, ignoreCase: true, out provider))
+                        throw new ArgumentException($"Unknown provider '{named}'. Try twilio or meta.");
+                    break;
                 case "--live":
                     live = true;
                     break;
@@ -63,6 +76,7 @@ public sealed record SimulatorOptions(
 
         return new SimulatorOptions(
             command,
+            provider,
             Absolute(doubleAddress, "--double"),
             Absolute(hiramAddress, "--hiram"),
             adminKey,
@@ -80,6 +94,7 @@ public sealed record SimulatorOptions(
           --double <url>      where the double listens (default http://localhost:4010/)
           --hiram <url>       the Hiram under test (default http://localhost:3357/)
           --admin-key <key>   X-Admin-Key, or the HIRAM_ADMIN_KEY environment variable
+          --provider <name>   twilio (default) or meta
           --scenario <name>   {ProviderScenarios.Codes}
           --live              talk to the real provider instead of the double, and spend real money
         """;

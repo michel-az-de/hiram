@@ -1,4 +1,4 @@
-namespace Hiram.Simulator.Twilio;
+namespace Hiram.Simulator.Providers;
 
 // A response the double is about to write. It is a value, not an IResult, so the same builder that serves
 // the HTTP endpoint can be asserted against the real adapters without opening a port.

@@ -1,4 +1,4 @@
-namespace Hiram.Simulator.Twilio;
+namespace Hiram.Simulator.Providers;
 
 // What the double answers next. The double exists to provoke the bad path, which is the part a stubbed
 // HttpMessageHandler in CI covers worst, so every value here maps to a failure a real account produces.
@@ -14,7 +14,12 @@ public enum ProviderScenario
     OutsideSessionWindow,
     TemplateRequired,
     RateLimited,
-    ServerError
+    ServerError,
+
+    // Introduced by the Cloud API, which has no counterpart on the Twilio side.
+    TemplateParametersMismatch,
+    TokenExpired,
+    AccountRestricted
 }
 
 public static class ProviderScenarios
@@ -54,24 +59,41 @@ public static class ProviderScenarios
                 scenario = ProviderScenario.UnreachableHandset;
                 return true;
             case "30005":
+            case "131026":
             case "unknown":
                 scenario = ProviderScenario.UnknownHandset;
                 return true;
             case "63016":
+            case "131047":
             case "window":
                 scenario = ProviderScenario.OutsideSessionWindow;
                 return true;
             case "21654":
+            case "132001":
             case "template":
                 scenario = ProviderScenario.TemplateRequired;
                 return true;
             case "429":
+            case "130429":
             case "ratelimited":
                 scenario = ProviderScenario.RateLimited;
                 return true;
             case "500":
+            case "131000":
             case "servererror":
                 scenario = ProviderScenario.ServerError;
+                return true;
+            case "132000":
+            case "parameters":
+                scenario = ProviderScenario.TemplateParametersMismatch;
+                return true;
+            case "190":
+            case "token":
+                scenario = ProviderScenario.TokenExpired;
+                return true;
+            case "131031":
+            case "restricted":
+                scenario = ProviderScenario.AccountRestricted;
                 return true;
             default:
                 return false;
@@ -80,8 +102,29 @@ public static class ProviderScenarios
 
     // What --scenario accepts, derived from the enum instead of written down a second time: the hand
     // kept list went stale the moment a scenario was added, and the help then advertised half of what works.
-    public static string Codes => string.Join(
-        " | ", Enum.GetValues<ProviderScenario>().Select(scenario => Describe(scenario).Split(',')[0].Split(' ')[0]));
+    public static string Codes => string.Join(" | ", Enum.GetValues<ProviderScenario>().Select(Alias));
+
+    // The provider neutral name of a scenario. Codes are the handle someone reproducing an incident has,
+    // and they differ per provider for the same failure: a closed window is 63016 on Twilio and 131047 on
+    // Meta. Listing what a double accepts has to use the word both understand.
+    public static string Alias(ProviderScenario scenario) => scenario switch
+    {
+        ProviderScenario.Accept => "accept",
+        ProviderScenario.GeoPermissionDenied => "geo",
+        ProviderScenario.CampaignNotRegistered => "10dlc",
+        ProviderScenario.RecipientOptedOut => "optout",
+        ProviderScenario.CarrierFiltered => "filtered",
+        ProviderScenario.UnreachableHandset => "unreachable",
+        ProviderScenario.UnknownHandset => "unknown",
+        ProviderScenario.OutsideSessionWindow => "window",
+        ProviderScenario.TemplateRequired => "template",
+        ProviderScenario.RateLimited => "ratelimited",
+        ProviderScenario.ServerError => "servererror",
+        ProviderScenario.TemplateParametersMismatch => "parameters",
+        ProviderScenario.TokenExpired => "token",
+        ProviderScenario.AccountRestricted => "restricted",
+        _ => scenario.ToString().ToLowerInvariant()
+    };
 
     public static string Describe(ProviderScenario scenario) => scenario switch
     {
@@ -96,6 +139,9 @@ public static class ProviderScenarios
         ProviderScenario.TemplateRequired => "21654, ContentSid required, what a closed window actually answers",
         ProviderScenario.RateLimited => "429, rate limited",
         ProviderScenario.ServerError => "500, provider side error",
+        ProviderScenario.TemplateParametersMismatch => "132000, the template takes a different number of values",
+        ProviderScenario.TokenExpired => "190, the access token expired",
+        ProviderScenario.AccountRestricted => "131031, the business account is restricted for a policy violation",
         _ => scenario.ToString()
     };
 }

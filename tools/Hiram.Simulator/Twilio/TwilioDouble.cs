@@ -1,12 +1,13 @@
 using System.Net.Http.Headers;
 using System.Text;
+using Hiram.Simulator.Providers;
 
 namespace Hiram.Simulator.Twilio;
 
 // A local stand in for the Twilio API, spoken over real HTTP. A stubbed handler proves an adapter; this
 // proves the composition around it, which is where the defect that opened issue #139 lived: serialization,
 // authorization header, form encoding, timeout and the resilience pipeline all run for real here.
-public sealed class TwilioDouble
+public sealed class TwilioDouble : IProviderDouble
 {
     private readonly SidSequence _messageSids = new("SM");
     private readonly SidSequence _emailOperations = new("EM");
@@ -35,30 +36,42 @@ public sealed class TwilioDouble
 
     public int EmailsAccepted => _emailOperations.Issued;
 
-    public WebApplication Build(Uri address)
+    public string Name => "twilio";
+
+    public string WalkthroughChannel => "sms";
+
+    public IReadOnlyList<ProviderConfig> Configs =>
+    [
+        new("sms", "twilio-sms", MessagingSettings),
+        new("whatsapp", "twilio-whatsapp", MessagingSettings)
+    ];
+
+    private static IReadOnlyDictionary<string, string> MessagingSettings => new Dictionary<string, string>
     {
-        var builder = WebApplication.CreateSlimBuilder();
-        builder.Logging.SetMinimumLevel(LogLevel.Warning);
-        builder.WebHost.UseUrls(address.ToString());
+        ["account_sid"] = "AC00000000000000000000000000000000",
+        ["api_key_sid"] = "SK00000000000000000000000000000000",
+        ["from"] = "+15005550006"
+    };
 
-        var app = builder.Build();
+    // Twilio answers every scenario the enum has except the three the Cloud API introduced, which have no
+    // counterpart on this side.
+    public bool Supports(ProviderScenario scenario) => scenario
+        is not (ProviderScenario.TemplateParametersMismatch
+            or ProviderScenario.TokenExpired
+            or ProviderScenario.AccountRestricted);
 
+    public void MapInto(IEndpointRouteBuilder endpoints)
+    {
         // The real paths, so the only thing an environment has to change is the host.
-        app.MapPost("/2010-04-01/Accounts/{accountSid}/Messages.json", HandleMessageAsync);
-        app.MapPost("/v1/Emails", HandleEmailAsync);
-
-        // Lets a script flip the answer between acts without restarting the process.
-        app.MapPost("/_control/scenario", (ScenarioChange change) =>
-        {
-            if (!ProviderScenarios.TryParse(change.Scenario, out var parsed))
-                return Results.BadRequest(new { error = $"Unknown scenario '{change.Scenario}'." });
-
-            Scenario = parsed;
-            return Results.Ok(new { scenario = parsed.ToString() });
-        });
-
-        return app;
+        endpoints.MapPost("/2010-04-01/Accounts/{accountSid}/Messages.json", HandleMessageAsync);
+        endpoints.MapPost("/v1/Emails", HandleEmailAsync);
     }
+
+    public IReadOnlyList<string> Wiring(Uri address) =>
+    [
+        $"Hiram__Providers__Endpoints__TwilioApi={address}",
+        $"Hiram__Providers__Endpoints__TwilioEmail={new Uri(address, "v1/")}"
+    ];
 
     private async Task<IResult> HandleMessageAsync(HttpRequest request, string accountSid)
     {
@@ -127,5 +140,4 @@ public sealed class TwilioDouble
     private static string Mask(string destination) =>
         destination.Length <= 6 ? destination : string.Concat(destination.AsSpan(0, 6), "…", destination.AsSpan(destination.Length - 2));
 
-    private sealed record ScenarioChange(string Scenario);
 }
