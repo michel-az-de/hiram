@@ -22,7 +22,10 @@ Prioridade: este documento tem precedência sobre o prompt do usuário (exceto G
 - TEST_ARCH:        `dotnet test Hiram.sln --configuration Release`    <!-- suíte inteira; não há projeto de teste de arquitetura dedicado -->
 - GIT_EMAIL:        `michel.az.de@gmail.com`   <!-- email VINCULADO a conta; atribui os commits no GitHub -->
 - GH_ACCOUNT:       `michel-az-de`
-- AUTO_MERGE_TIER:  baixo=chore/docs/test/fix-trivial (auto no verde); alto=feat/refactor/migração/auth/RLS (aguarda label `aprovado`)
+- AUTO_MERGE_TIER:  **não existe auto-merge neste repo.** `gate-aprovado.yml` é check obrigatório em TODO PR
+                    e só passa com a label `aprovado`, que é humana. O tier segue registrado porque descreve
+                    RISCO, e risco decide quanto cuidado a mudança merece: baixo=chore/docs/test/fix-trivial;
+                    alto=feat/refactor/migração/auth/RLS. Medido em 2026-08-20 nos PRs #145, #147, #149 e #151
 - HAS_CI:           `sim`                      <!-- .github/workflows/ci.yml: restore + build Release + dotnet test + imagens Docker -->
 - LABELS_MODULO:    `estabilidade, go-live, demo-venda, dx, seguranca`
 - LABELS_PRIO:      `P0, P1, P2`               <!-- este repo usa P0/P1/P2, não priority:pN -->
@@ -65,7 +68,8 @@ Fluxo: issue → branch (worktree se risky) → commits → push → PR → CI+r
 temp, tmp, asdf. Corpo referencia a issue (`Refs #N`; `Closes #N` no PR/commit final).
 
 **R4 (mantida).** Build + arquitetura verdes antes de CADA commit (`dotnet build Hiram.sln --configuration Release`,
-`dotnet test Hiram.sln --configuration Release`). Falha = não commita. O CI do PR repete o gate e destrava o auto-merge do tier baixo.
+`dotnet test Hiram.sln --configuration Release`). Falha = não commita. O CI do PR repete o gate, e verde ali é
+pré-condição do merge, não gatilho: quem destrava é a label `aprovado`.
 
 **R5 (v4.0).** **PR SEMPRE.** Merge somente via PR. Não existe "isento de PR". Mudança grande
 (> 100 LoC OU > 5 arquivos OU breaking OU toca Program.cs/migrations/Dockerfile/entrypoint) NÃO cancela o PR:
@@ -79,8 +83,11 @@ Proibido apenas `main` sujo e commit-lixo. A branch versionada é a memória; se
 
 **R8 (mantida).** Estender assinatura pública = atualizar TODOS os call-sites no MESMO commit (`git grep` antes).
 
-**R9 (v4.0 — tiered).** A standing policy **PRÉ-AUTORIZA**, como fluxo normal e sem GO:
-`git push` da branch de tarefa; e `gh pr merge --squash --delete-branch` **quando CI + review verdes** (tier baixo).
+**R9 (v4.0, reconciliada em 2026-08-20).** A standing policy **PRÉ-AUTORIZA**, como fluxo normal e sem GO:
+`git push` da branch de tarefa. **O merge não é pré-autorizado em nenhum tier**, porque `gate-aprovado.yml`
+exige a label `aprovado` em todo PR e essa label é a aprovação humana. Aplicá-la sem GO é o agente aprovando
+o próprio trabalho, o que esvazia o único gate humano que este repo tem. Com GO, comente no PR registrando de
+quem veio a aprovação antes de aplicar, para o rastro não parecer auto-aprovação.
 **Exigem GO explícito NESTA sessão:** `git push --force`/`--force-with-lease`, `git reset --hard`,
 `git rebase` que reescreve história publicada, `git branch -D` de branch alheia/não-mergeada, `git revert` no `main`,
 `Remove-Item -Force`/`rm -rf` fora de artefatos, `dotnet ef database update`, `fly deploy/secrets/volumes destroy`,
@@ -126,8 +133,10 @@ porque ele testa a branch e não a integração dela com o trunk de agora.
    gate = `/verify` local + review (`/code-review` + `pr-review-toolkit:review-pr`).
    **E** `gh pr view <N> --json mergeable` exigindo `MERGEABLE` (R20), reconferido imediatamente antes de reportar.
 7. **ACEITE** — recusar merge se `## Aceite` da issue tem item não-marcado.
-8. **MERGE por tier:** baixo + verde → `git switch main` + tree limpo → `gh pr merge --squash --delete-branch`.
-   Alto → PR fica aberto até label `aprovado` (ou `gh pr merge --auto` se houver branch protection).
+8. **MERGE.** Todo PR fica aberto até a label `aprovado`, em qualquer tier. Com ela e com CI verde:
+   `git switch main` + tree limpo → `gh pr merge --squash --delete-branch`.
+   **A label não deixa o check verde na hora:** o workflow re-roda pelo evento `labeled`, e `gh pr checks`
+   segue mostrando `fail` até o run novo terminar. Espere o run, reconfira a R20, aí mergeie.
 9. **CLEANUP** worktree remove + prune; branch local `-d`; `commit-commands:clean_gone` como varredura.
 10. **FECHAMENTO** CHANGELOG (se existir) + ADR (se decisão); checklist DoD "zero resquícios".
 
