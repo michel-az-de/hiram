@@ -136,6 +136,10 @@ Formato baseado em Keep a Changelog (https://keepachangelog.com/pt-BR/1.1.0/).
 - Remove o projeto, processo e imagem Hiram.Dispatcher.
 
 ### Fixed
+- Dependencias vulneraveis: `Microsoft.AspNetCore.DataProtection` 10.0.10 para 10.0.15 (traz `Cryptography.Xml` e
+  `Pkcs` corrigidos, GHSA-7hqp-7c5m-4vq6, GHSA-c399-9853-6jmj, GHSA-r955-8q5j-3h83, GHSA-846f-f764-76mx,
+  GHSA-2fmv-rv2c-59x7) e `System.Security.Cryptography.Pkcs` 10.0.15 fixado em `Hiram.Api` ate o MimeKit
+  referenciar 10.0.13 ou mais (#156).
 - Erro de provider passa a ser classificado pelo codigo, nao pela faixa de status. O caso caro e o
   `30007`, filtragem por spam da operadora, que chega como `201` com status terminal: uma regra por faixa
   que o lesse como retentavel faria o Hiram piorar a propria reputacao de remetente a cada tentativa. O
