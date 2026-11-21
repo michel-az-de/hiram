@@ -1,5 +1,7 @@
 # CLAUDE.md — Protocolo Operacional Canônico v4.0
 
+**Plano vivo (D15):** atividade que edita arquivo, roda comando com efeito ou delega a agente começa com um plano em `~/.claude/planos/<sessão>.md`, que passa por banca, é relido a cada ação e vira o handoff. Regra completa na seção D15 de `ATLAS_AGENT_DISCIPLINE_V1`, projetada em `~/.claude/CLAUDE.md` e `~/.codex/AGENTS.md`.
+
 Versão: 4.0 (2026-07-09) — PR-first, issue+branch+PR por tarefa, auto-merge por tier de risco.
 Supersede: a governança de git anterior deste repo (WIP=1, commit direto no `main` quando aditivo, branch opcional, sem PR obrigatório). Ver o ADR de adoção deste repo (`docs/adr/ADR-023-adocao-policy-v4.md`).
 Status: **VINCULANTE**. Toda sessão Claude Code DEVE seguir.
